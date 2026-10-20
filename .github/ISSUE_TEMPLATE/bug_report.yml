@@ -1,0 +1,71 @@
+name: Bug report
+description: Report a reproducible problem in Jarvis
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please share enough detail to reproduce it.
+        Remove personal data, passwords, API keys, and tokens from logs before submitting.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Problem
+      description: What is going wrong?
+      placeholder: Describe the problem in a few sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+      placeholder: Describe the expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead? Include any safe, relevant error message.
+      placeholder: Describe what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps that reliably reproduce the problem.
+      placeholder: |
+        1. Go to …
+        2. Do …
+        3. See …
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who or what is affected, and how often?
+      placeholder: Describe the impact and any workaround.
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Add relevant app version, platform, configuration, or affected component. Use Unknown when you do not know.
+      placeholder: |
+        Version/commit:
+        Platform:
+        Component:
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Add only relevant, redacted logs or screenshots. Never include credentials or personal data.
+      render: text
+    validations:
+      required: false
