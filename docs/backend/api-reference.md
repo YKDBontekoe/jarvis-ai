@@ -178,7 +178,7 @@ Weeks run Monday to Sunday; a weekly habit's streak counts weeks that reached `t
 
 ## Skills
 
-`/skills` — CRUD, import/export, status, lock.
+`/skills` — CRUD, import/export, status, lock. Skills carry `requiredTools` (exact tool names, at most 10); a save without it keeps the stored list. SKILL.md export writes them as `metadata.requires-tools`.
 
 ## Integrations and MCP
 
@@ -242,8 +242,9 @@ Owner-scoped; see [memory-knowledge-learning.md](memory-knowledge-learning.md#si
 
 | Route | Purpose |
 |-------|---------|
-| GET `/improvements` | Pending proposals (`id`, `kind`, `title`, `evidence`, `confidence`, `status`, `canUndo`) and recent changes that can still be undone |
-| POST `/improvements/refresh` | Run the skill and review miners now (honours `proposeImprovements`); returns the counts added |
+| GET `/improvements` | Pending proposals (`id`, `kind`, `title`, `evidence`, `confidence`, `status`, `canUndo`, optional `acceptLabel`) and recent changes that can still be undone |
+| POST `/improvements/refresh` | Run the skill, review, lesson, refinement and capability-gap miners now (honours `proposeImprovements`); returns the counts added |
+| POST `/improvements/evolve` | Run the unattended app build for the most wanted capability gap now (honours `autonomousEvolution`; never activates); returns `{built}` |
 | POST `/improvements/{id}/accept` | Apply a pending proposal; idempotent. 404 if it is not the caller's or no longer valid |
 | POST `/improvements/{id}/dismiss` | Refuse a pending proposal for good; 404 otherwise |
 | POST `/improvements/{id}/undo` | Reverse an accepted or automatically applied change within 30 days |

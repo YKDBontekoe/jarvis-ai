@@ -256,14 +256,22 @@ internal sealed class InMemorySkillRepository : ISkillRepository
         if (index < 0)
         {
             var created = new SkillRecord(Guid.NewGuid(), ownerId, draft.Name, draft.Description, draft.Instructions,
-                source, statusForNew, source == SkillSources.User, 1, 0, null, now, now);
+                source, statusForNew, source == SkillSources.User, 1, 0, null, now, now,
+                RequiredToolList: draft.RequiredTools);
             Items.Add(created);
             Remember(created, source, changeNote);
             return Task.FromResult<SkillRecord?>(created);
         }
         if (respectLock && Items[index].IsLocked) return Task.FromResult<SkillRecord?>(null);
+        var tools = draft.RequiredTools ?? Items[index].RequiredToolList;
+        if (Items[index].Description == draft.Description && Items[index].Instructions == draft.Instructions)
+        {
+            Items[index] = Items[index] with { RequiredToolList = tools };
+            return Task.FromResult<SkillRecord?>(Items[index]);
+        }
         Items[index] = Items[index] with
         {
+            RequiredToolList = tools,
             Description = draft.Description, Instructions = draft.Instructions, Version = Items[index].Version + 1,
             UpdatedAt = now, OutcomeRuns = 0, OutcomeSuccesses = 0, OutcomeCountedAt = now,
             Status = source == SkillSources.Learned && statusForNew != SkillStatuses.Active &&

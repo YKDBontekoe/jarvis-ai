@@ -11,8 +11,10 @@ public static class ImprovementKinds
     public const string Review = "review";
     public const string Lesson = "lesson";
     public const string SkillRefine = "skill_refine";
+    public const string Capability = "capability";
 
-    public static bool IsValid(string? kind) => kind is Memory or Skill or Review or Lesson or SkillRefine;
+    public static bool IsValid(string? kind) =>
+        kind is Memory or Skill or Review or Lesson or SkillRefine or Capability;
 }
 
 /// <summary>
@@ -99,8 +101,12 @@ public static class ReviewActions
     public const string Note = "note";
 }
 
+/// <summary>
+/// One proposal as the owner sees it. <see cref="AcceptLabel"/> names what accepting does when that depends on the
+/// payload (a capability with a tested app switches it on); null leaves the wording to the client.
+/// </summary>
 public sealed record ImprovementView(Guid Id, string Kind, string Title, string Evidence, double Confidence,
-    string Status, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt)
+    string Status, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string? AcceptLabel = null)
 {
     public bool CanUndo => ImprovementStatuses.CanUndo(Status);
 }

@@ -12,6 +12,7 @@ public static partial class SkillMarkdown
     public const int MaxNameLength = 64;
     public const int MaxDescriptionLength = 1_024;
     public const int MaxInstructionsLength = 12_000;
+    public const int MaxRequiredTools = 10;
 
     public static SkillDraft Parse(string markdown)
     {
@@ -24,16 +25,24 @@ public static partial class SkillMarkdown
         var frontMatter = text[4..end];
         var body = text[(end + 4)..].TrimStart('-').Trim();
         string? name = null, description = null;
+        IReadOnlyList<string>? tools = null;
         foreach (var line in frontMatter.Split('\n'))
         {
             var separator = line.IndexOf(':');
-            if (separator <= 0 || char.IsWhiteSpace(line[0])) continue;
+            if (separator <= 0) continue;
             var key = line[..separator].Trim();
             var value = Unquote(line[(separator + 1)..].Trim());
+            // Jarvis keeps its own keys under metadata, so the file stays valid for other agents.
+            if (char.IsWhiteSpace(line[0]))
+            {
+                if (key == RequiresToolsKey)
+                    tools = value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                continue;
+            }
             if (key == "name") name = value;
             else if (key == "description") description = value;
         }
-        return Validate(new SkillDraft(name ?? string.Empty, description ?? string.Empty, body));
+        return Validate(new SkillDraft(name ?? string.Empty, description ?? string.Empty, body, tools));
     }
 
     public static string Serialize(SkillRecord skill)
@@ -45,6 +54,9 @@ public static partial class SkillMarkdown
         builder.Append("metadata:\n");
         builder.Append("  source: jarvis-").Append(skill.Source).Append('\n');
         builder.Append("  version: ").Append(skill.Version).Append('\n');
+        if (skill.RequiredTools.Count > 0)
+            builder.Append("  ").Append(RequiresToolsKey).Append(": ").Append(string.Join(", ", skill.RequiredTools))
+                .Append('\n');
         builder.Append("---\n\n");
         builder.Append(skill.Instructions.Trim()).Append('\n');
         return builder.ToString();
@@ -61,7 +73,23 @@ public static partial class SkillMarkdown
             throw new ArgumentException("Describe when to use the skill in 10 to 1,024 characters.");
         if (instructions.Length is < 20 or > MaxInstructionsLength)
             throw new ArgumentException("Skill instructions must contain 20 to 12,000 characters.");
-        return new SkillDraft(name, description, instructions);
+        return new SkillDraft(name, description, instructions, NormalizeTools(draft.RequiredTools));
+    }
+
+    /// <summary>
+    /// Trims and de-duplicates tool names; null stays null so a save without tools keeps the ones already listed.
+    /// </summary>
+    public static IReadOnlyList<string>? NormalizeTools(IEnumerable<string>? tools)
+    {
+        if (tools is null) return null;
+        var normalized = tools.Select(tool => (tool ?? string.Empty).Trim())
+            .Where(tool => tool.Length > 0).Distinct(StringComparer.Ordinal).ToArray();
+        if (normalized.Length > MaxRequiredTools)
+            throw new ArgumentException($"A skill can rely on at most {MaxRequiredTools} tools.");
+        var invalid = normalized.FirstOrDefault(tool => !ToolNamePattern().IsMatch(tool));
+        if (invalid is not null)
+            throw new ArgumentException($"'{(invalid.Length > 40 ? invalid[..40] : invalid)}' is not a tool name. Use the exact tool names you call.");
+        return normalized;
     }
 
     public static string NormalizeName(string? value)
@@ -86,6 +114,11 @@ public static partial class SkillMarkdown
     }
 
     private static string Quote(string value) => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+
+    private const string RequiresToolsKey = "requires-tools";
+
+    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9_.\-]{0,127}$")]
+    private static partial Regex ToolNamePattern();
 
     [GeneratedRegex(@"[\s_]+")]
     private static partial Regex NameSeparators();

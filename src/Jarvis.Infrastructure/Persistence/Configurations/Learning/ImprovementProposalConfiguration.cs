@@ -15,7 +15,7 @@ internal sealed class ImprovementProposalConfiguration : IEntityTypeConfiguratio
                 $"'{ImprovementStatuses.Applied}', '{ImprovementStatuses.Dismissed}', '{ImprovementStatuses.Undone}')");
             table.HasCheckConstraint("ck_improvement_proposals_kind",
                 $"kind IN ('{ImprovementKinds.Memory}', '{ImprovementKinds.Skill}', '{ImprovementKinds.Review}', " +
-                $"'{ImprovementKinds.Lesson}', '{ImprovementKinds.SkillRefine}')");
+                $"'{ImprovementKinds.Lesson}', '{ImprovementKinds.SkillRefine}', '{ImprovementKinds.Capability}')");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();

@@ -1,6 +1,10 @@
 namespace Jarvis.Application.Settings;
 
-/// <summary>Owner controls for continuous learning, self-authored skills, dreaming, and the proactive heartbeat.</summary>
+/// <summary>
+/// Owner controls for continuous learning, self-authored skills, dreaming, and the proactive heartbeat.
+/// <see cref="AutonomousEvolution"/> lets the nightly pass write and test (never switch on) a self-built app for a
+/// capability Jarvis keeps lacking.
+/// </summary>
 public sealed record LearningSettings(
     bool HeartbeatEnabled = true,
     int HeartbeatMinutes = 60,
@@ -15,7 +19,8 @@ public sealed record LearningSettings(
     bool CaptureSignals = true,
     int TraceRetentionDays = 30,
     bool ProposeImprovements = true,
-    bool AutoApplyLowRiskMemory = true)
+    bool AutoApplyLowRiskMemory = true,
+    bool AutonomousEvolution = false)
 {
     public static LearningSettings Default { get; } = new();
 

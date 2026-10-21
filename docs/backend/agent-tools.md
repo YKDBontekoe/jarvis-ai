@@ -8,7 +8,7 @@ Tools are exposed to the model through **Microsoft Agent Framework** `AITool` in
 |-------------|------------------|
 | **CoreAgentTools** | Clock, reminders, files, tasks, watches, memory, MCP admin/invoke, optional coding |
 | **McpSetupToolContributor** | `OfferMcpSetup`, `AskForMcpCredential`, `InstallIntegrationPack` |
-| **SkillToolContributor** | Load/list/save skills |
+| **SkillToolContributor** | `LoadSkill`, `ListSkills` (with outcome counts and required tools), `SaveSkill` (with `requiredTools`), `RetireSkill` (learned, unlocked skills only) |
 | **PersonaToolContributor** | Record persona traits |
 | **ComparisonToolContributor** | `CreateComparison`, `SetComparisonCell`, `GetComparison` (options × weighted criteria; unknown stays unknown, the ranking is computed by the app not the model). Group `comparisons` |
 | **MeetingToolContributor** | `PrepareMeeting` (create + prep pack from the user's own records), `DebriefMeeting` (proposals only; the user accepts in the Meetings screen), `DraftMeetingFollowUp` (never sent). Group `meetings` |
@@ -71,7 +71,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Finance | `FinanceAgentTools` `GetFinanceOverview`, `GetBudgets`, `SetBudget`, `RemoveBudget`, `GetSubscriptions`, `GetRenewalReview`, `SetSubscriptionStatus`, `RemindBeforeCharge`, `StartSubscriptionNegotiation`, `ImportBankStatement` | No approval; `ImportBankStatement` previews first. `StartSubscriptionNegotiation` only starts a drafting task: nothing is sent or contacted. Setters are hidden during background task turns |
 | Wealth | `WealthAgentTools` `GetAccounts`, `GetTransactions`, `GetPortfolio`, `AddAccount`, `LogIncome`, `RecordTrade`, `SetHoldingPrice` | No approval; they only change the owner's own finance data. Writers are hidden during background task turns. No investment advice |
 | Routines | `RoutineAgentTools` `GetRoutineSuggestions` | Read-only. Accepting or dismissing a suggestion is done in the app |
-| Improvements | `ImprovementAgentTools` `GetImprovementProposals` | Read-only. Accepting, dismissing and undoing stay with the owner in the app |
+| Improvements | `ImprovementAgentTools` `GetImprovementProposals`, `ListLessons`, `RecordLesson`, `ReportCapabilityGap` | `RecordLesson` files a lesson through the same pipeline as the lesson miner (in force only with `autoApplyLowRiskMemory`, switched off if it hurts); `ReportCapabilityGap` stores a bare label signal. Accepting, dismissing and undoing stay with the owner in the app. See [memory-knowledge-learning.md](memory-knowledge-learning.md#self-evolution) |
 | Decisions | `DecisionAgentTools` `LogDecision`, `ResolveDecision`, `GetDecisions`, `GetCalibration` | No approval; they only read and write the owner's own decision journal |
 | Relationship radar | `RadarAgentTools` `GetRelationshipRadar`, `GetPersonFollowThrough` (read-only) | Read-only. Linking chats and the tone switch are done in the app |
 | Automation studio | `AutomationAgentTools` `PreviewAutomation`, `ListAutomationTemplates`, `CreateAutomationFromTemplate` | Preview saves nothing; templates create a draft that stays off |

@@ -67,4 +67,27 @@ internal sealed class AssistantDreamingActivities(IServiceScopeFactory scopeFact
             settings.DreamingHour, briefing?.TimeZoneId);
         return new DreamingRunResult(true, minutes);
     }
+
+    [Activity("RunCapabilityEvolution")]
+    public override async Task<int> EvolveAsync(DreamingWorkflowInput input)
+    {
+        var cancellationToken = ActivityExecutionContext.Current.CancellationToken;
+        using var trace = JarvisWorkerTelemetry.Source.StartActivity("dreaming.evolve");
+        using var heartbeat = new ActivityHeartbeat(input.OwnerId);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var services = scope.ServiceProvider;
+        services.GetRequiredService<WorkerCurrentUser>().SetOwner(input.OwnerId);
+        try
+        {
+            return await services.GetRequiredService<ICapabilityEvolutionService>()
+                .EvolveAsync(input.OwnerId, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // An unattended build that fails is tried again on a later night; it never fails the dreaming loop.
+            services.GetRequiredService<ILogger<AssistantDreamingActivities>>()
+                .LogWarning(exception, "Capability evolution failed after dreaming.");
+            return 0;
+        }
+    }
 }

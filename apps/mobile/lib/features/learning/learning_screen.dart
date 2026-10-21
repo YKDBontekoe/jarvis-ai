@@ -366,6 +366,14 @@ class _LearningScreenState extends _LearningController with _LearningCards {
                             fallback: true,
                           ),
                           _switch(
+                            'autonomousEvolution',
+                            'Build missing apps overnight',
+                            'When Jarvis keeps lacking a tool, it writes and tests a small app in the isolated runner. It only switches on once you accept it.',
+                            PhosphorIconsRegular.puzzlePiece,
+                            fallback: false,
+                            enabled: _flag('proposeImprovements', true),
+                          ),
+                          _switch(
                             'proactiveCheckIns',
                             'Proactive check-ins',
                             'Heads-ups about upcoming reminders, waiting approvals, and failed tasks.',

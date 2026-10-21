@@ -157,6 +157,51 @@ public sealed class SkillReviewTests : IAsyncLifetime
         Assert.Equal((3, "1. Ask for dates and budget."), (restored.Version, restored.Instructions));
     }
 
+    [Fact]
+    public async Task Required_tools_are_stored_and_a_tools_only_change_makes_no_new_revision()
+    {
+        var owner = Guid.CreateVersion7();
+        var created = await Save(owner, Draft("train-check", "1. Call get_departures.") with
+        {
+            RequiredTools = ["get_departures"]
+        }, SkillSources.Learned, SkillStatuses.Active);
+        Assert.Equal(["get_departures"], created.RequiredTools);
+
+        // No tools in the draft keeps the stored ones.
+        var kept = await Save(owner, Draft("train-check", "1. Call get_departures.\n2. Mention delays."),
+            SkillSources.Learned, SkillStatuses.Active);
+        Assert.Equal(2, kept.Version);
+        Assert.Equal(["get_departures"], kept.RequiredTools);
+
+        var retooled = await Save(owner, Draft("train-check", "1. Call get_departures.\n2. Mention delays.") with
+        {
+            RequiredTools = ["get_departures", "get_delays"]
+        }, SkillSources.Learned, SkillStatuses.Active);
+        Assert.Equal(2, retooled.Version);
+        Assert.Equal(["get_departures", "get_delays"], retooled.RequiredTools);
+
+        await using var read = CreateDbContext();
+        Assert.Equal(["get_departures", "get_delays"],
+            (await new SkillRepository(read).GetAsync(created.Id, owner, default))!.RequiredTools);
+        Assert.Equal(2, (await new SkillRepository(read).ListRevisionsAsync(created.Id, owner, default)).Count);
+    }
+
+    [Fact]
+    public async Task Capability_proposals_are_allowed_by_the_database()
+    {
+        var owner = Guid.CreateVersion7();
+        var now = DateTimeOffset.UtcNow;
+        await using (var database = CreateDbContext())
+            await new ImprovementRepository(database).AddAsync(new ImprovementProposal(Guid.CreateVersion7(), owner,
+                ImprovementKinds.Capability, "gap:live-train-departures", "Jarvis keeps lacking: live train departures",
+                "Needed in 2 conversations.", 0.6, """{"slug":"live-train-departures","reports":2,"conversations":2}""",
+                ImprovementStatuses.Pending, null, now, now), default);
+
+        await using var read = CreateDbContext();
+        var stored = await new ImprovementRepository(read).FindByFingerprintAsync(owner, "gap:live-train-departures", default);
+        Assert.Equal(ImprovementKinds.Capability, stored!.Kind);
+    }
+
     // Only the repositories a refinement touches are real; the other collaborators are never reached.
     private static ImprovementService Service(JarvisDbContext database) =>
         new(new ImprovementRepository(database), null!, new SkillRepository(database), null!, null!, null!);

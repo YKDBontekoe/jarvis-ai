@@ -9,6 +9,10 @@ public abstract class AssistantDreamingActivityContract
 {
     [Activity("RunAssistantDreaming")]
     public abstract Task<DreamingRunResult> RunAsync(DreamingWorkflowInput input);
+
+    /// <summary>Builds at most one draft app for a capability Jarvis keeps lacking. Returns how many were built.</summary>
+    [Activity("RunCapabilityEvolution")]
+    public abstract Task<int> EvolveAsync(DreamingWorkflowInput input);
 }
 
 /// <summary>Durable per-owner dreaming sweep that consolidates memory around the configured local hour.</summary>
@@ -43,6 +47,24 @@ public sealed class AssistantDreamingWorkflow
                 result = new DreamingRunResult(true, 60);
             }
             if (!result.Continue) return;
+            if (Workflow.Patched("capability-evolution"))
+            {
+                try
+                {
+                    // Writing and testing code gets its own budget and is never retried: a failed night just waits for the next.
+                    await Workflow.ExecuteActivityAsync(
+                        (AssistantDreamingActivityContract activities) => activities.EvolveAsync(input),
+                        new ActivityOptions
+                        {
+                            StartToCloseTimeout = TimeSpan.FromMinutes(20),
+                            HeartbeatTimeout = TimeSpan.FromMinutes(2),
+                            RetryPolicy = new Temporalio.Common.RetryPolicy { MaximumAttempts = 1 }
+                        });
+                }
+                catch (ActivityFailureException)
+                {
+                }
+            }
             await Workflow.DelayAsync(TimeSpan.FromMinutes(Math.Clamp(result.NextRunMinutes, 15, 1_440)));
             if (Workflow.ContinueAsNewSuggested)
                 throw Workflow.CreateContinueAsNewException(

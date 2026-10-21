@@ -278,6 +278,46 @@ void main() {
     expect(http.sent('POST', '/api/v1/improvements/p2/dismiss'), hasLength(1));
   });
 
+  testWidgets('a built app is offered to switch on with the server label', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/learning/status', status());
+    http.on('GET', '/api/v1/improvements', [
+      {
+        ...proposal('p4', 'capability', 'pending'),
+        'title': 'Switch on “Trains”, an app Jarvis built for live train times',
+        'acceptLabel': 'Switch on',
+      },
+    ]);
+    http.on('POST', '/api/v1/improvements/p4/accept', {});
+    await show(tester);
+
+    expect(find.text('Switch on'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('improvement-accept-p4')));
+    await tester.tap(find.byKey(const Key('improvement-accept-p4')));
+    await tester.pumpAndSettle();
+    expect(http.sent('POST', '/api/v1/improvements/p4/accept'), hasLength(1));
+  });
+
+  testWidgets('overnight app building is off until the owner turns it on', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/learning/status', status());
+    http.on('PUT', '/api/v1/settings/learning', _settings(heartbeat: true));
+    await show(tester);
+
+    final toggle = find.byKey(const Key('learning-autonomousEvolution'));
+    await tester.ensureVisible(toggle);
+    expect(find.text('Build missing apps overnight'), findsOneWidget);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+
+    final body =
+        http.sent('PUT', '/api/v1/settings/learning').single.body
+            as Map<String, dynamic>;
+    expect(body['autonomousEvolution'], true);
+  });
+
   testWidgets('what Jarvis saved on its own can be undone', (tester) async {
     http.on('GET', '/api/v1/learning/status', status());
     http.on('GET', '/api/v1/improvements', [

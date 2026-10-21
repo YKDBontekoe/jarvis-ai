@@ -88,6 +88,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Routines.RoutineToolContributor>();
         services.AddScoped<IAgentToolContributor, Improvements.ImprovementToolContributor>();
         services.AddScoped<Jarvis.Application.Improvements.ISkillDrafter, Improvements.ModelSkillDrafter>();
+        services.AddScoped<Jarvis.Application.Improvements.ICapabilityBuilder, Improvements.ModelCapabilityBuilder>();
         services.AddScoped<Jarvis.Application.Improvements.ILessonDrafter, Improvements.ModelLessonDrafter>();
         services.AddScoped<Jarvis.Application.Improvements.ISkillRefiner, Improvements.ModelSkillRefiner>();
         services.AddScoped<IAgentContextContributor, Improvements.LessonContextContributor>();
@@ -159,6 +160,7 @@ public static class DependencyInjection
         services.AddScoped<IDailyBriefingNarrator, DailyBriefingNarrator>();
         services.AddScoped<IConversationSummarizer, ConversationSummarizer>();
         services.AddScoped<Jarvis.Application.Reviews.IWeeklyReviewNarrator, WeeklyReviewNarrator>();
+        services.AddScoped<AgentToolCatalog>();
         services.AddScoped<JarvisAgentFactory>();
         services.AddScoped<VoiceSessionContext>();
         services.AddScoped<IJarvisAgent, JarvisAgent>();

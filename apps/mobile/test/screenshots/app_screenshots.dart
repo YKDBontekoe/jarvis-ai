@@ -526,6 +526,24 @@ void main() {
     await capture(tester, '17-settings');
   });
 
+  for (final dark in [false, true]) {
+    screenshotTest('learning evolution ${dark ? 'dark' : 'light'}', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openTab(tester, 'you');
+      final entry = find.byKey(const Key('settings-learning'));
+      await tester.ensureVisible(entry);
+      await settle(tester);
+      await tester.tap(entry);
+      await settle(tester);
+      await tester.ensureVisible(
+        find.byKey(const Key('learning-autonomousEvolution')),
+      );
+      await settle(tester);
+      await capture(tester, '17b-learning-evolution-${dark ? 'dark' : 'light'}');
+    });
+  }
+
   screenshotTest('voice', (tester) async {
     usePhone(tester);
     await start(tester, dark: true);
