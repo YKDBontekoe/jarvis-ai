@@ -402,7 +402,8 @@ abstract class _RemindersController extends State<RemindersScreen>
         );
         if (mounted) {
           _showMessage(
-            queued.problem ?? 'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not done yet.',
+            queued.problem ??
+                'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not done yet.',
           );
         }
         return;
@@ -720,8 +721,9 @@ abstract class _RemindersController extends State<RemindersScreen>
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showMessage(String message) => _showError(message);

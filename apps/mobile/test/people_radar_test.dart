@@ -144,8 +144,9 @@ void main() {
       expect(RadarReportData.fromJson({'name': 'no id'}), isNull);
       expect(RadarReportData.fromJson(null), isNull);
       expect(
-        RadarReportData.fromJson(_report('p2', 'Piet', weekly: [0, 0]))!
-            .hasMessages,
+        RadarReportData.fromJson(
+          _report('p2', 'Piet', weekly: [0, 0]),
+        )!.hasMessages,
         isFalse,
       );
       expect(RadarOverviewData.fromJson(_overview([]))!.people, isEmpty);

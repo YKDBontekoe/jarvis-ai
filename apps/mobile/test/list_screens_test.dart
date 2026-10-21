@@ -74,93 +74,89 @@ void main() {
     expect(find.text('Work docs'), findsOneWidget);
   });
 
-  testWidgets(
-    'Ask Jarvis about a file opens a chat that has only that file attached',
-    (tester) async {
-      http
-        ..on('GET', '/api/v1/files', [
-          {
-            'id': 'f1',
-            'fileName': 'quote.pdf',
-            'sizeBytes': 12,
-            'processingStatus': 'ready',
-          },
-          {
-            'id': 'f2',
-            'fileName': 'broken.pdf',
-            'sizeBytes': 12,
-            'processingStatus': 'failed',
-          },
-        ])
-        ..on('GET', '/api/v1/collections', <Object>[])
-        ..on('POST', '/api/v1/files/f1/ask', {
-          'conversationId': 'chat-1',
-          'fileId': 'f1',
-          'fileName': 'quote.pdf',
-          'status': 'ready',
-        }, status: 201);
-      final opened = <String>[];
-      await show(
-        tester,
-        FilesScreen(
-          http: http.client(),
-          onOpenConversation: (id) async => opened.add(id),
-        ),
-      );
-
-      await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Ask Jarvis about this'));
-      await tester.pumpAndSettle();
-
-      expect(http.sent('POST', '/api/v1/files/f1/ask'), hasLength(1));
-      expect(opened, ['chat-1']);
-
-      // A file that failed to index cannot be asked about.
-      await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).last);
-      await tester.pumpAndSettle();
-      expect(find.text('Ask Jarvis about this'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'a profile that cannot read the file explains why instead of opening a chat',
-    (tester) async {
-      http
-        ..on('GET', '/api/v1/files', [
-          {
-            'id': 'f1',
-            'fileName': 'quote.pdf',
-            'sizeBytes': 12,
-            'processingStatus': 'ready',
-          },
-        ])
-        ..on('GET', '/api/v1/collections', <Object>[])
-        ..on('POST', '/api/v1/files/f1/ask', {
-          'message': 'That assistant profile cannot read this file.',
-        }, status: 409);
-      final opened = <String>[];
-      await show(
-        tester,
-        FilesScreen(
-          http: http.client(),
-          onOpenConversation: (id) async => opened.add(id),
-        ),
-      );
-
-      await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).first);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Ask Jarvis about this'));
-      await tester.pumpAndSettle();
-
-      expect(opened, isEmpty);
-      expect(find.textContaining('cannot read this file'), findsWidgets);
-    },
-  );
-
-  testWidgets('without a chat to open, Files offers no Ask action', (
+  testWidgets('Ask Jarvis about a file opens a chat that has only that file attached', (
     tester,
   ) async {
+    http
+      ..on('GET', '/api/v1/files', [
+        {
+          'id': 'f1',
+          'fileName': 'quote.pdf',
+          'sizeBytes': 12,
+          'processingStatus': 'ready',
+        },
+        {
+          'id': 'f2',
+          'fileName': 'broken.pdf',
+          'sizeBytes': 12,
+          'processingStatus': 'failed',
+        },
+      ])
+      ..on('GET', '/api/v1/collections', <Object>[])
+      ..on('POST', '/api/v1/files/f1/ask', {
+        'conversationId': 'chat-1',
+        'fileId': 'f1',
+        'fileName': 'quote.pdf',
+        'status': 'ready',
+      }, status: 201);
+    final opened = <String>[];
+    await show(
+      tester,
+      FilesScreen(
+        http: http.client(),
+        onOpenConversation: (id) async => opened.add(id),
+      ),
+    );
+
+    await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ask Jarvis about this'));
+    await tester.pumpAndSettle();
+
+    expect(http.sent('POST', '/api/v1/files/f1/ask'), hasLength(1));
+    expect(opened, ['chat-1']);
+
+    // A file that failed to index cannot be asked about.
+    await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).last);
+    await tester.pumpAndSettle();
+    expect(find.text('Ask Jarvis about this'), findsNothing);
+  });
+
+  testWidgets('a profile that cannot read the file explains why instead of opening a chat', (
+    tester,
+  ) async {
+    http
+      ..on('GET', '/api/v1/files', [
+        {
+          'id': 'f1',
+          'fileName': 'quote.pdf',
+          'sizeBytes': 12,
+          'processingStatus': 'ready',
+        },
+      ])
+      ..on('GET', '/api/v1/collections', <Object>[])
+      ..on('POST', '/api/v1/files/f1/ask', {
+        'message': 'That assistant profile cannot read this file.',
+      }, status: 409);
+    final opened = <String>[];
+    await show(
+      tester,
+      FilesScreen(
+        http: http.client(),
+        onOpenConversation: (id) async => opened.add(id),
+      ),
+    );
+
+    await tester.tap(find.byIcon(PhosphorIconsRegular.dotsThree).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ask Jarvis about this'));
+    await tester.pumpAndSettle();
+
+    expect(opened, isEmpty);
+    expect(find.textContaining('cannot read this file'), findsWidgets);
+  });
+
+  testWidgets('without a chat to open, Files offers no Ask action', (tester) async {
     http
       ..on('GET', '/api/v1/files', [
         {
@@ -177,64 +173,54 @@ void main() {
     expect(find.text('Ask Jarvis about this'), findsNothing);
   });
 
-  testWidgets(
-    'a new collection needs a name, stops at 80 characters and is created on enter',
-    (tester) async {
-      http.on('GET', '/api/v1/files', <Object>[]);
-      http.on('GET', '/api/v1/collections', <Object>[]);
-      http.on('POST', '/api/v1/collections', {'id': 'c9', 'name': 'Trips'});
-      await show(tester, FilesScreen(http: http.client()));
+  testWidgets('a new collection needs a name, stops at 80 characters and is created on enter', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/files', <Object>[]);
+    http.on('GET', '/api/v1/collections', <Object>[]);
+    http.on('POST', '/api/v1/collections', {'id': 'c9', 'name': 'Trips'});
+    await show(tester, FilesScreen(http: http.client()));
 
-      await tester.tap(find.text('Collection'));
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Create'))
-            .onPressed,
-        isNull,
-      );
+    await tester.tap(find.text('Collection'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Create')).onPressed,
+      isNull,
+    );
 
-      await tester.enterText(find.byType(TextField), 'x' * 120);
-      await tester.pump();
-      expect(
-        tester
-            .widget<TextField>(find.byType(TextField))
-            .controller!
-            .text
-            .length,
-        80,
-      );
+    await tester.enterText(find.byType(TextField), 'x' * 120);
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text.length,
+      80,
+    );
 
-      await tester.enterText(find.byType(TextField), '  Trips  ');
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '  Trips  ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
-      expect(http.sent('POST', '/api/v1/collections').single.body, {
-        'name': 'Trips',
-      });
-    },
-  );
+    expect(tester.takeException(), isNull);
+    expect(http.sent('POST', '/api/v1/collections').single.body, {'name': 'Trips'});
+  });
 
-  testWidgets(
-    'tearing Files down with its new-collection dialog open leaves no error and creates nothing',
-    (tester) async {
-      http.on('GET', '/api/v1/files', <Object>[]);
-      http.on('GET', '/api/v1/collections', <Object>[]);
-      await show(tester, FilesScreen(http: http.client()));
+  testWidgets('tearing Files down with its new-collection dialog open leaves no error and creates nothing', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/files', <Object>[]);
+    http.on('GET', '/api/v1/collections', <Object>[]);
+    await show(tester, FilesScreen(http: http.client()));
 
-      await tester.tap(find.text('Collection'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Trips');
-      await tester.pump();
-      // The screen goes away behind the dialog (sign-out, deep link), then the dialog is confirmed.
-      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
-      await tester.pumpAndSettle();
+    await tester.tap(find.text('Collection'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Trips');
+    await tester.pump();
+    // The screen goes away behind the dialog (sign-out, deep link), then the dialog is confirmed.
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
-      expect(http.sent('POST', '/api/v1/collections'), isEmpty);
-    },
-  );
+    expect(tester.takeException(), isNull);
+    expect(http.sent('POST', '/api/v1/collections'), isEmpty);
+  });
 
   testWidgets('conversations skip invalid list rows instead of crashing', (
     tester,

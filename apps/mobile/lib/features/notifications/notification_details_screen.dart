@@ -95,8 +95,9 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     final date = jsonDate(raw, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
-    final timeText = MaterialLocalizations.of(context)
-        .formatTimeOfDay(TimeOfDay.fromDateTime(date));
+    final timeText = MaterialLocalizations.of(
+      context,
+    ).formatTimeOfDay(TimeOfDay.fromDateTime(date));
     return '$dateText · $timeText';
   }
 

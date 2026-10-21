@@ -94,8 +94,9 @@ void main() {
             : ValueListenableBuilder<bool>(
                 valueListenable: reducedMotion,
                 builder: (context, reduced, _) => MediaQuery(
-                  data: MediaQuery.of(context)
-                      .copyWith(disableAnimations: reduced),
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(disableAnimations: reduced),
                   child: child!,
                 ),
               ),

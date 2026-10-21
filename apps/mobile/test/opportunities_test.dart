@@ -73,10 +73,7 @@ void main() {
       await show(tester);
 
       expect(find.textContaining('It starts soon.'), findsOneWidget);
-      expect(
-        find.textContaining('Also: Also something related.'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Also: Also something related.'), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('opportunity-open-meeting_prep:m1')),
       );

@@ -68,7 +68,9 @@ void main() {
     expect(body['localTime'], '09:00:00');
   });
 
-  testWidgets('swiping a reminder marks it done or snoozes it', (tester) async {
+  testWidgets('swiping a reminder marks it done or snoozes it', (
+    tester,
+  ) async {
     http.on('GET', '/api/v1/reminders', [
       {
         'id': 'r1',

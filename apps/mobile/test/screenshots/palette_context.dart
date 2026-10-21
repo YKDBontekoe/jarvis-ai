@@ -45,8 +45,7 @@ void main() {
           child: MaterialApp(
             debugShowCheckedModeBanner: false,
             builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(context)
-                  .copyWith(textScaler: TextScaler.linear(scale)),
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
               child: child!,
             ),
             theme: buildJarvisTheme(),

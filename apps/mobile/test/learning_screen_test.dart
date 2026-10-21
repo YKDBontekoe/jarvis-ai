@@ -85,7 +85,8 @@ void main() {
       'activity': <Object>[],
     });
     http.on('POST', '/api/v1/learning/run', {
-      'summary': '1 new preference, 1 skill. Review them in Settings. Sent 1 check-in.',
+      'summary':
+          '1 new preference, 1 skill. Review them in Settings. Sent 1 check-in.',
       'checkIns': <Object>[],
     });
     await show(tester);

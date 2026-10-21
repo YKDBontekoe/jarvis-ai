@@ -205,30 +205,27 @@ void main() {
     expect(pasted.single.mimeType, 'image/png');
   });
 
-  testWidgets(
-    'the composer does not accept keyboard images without a handler',
-    (tester) async {
-      final controller = TextEditingController();
-      addTearDown(controller.dispose);
-      await tester.pumpWidget(
-        _host(
-          ChatComposer(
-            controller: controller,
-            onSend: () {},
-            onVoice: null,
-            sending: false,
-            voiceActive: false,
-            voiceStarting: false,
-          ),
+  testWidgets('the composer does not accept keyboard images without a handler', (
+    tester,
+  ) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      _host(
+        ChatComposer(
+          controller: controller,
+          onSend: () {},
+          onVoice: null,
+          sending: false,
+          voiceActive: false,
+          voiceStarting: false,
         ),
-      );
+      ),
+    );
 
-      expect(
-        tester
-            .widget<TextField>(find.byType(TextField))
-            .contentInsertionConfiguration,
-        isNull,
-      );
-    },
-  );
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).contentInsertionConfiguration,
+      isNull,
+    );
+  });
 }

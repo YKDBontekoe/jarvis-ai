@@ -109,12 +109,15 @@ Future<void> _paint(WidgetTester tester) async {
 class _PictureHttp implements HttpClientAdapter {
   _PictureHttp() {
     pictures = {
-      '+31611111111': File('test/screenshots/avatars/piet.png')
-          .readAsBytesSync(),
-      '+31622222222': File('test/screenshots/avatars/sanne.png')
-          .readAsBytesSync(),
-      '120363025-1@g.us': File('test/screenshots/avatars/familie.png')
-          .readAsBytesSync(),
+      '+31611111111': File(
+        'test/screenshots/avatars/piet.png',
+      ).readAsBytesSync(),
+      '+31622222222': File(
+        'test/screenshots/avatars/sanne.png',
+      ).readAsBytesSync(),
+      '120363025-1@g.us': File(
+        'test/screenshots/avatars/familie.png',
+      ).readAsBytesSync(),
     };
   }
 

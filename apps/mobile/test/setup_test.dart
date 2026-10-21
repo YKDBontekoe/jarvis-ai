@@ -86,7 +86,7 @@ void main() {
 
       expect(find.text('1 OF 3 DONE'), findsOneWidget);
       expect(find.byKey(const Key('setup-done-mark')), findsOneWidget);
-      expect(find.text('Title talk'), findsOneWidget);
+    expect(find.text('Title talk'), findsOneWidget);
       expect(find.byKey(const Key('setup-act-talk')), findsNothing);
       expect(find.textContaining('Needs sign-in'), findsOneWidget);
       expect(find.text('Sign in again'), findsOneWidget);

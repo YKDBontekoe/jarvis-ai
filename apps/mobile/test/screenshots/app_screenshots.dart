@@ -542,9 +542,7 @@ void main() {
   });
 
   for (final dark in [false, true]) {
-    screenshotTest('learning evolution ${dark ? 'dark' : 'light'}', (
-      tester,
-    ) async {
+    screenshotTest('learning evolution ${dark ? 'dark' : 'light'}', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);
       await openTab(tester, 'you');
@@ -557,10 +555,7 @@ void main() {
         find.byKey(const Key('learning-autonomousEvolution')),
       );
       await settle(tester);
-      await capture(
-        tester,
-        '17b-learning-evolution-${dark ? 'dark' : 'light'}',
-      );
+      await capture(tester, '17b-learning-evolution-${dark ? 'dark' : 'light'}');
     });
   }
 
