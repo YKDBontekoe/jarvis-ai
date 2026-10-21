@@ -351,7 +351,8 @@ internal static partial class McpRunnerHost
 /// <summary>
 /// A self-built server's state file. It starts with what Jarvis saved after the last run; whenever the server
 /// writes something different, <see cref="ChangedAsync"/> returns the new text (empty once the file is gone or
-/// emptied). A file over the size limit is ignored, so the previous state stays saved.
+/// emptied, or an empty JSON object). A file over the size limit, or one that is not a JSON object (a write caught half way), is ignored
+/// and read again later, so the previous state stays saved.
 /// </summary>
 internal sealed class StateSync(string path, string? initial)
 {
@@ -374,8 +375,34 @@ internal sealed class StateSync(string path, string? initial)
             return null;
         }
         if (current.Length > McpRunnerState.MaxLength || current == _last) return null;
+        if (current.Length > 0)
+        {
+            switch (ObjectSize(current))
+            {
+                case null: return null;
+                // An empty object is how a server says "logged out"; it clears the saved state like a deleted file.
+                case 0: current = ""; break;
+            }
+            if (current == _last) return null;
+        }
         _last = current;
         return current;
+    }
+
+    /// <summary>The number of properties when the text is one JSON object, otherwise null.</summary>
+    private static int? ObjectSize(string text)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                ? document.RootElement.EnumerateObject().Count()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }
 

@@ -16,11 +16,11 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    [Description("Get the template and rules for writing a self-built MCP server (one Python file using the official MCP SDK). Call this before WriteCustomMcpServer when no app in SearchMcpCatalog fits what the user wants. Read-only.")]
+    [Description("Get the template and rules for writing a self-built MCP server (one Python file using the official MCP SDK), including how to keep a login between tool calls. Call this before WriteCustomMcpServer when no app in SearchMcpCatalog fits what the user wants, and before changing an app that loses its login or other session between calls. Read-only.")]
     public string GetCustomMcpTemplate() =>
         CustomMcpTemplate.Guidance + "\n\nTemplate:\n" + CustomMcpTemplate.Source;
 
-    [Description("Save the code of a self-built MCP server for this user, creating it or saving a new draft revision when an app with this name exists. It only stores the code; nothing runs until TestCustomMcpServer or ActivateCustomMcpServer. If the code breaks the rules, the errors come back so you can fix them and call this again. Follow GetCustomMcpTemplate exactly.")]
+    [Description("Save the code of a self-built MCP server for this user, creating it or saving a new draft revision when an app with this name exists. It only stores the code; nothing runs until TestCustomMcpServer or ActivateCustomMcpServer. If the code breaks the rules, the errors come back so you can fix them and call this again. Follow GetCustomMcpTemplate exactly. Each run starts with an empty home, so a server that logs in must keep its session with load_state and save_state from the template.")]
     public async Task<string> WriteCustomMcpServerAsync(
         [Description("Short app name, 1 to 60 letters, numbers, spaces, underscores or hyphens, for example Weather.")] string name,
         [Description("One sentence on what the app does, shown to the user.")] string description,
@@ -46,7 +46,8 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
                 : "Keys it reads: " + string.Join(", ", saved.Secrets.Select(secret => secret.Key)) +
                   $". Ask for them with AskForMcpCredential (serverId '{saved.RegistryServerId}').";
             return $"Saved '{saved.Name}' revision {saved.Revision} (app id {saved.Id}, code sha256 {saved.DraftSha256}). " +
-                   keys + " Next, call TestCustomMcpServer to check it starts and lists its tools.";
+                   keys + " Next, call TestCustomMcpServer to check it starts and lists its tools." +
+                   (CustomMcpTemplate.StateAdvice(source) is { } advice ? "\nWarning: " + advice : "");
         }
         catch (CustomMcpScriptException exception)
         {
@@ -66,6 +67,7 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
         try
         {
             var result = await mcpToolHost.TestCustomServerAsync(customId, toolName, argumentsJson, cancellationToken);
+            var draft = await store.GetAsync(currentUser.OwnerId, customId, cancellationToken);
             return JsonSerializer.Serialize(new
             {
                 ok = result.Ok,
@@ -74,6 +76,7 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
                 error = result.Error,
                 toolResult = result.ToolResult,
                 diagnostics = result.Diagnostics,
+                warning = draft is null ? null : CustomMcpTemplate.StateAdvice(draft.DraftSource),
                 next = result.Ok
                     ? "If the tools look right, call ActivateCustomMcpServer with this sha256 to make it live."
                     : "Fix the code and call WriteCustomMcpServer again, then test again."
@@ -110,11 +113,18 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
         catch (ArgumentException exception) { return $"Not activated: {exception.Message}"; }
     }
 
-    [Description("List the MCP servers Jarvis wrote for this user, with their ids, revisions, whether a draft is waiting for approval, and the last test result. Read-only.")]
+    [Description("List the MCP servers Jarvis wrote for this user, with their ids, revisions, whether a draft is waiting for approval, the last test result, and a warning when an app seems to lose its login between tool calls. Read-only.")]
     public async Task<string> ListCustomMcpServersAsync(CancellationToken cancellationToken = default)
     {
         var servers = await store.ListAsync(currentUser.OwnerId, cancellationToken);
         if (servers.Count == 0) return "Jarvis has not written any apps for this user yet.";
+        var advice = new Dictionary<Guid, string>();
+        foreach (var server in servers)
+        {
+            var detail = await store.GetAsync(currentUser.OwnerId, server.Id, cancellationToken);
+            var live = detail?.ActiveSource ?? detail?.DraftSource;
+            if (live is not null && CustomMcpTemplate.StateAdvice(live) is { } text) advice[server.Id] = text;
+        }
         return JsonSerializer.Serialize(servers.Select(server => new
         {
             server.Id,
@@ -127,7 +137,8 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
             draftSha256 = server.DraftSha256,
             serverId = server.RegistryServerId,
             keys = server.Secrets.Select(secret => secret.Key),
-            lastTest = server.LastTest is null ? null : new { server.LastTest.Ok, server.LastTest.Tools, server.LastTest.Error }
+            lastTest = server.LastTest is null ? null : new { server.LastTest.Ok, server.LastTest.Tools, server.LastTest.Error },
+            warning = advice.GetValueOrDefault(server.Id)
         }), JsonOptions);
     }
 
@@ -140,6 +151,7 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
         var detail = await store.GetAsync(currentUser.OwnerId, customId, cancellationToken);
         if (detail is null) return "That app does not exist.";
         return $"'{detail.Server.Name}' draft revision {detail.Server.Revision} (sha256 {detail.Server.DraftSha256})" +
-               (detail.Server.HasUnapprovedChanges ? ", not yet approved" : ", live") + ":\n" + detail.DraftSource;
+               (detail.Server.HasUnapprovedChanges ? ", not yet approved" : ", live") + ":\n" + detail.DraftSource +
+               (CustomMcpTemplate.StateAdvice(detail.DraftSource) is { } advice ? "\n\nWarning: " + advice : "");
     }
 }

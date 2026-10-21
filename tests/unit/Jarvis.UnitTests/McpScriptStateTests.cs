@@ -56,6 +56,32 @@ public sealed class McpScriptStateTests : IDisposable
     }
 
     [Fact]
+    public async Task An_empty_json_object_clears_the_saved_state_like_a_deleted_file()
+    {
+        var sync = new StateSync(StatePath, """{"session":"one"}""");
+        await sync.InitializeAsync(default);
+
+        await File.WriteAllTextAsync(StatePath, "{}");
+        Assert.Equal("", await sync.ChangedAsync(default));
+        Assert.Null(await sync.ChangedAsync(default));
+    }
+
+    [Fact]
+    public async Task A_half_written_state_file_is_ignored_until_it_is_complete()
+    {
+        var sync = new StateSync(StatePath, """{"session":"one"}""");
+        await sync.InitializeAsync(default);
+
+        await File.WriteAllTextAsync(StatePath, """{"session":"tw""");
+        Assert.Null(await sync.ChangedAsync(default));
+        await File.WriteAllTextAsync(StatePath, "[1,2]");
+        Assert.Null(await sync.ChangedAsync(default));
+
+        await File.WriteAllTextAsync(StatePath, """{"session":"two"}""");
+        Assert.Equal("""{"session":"two"}""", await sync.ChangedAsync(default));
+    }
+
+    [Fact]
     public async Task A_state_file_over_the_limit_is_ignored_so_the_saved_state_stays()
     {
         var sync = new StateSync(StatePath, "saved");
@@ -129,6 +155,73 @@ public sealed class McpScriptStateTests : IDisposable
     }
 
     [Fact]
+    public async Task A_state_that_failed_to_save_is_kept_and_saved_on_the_next_attempt()
+    {
+        var inner = new InMemoryCredentialStore();
+        var store = new FailingOnceStore(inner);
+        var owner = Guid.NewGuid();
+        var provider = IntegrationCredentialProviders.UserMcpPrefix + Guid.NewGuid().ToString("N");
+        await using var host = new McpToolHost(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<McpToolHost>.Instance,
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance, new TestOwner(owner), store,
+            null!, null!, null!);
+
+        host.RememberScriptState(provider, """{"token":"abc"}""");
+        await host.PersistScriptStateAsync(provider, default);
+        Assert.Null(await inner.GetSecretsAsync(owner, provider, default));
+
+        await host.PersistScriptStateAsync(provider, default);
+        Assert.Equal("""{"token":"abc"}""",
+            (await inner.GetSecretsAsync(owner, provider, default))![IntegrationCredentialProviders.UserMcpStateSecret]);
+
+        // A newer report that arrived while the save failed is not overwritten by the older value.
+        var again = new FailingOnceStore(new InMemoryCredentialStore());
+        await using var second = new McpToolHost(new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<McpToolHost>.Instance,
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance, new TestOwner(owner), again,
+            null!, null!, null!);
+        second.RememberScriptState(provider, """{"v":1}""");
+        again.OnFailure = () => second.RememberScriptState(provider, """{"v":2}""");
+        await second.PersistScriptStateAsync(provider, default);
+        await second.PersistScriptStateAsync(provider, default);
+        Assert.Equal("""{"v":2}""",
+            (await again.GetSecretsAsync(owner, provider, default))![IntegrationCredentialProviders.UserMcpStateSecret]);
+    }
+
+    [Fact]
+    public void Code_that_logs_in_without_the_state_file_gets_a_warning_and_other_code_does_not()
+    {
+        var roborock = """
+            _client = None
+
+            @mcp.tool()
+            async def roborock_login(email: str, code: str) -> str:
+                global _client
+                _client = await login(email, code)
+                return "logged in"
+            """;
+        var advice = CustomMcpTemplate.StateAdvice(roborock);
+        Assert.NotNull(advice);
+        Assert.Contains("JARVIS_STATE_FILE", advice);
+        Assert.Contains("save_state", advice);
+
+        Assert.Null(CustomMcpTemplate.StateAdvice(roborock + "\nSTATE = os.environ['JARVIS_STATE_FILE']"));
+        Assert.Null(CustomMcpTemplate.StateAdvice("def weather(city): return fetch(city, API_KEY)"));
+        Assert.Null(CustomMcpTemplate.StateAdvice(CustomMcpTemplate.Source));
+    }
+
+    [Fact]
+    public void The_template_and_rules_teach_the_state_file()
+    {
+        Assert.Contains("def load_state", CustomMcpTemplate.Source);
+        Assert.Contains("def save_state", CustomMcpTemplate.Source);
+        Assert.Contains("os.replace", CustomMcpTemplate.Source);
+        Assert.True(CustomMcpScriptValidator.Validate(CustomMcpTemplate.Source).Ok);
+        Assert.Contains("JARVIS_STATE_FILE", CustomMcpTemplate.Guidance);
+        Assert.Contains("before the tool returns", CustomMcpTemplate.Guidance);
+    }
+
+    [Fact]
     public void The_saved_state_is_not_a_key_the_owner_can_declare_or_the_agent_can_read()
     {
         var binding = new McpSecretBinding(IntegrationCredentialProviders.UserMcpStateSecret,
@@ -173,5 +266,34 @@ public sealed class McpScriptStateTests : IDisposable
     private sealed class TestOwner(Guid ownerId) : Jarvis.Application.Conversations.ICurrentUser
     {
         public Guid OwnerId { get; } = ownerId;
+    }
+
+    /// <summary>Fails the first state save, then behaves like the wrapped store.</summary>
+    private sealed class FailingOnceStore(InMemoryCredentialStore inner) : IIntegrationCredentialStore
+    {
+        private bool _failed;
+        public Action? OnFailure { get; set; }
+
+        public Task SaveSecretAsync(Guid ownerId, string provider, string secretName, string value,
+            CancellationToken cancellationToken)
+        {
+            if (_failed) return inner.SaveSecretAsync(ownerId, provider, secretName, value, cancellationToken);
+            _failed = true;
+            OnFailure?.Invoke();
+            throw new InvalidOperationException("database unavailable");
+        }
+
+        public Task<IReadOnlyList<IntegrationCredentialStatus>> ListAsync(Guid ownerId, CancellationToken ct) =>
+            inner.ListAsync(ownerId, ct);
+        public Task<IntegrationCredentialStatus?> GetStatusAsync(Guid ownerId, string provider, CancellationToken ct) =>
+            inner.GetStatusAsync(ownerId, provider, ct);
+        public Task SaveAsync(Guid ownerId, string provider, IReadOnlyDictionary<string, string> secrets,
+            CancellationToken ct) => inner.SaveAsync(ownerId, provider, secrets, ct);
+        public Task<bool> DeleteSecretAsync(Guid ownerId, string provider, string secretName, CancellationToken ct) =>
+            inner.DeleteSecretAsync(ownerId, provider, secretName, ct);
+        public Task<IReadOnlyDictionary<string, string>?> GetSecretsAsync(Guid ownerId, string provider,
+            CancellationToken ct) => inner.GetSecretsAsync(ownerId, provider, ct);
+        public Task<bool> DeleteAsync(Guid ownerId, string provider, CancellationToken ct) =>
+            inner.DeleteAsync(ownerId, provider, ct);
     }
 }

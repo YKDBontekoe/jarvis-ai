@@ -400,7 +400,7 @@ public static partial class CustomMcpScriptValidator
 }
 
 /// <summary>The starting point Jarvis copies when it writes a server, and the rules it must follow.</summary>
-public static class CustomMcpTemplate
+public static partial class CustomMcpTemplate
 {
     /// <summary>The MCP Python SDK release self-built servers use. Bump it after checking the release notes.</summary>
     public const string McpVersion = "2.2.0";
@@ -415,6 +415,7 @@ public static class CustomMcpTemplate
         # ]
         # ///
         """Weather lookups for Jarvis. Replace the tools with your own."""
+        import json
         import os
 
         import httpx
@@ -425,6 +426,31 @@ public static class CustomMcpTemplate
 
         # Keys arrive as environment variables, one per declared secret. Never print them.
         API_KEY = os.environ.get("WEATHER_API_KEY", "")
+
+        # Each run starts with an empty home, so memory and files are gone by the next tool call. A server that
+        # logs in keeps its session here; Jarvis saves it encrypted and restores it on the next start. This
+        # weather example needs no login, so it never calls save_state.
+        STATE_FILE = os.environ.get("JARVIS_STATE_FILE", "")
+
+
+        def load_state() -> dict:
+            """What an earlier run saved. Empty when nothing was saved or the saved format is not understood."""
+            try:
+                with open(STATE_FILE, encoding="utf-8") as handle:
+                    state = json.load(handle)
+                return state if isinstance(state, dict) else {}
+            except (OSError, ValueError):
+                return {}
+
+
+        def save_state(state: dict) -> None:
+            """Keep the session for the next run. Call it as soon as it changes, before the tool returns."""
+            if not STATE_FILE:
+                return
+            temporary = STATE_FILE + ".tmp"
+            with open(temporary, "w", encoding="utf-8") as handle:
+                json.dump(state, handle)
+            os.replace(temporary, STATE_FILE)  # whole file at once; an empty dict or a deleted file logs out
 
 
         @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
@@ -465,12 +491,35 @@ public static class CustomMcpTemplate
         - Keep network calls bounded with timeouts. The server runs in an isolated sandbox with no access to Jarvis,
           its database or other apps, and a fresh temporary home on each start. Module variables and files in the
           home are gone after each run, so a login done in one tool call is lost for the next.
-        - To stay logged in, keep the session (tokens, device list, anything a login produces) in the file named by
-          the JARVIS_STATE_FILE environment variable. Read it on start and rewrite it whenever the session changes,
-          for example right after login. Jarvis saves it encrypted (at most 16,000 characters, so plain JSON) and
-          puts it back on the next start. Write the whole file at once, delete or empty it to log out, and never
-          return its contents from a tool.
+        - Anything that must outlive one tool call (a login, tokens, a device list) goes in the file named by the
+          JARVIS_STATE_FILE environment variable, using load_state and save_state from the template. Load it when a
+          tool runs, and save it right after the session changes and before the tool returns, so the change is kept
+          even if the run ends straight afterwards. It must be one JSON object of at most 16,000 characters; the
+          file is replaced atomically (save_state does this), because a half-written file is ignored. Jarvis keeps
+          it encrypted and restores it on the next start. Treat missing or unfamiliar content as "not logged in"
+          (an older revision may have written it). Never return its contents from a tool or print it.
         """;
+
+    /// <summary>The server's saved-state variable. Code that mentions it is assumed to keep its session.</summary>
+    public const string StateVariable = "JARVIS_STATE_FILE";
+
+    [System.Text.RegularExpressions.GeneratedRegex(
+        @"log_?in|sign_?in|authenticat|verification|otp\b|session|refresh_token|access_token|password",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex SessionTerms();
+
+    /// <summary>
+    /// A warning for code that looks like it logs in but never uses the state file, so its login is lost after
+    /// every tool call. Null when the code keeps its state or has nothing to keep.
+    /// </summary>
+    public static string? StateAdvice(string source) =>
+        source.Contains(StateVariable, StringComparison.Ordinal) || !SessionTerms().IsMatch(source)
+            ? null
+            : "This code looks like it logs in or keeps a session, but it never uses " + StateVariable + ". " +
+              "Each run starts with an empty home and ends after the turn, so anything held in memory or in files " +
+              "is gone by the next tool call and the user would have to log in again every time. Keep the session " +
+              "with load_state and save_state from GetCustomMcpTemplate, save it right after login, and treat " +
+              "missing state as not logged in.";
 }
 
 /// <summary>How much an app was used recently, read from turn traces (tool names only, no arguments).</summary>

@@ -482,6 +482,9 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            // Kept for the next attempt (after the next call or when the host is disposed) unless the server has
+            // reported something newer since.
+            _pendingState.TryAdd(provider, state);
             logger.LogWarning("Could not save the state of MCP provider {Provider} ({FailureType}).",
                 provider, exception.GetType().Name);
         }

@@ -98,13 +98,22 @@ draft. Removing the registry entry (any screen or `RemoveMcpServer`) deletes the
 temporary home are gone by the next tool call. A server that needs a session (a login, tokens, a device list) keeps
 it in the file named by `JARVIS_STATE_FILE`. Flow: the API sends the last saved text in the launch (`state`); the
 runner writes it to that file before starting the server; before forwarding each chunk of the server's output the
-runner re-reads the file and, if it changed, sends a text frame `{type: "state", state}` ahead of the MCP reply
-(empty when the file was deleted or emptied). `McpToolHost` keeps the newest value per server and saves it after
-each tool call and when the host is disposed as the `server_state` secret on the server's own credential provider,
-so it is encrypted with the keys, owner-scoped and removed with the server. It is limited to 16,000 characters
-(`McpRunnerState.MaxLength`; a larger file is ignored and the previous state stays), is never a declarable key,
-is not available as a `{{secret:…}}` placeholder, and is not given to test runs of a draft. Registry packages get no
-state file. `CustomMcpTemplate.Guidance` tells Jarvis to use it.
+runner re-reads the file and, if it changed, sends a text frame `{type: "state", state}` ahead of the MCP reply.
+`McpToolHost` keeps the newest value per server and saves it after each tool call and when the host is disposed as
+the `server_state` secret on the server's own credential provider, so it is encrypted with the keys, owner-scoped
+and removed with the server. A failed save is kept and retried unless a newer value arrived.
+
+Rules for the file: one JSON object of at most 16,000 characters (`McpRunnerState.MaxLength`). Anything else (too
+large, a write caught half way, not an object) is ignored and the previous state stays. A deleted file, an empty
+file or `{}` clears the saved state. The state is never a declarable key, is not available as a `{{secret:…}}`
+placeholder, and is not given to test runs of a draft. Registry packages get no state file.
+
+How Jarvis learns about it: the template (`CustomMcpTemplate.Source`) has `load_state` / `save_state` (atomic
+`os.replace`), and `Guidance` says to save before the tool returns and to treat missing or unfamiliar content as
+logged out. `GetCustomMcpTemplate` returns both. Code that looks like it logs in (`login`, `session`, `token`
+terms, …) but never mentions `JARVIS_STATE_FILE` gets a warning from `CustomMcpTemplate.StateAdvice` in the results
+of `WriteCustomMcpServer`, `TestCustomMcpServer`, `ListCustomMcpServers` and `GetCustomMcpServerSource`, so an
+existing server that loses its login is flagged without the user having to say so.
 
 ### MCP runner
 
