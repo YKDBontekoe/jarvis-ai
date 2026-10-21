@@ -15,7 +15,18 @@ final _png = Uint8List.fromList([
 
 final _jpeg = Uint8List.fromList([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
 final _webp = Uint8List.fromList([
-  0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+  0x52,
+  0x49,
+  0x46,
+  0x46,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x57,
+  0x45,
+  0x42,
+  0x50,
 ]);
 final _gif = Uint8List.fromList([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
 
@@ -31,10 +42,7 @@ void main() {
   test('names a pasted photo from a path and ignores content URIs', () {
     expect(incomingPhotoFileName('leaf.HEIC', '.jpg'), 'leaf.jpg');
     expect(incomingPhotoFileName('C:\\Temp\\shot.png', '.png'), 'shot.png');
-    expect(
-      incomingPhotoFileName('content://media/1', '.png'),
-      'photo.png',
-    );
+    expect(incomingPhotoFileName('content://media/1', '.png'), 'photo.png');
     expect(
       incomingPhotoFileName('https://cdn.example/leaf.png', '.png'),
       'photo.png',
@@ -74,10 +82,7 @@ void main() {
     expect(skippedType.photos, isEmpty);
     expect(skippedType.notice, 'Only JPEG, PNG, and WebP photos can be sent.');
     expect(skippedLarge.photos, isEmpty);
-    expect(
-      skippedLarge.notice,
-      'A photo is larger than 8 MB and was skipped.',
-    );
+    expect(skippedLarge.notice, 'A photo is larger than 8 MB and was skipped.');
   });
 
   test('caps a paste at the remaining slots', () {

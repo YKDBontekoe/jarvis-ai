@@ -269,10 +269,8 @@ class _RemindersScreenState extends _RemindersController {
                   denied
                       ? 'Place reminders need location access. Turn it on in Settings.'
                       : 'Set location to Always in Settings so place reminders also work when the app is closed.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.inkSoft,
-                    height: 1.35,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: colors.inkSoft, height: 1.35),
                 ),
                 const SizedBox(height: 6),
                 TextButton(
@@ -282,9 +280,8 @@ class _RemindersScreenState extends _RemindersController {
                     minimumSize: const Size(0, 32),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     foregroundColor: colors.ink,
-                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    textStyle: Theme.of(context).textTheme.labelLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   child: const Text('Open Settings'),
                 ),
@@ -405,18 +402,16 @@ class _RemindersScreenState extends _RemindersController {
                         ),
                     ],
                   ),
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: colors.inkSoft),
                 ),
                 if (otherZone)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       'Runs on ${zone.replaceAll('_', ' ')} time',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: colors.inkSoft),
                     ),
                   ),
               ],
@@ -526,17 +521,6 @@ class _RemindersScreenState extends _RemindersController {
     );
   }
 
-  IconData _notificationIcon(Object? type) => switch (type) {
-    'reminder.due' || 'reminder.failed' => PhosphorIconsRegular.alarm,
-    'whatsapp.reminder' => PhosphorIconsRegular.whatsappLogo,
-    'task.completed' => PhosphorIconsRegular.checkCircle,
-    'task.failed' => PhosphorIconsRegular.warningCircle,
-    'approval.required' => PhosphorIconsRegular.shieldCheck,
-    'coding.pr.ready' || 'coding.run.ready' => PhosphorIconsRegular.code,
-    'watch.triggered' || 'watch.failed' => PhosphorIconsRegular.pulse,
-    _ => PhosphorIconsRegular.bell,
-  };
-
   Widget _buildNotifications() => _notificationsFailed && _notifications.isEmpty
       ? ErrorState(
           message: 'Jarvis could not load notifications.',
@@ -557,26 +541,74 @@ class _RemindersScreenState extends _RemindersController {
             final notification = row as Map<String, dynamic>;
             final unread = notification['readAt'] == null;
             final body = asJsonString(notification['body']) ?? '';
+            final type = asJsonString(notification['type']);
+            final look = notificationLook(type);
+            final colors = JarvisColors.of(context);
+            final (tint, wash) = look.colors(colors);
+            final id = asJsonString(notification['id']) ?? '';
+            // At large text the side column would squeeze the text, so the delivery button joins the date line.
+            final stacked = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+            // Delivery details are for troubleshooting, so they sit one quiet tap away.
+            final delivery = IconButton(
+              key: Key('notification-delivery-$id'),
+              tooltip: 'How it was delivered',
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                PhosphorIconsRegular.info,
+                size: 18,
+                color: colors.muted,
+              ),
+              onPressed: () => unawaited(
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  showDragHandle: true,
+                  builder: (_) => NotificationDeliverySheet(
+                    http: widget.http,
+                    notificationId: id,
+                  ),
+                ),
+              ),
+            );
             return FadeSlideIn(
               index: index,
               child: ContentWidth(
                 child: SurfaceCard(
+                  key: Key('notification-$id'),
                   margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                  color: unread
-                      ? JarvisColors.of(context).surface
-                      : JarvisColors.of(context).canvas,
-                  borderColor: JarvisColors.of(context).outline,
+                  padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+                  color: unread ? colors.surface : colors.canvas,
+                  borderColor: colors.outline,
                   onTap: () => _openNotification(notification),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      IconBadge(icon: _notificationIcon(notification['type'])),
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: wash,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(look.icon, size: 20, color: tint),
+                      ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Says what kind of thing this is before the title, so "Water the basil" and
+                            // "New skill: weekly-review" can be told apart at a glance.
+                            Text(
+                              look.label.toUpperCase(),
+                              key: Key('notification-label-$id'),
+                              style: JarvisType.capsOf(context).copyWith(
+                                color: look.tone == NotificationTone.neutral
+                                    ? colors.muted
+                                    : tint,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
                             Text(
                               asJsonString(notification['title']) ?? '',
                               style: Theme.of(context).textTheme.titleSmall
@@ -594,18 +626,16 @@ class _RemindersScreenState extends _RemindersController {
                                 style: TextStyle(
                                   fontSize: 13.5,
                                   height: 1.4,
-                                  color: JarvisColors.of(context).inkSoft,
+                                  color: colors.inkSoft,
                                 ),
                               ),
                             ],
-                            if (asJsonString(notification['type']) ==
-                                    'reminder.due' &&
+                            if (type == 'reminder.due' &&
                                 notification['sourceId'] != null)
                               _snoozeActions(
                                 asJsonString(notification['sourceId']),
                               ),
-                            if (asJsonString(notification['type']) ==
-                                    'approval.required' &&
+                            if (type == 'approval.required' &&
                                 _pendingApprovals[asJsonString(
                                       notification['sourceId'],
                                     )] !=
@@ -619,62 +649,49 @@ class _RemindersScreenState extends _RemindersController {
                             Wrap(
                               crossAxisAlignment: WrapCrossAlignment.center,
                               spacing: 12,
+                              runSpacing: 2,
                               children: [
-                                Text(
-                                  _formatDate(notification['createdAt']),
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: JarvisColors.of(context).muted,
-                                      ),
-                                ),
-                                InkWell(
-                                  key: Key(
-                                    'notification-delivery-${notification['id']}',
+                                if (_formatDate(notification['createdAt'])
+                                    case final date when date.isNotEmpty)
+                                  Text(
+                                    date,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: colors.muted),
                                   ),
-                                  onTap: () => unawaited(
-                                    showModalBottomSheet<void>(
-                                      context: context,
-                                      isScrollControlled: true,
-                                      showDragHandle: true,
-                                      builder: (_) => NotificationDeliverySheet(
-                                        http: widget.http,
-                                        notificationId:
-                                            asJsonString(notification['id']) ??
-                                            '',
-                                      ),
-                                    ),
+                                if (look.nextStep case final step?)
+                                  Text(
+                                    '$step ›',
+                                    key: Key('notification-next-$id'),
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: colors.accent,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                   ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 6,
-                                    ),
-                                    child: Text(
-                                      'How it was delivered',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: JarvisColors.of(
-                                              context,
-                                            ).accent,
-                                          ),
-                                    ),
-                                  ),
-                                ),
+                                if (stacked) delivery,
                               ],
                             ),
                           ],
                         ),
                       ),
-                      if (unread)
-                        Container(
-                          margin: const EdgeInsets.only(top: 6, left: 8),
-                          width: 9,
-                          height: 9,
-                          decoration: BoxDecoration(
-                            color: JarvisColors.of(context).accent,
-                            shape: BoxShape.circle,
-                          ),
+                      if (!stacked)
+                        Column(
+                          children: [
+                            if (unread)
+                              Container(
+                                margin: const EdgeInsets.only(
+                                  top: 6,
+                                  bottom: 4,
+                                ),
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(
+                                  color: colors.accent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            delivery,
+                          ],
                         ),
                     ],
                   ),

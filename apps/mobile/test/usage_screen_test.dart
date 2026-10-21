@@ -86,8 +86,18 @@ Map<String, Object?> _usage() => {
   },
   'other': null,
   'daily': [
-    {'day': '2026-09-27', 'codexTokens': 1000, 'openRouterTokens': 0, 'openRouterCostUsd': 0},
-    {'day': '2026-09-28', 'codexTokens': 14400, 'openRouterTokens': 2001000, 'openRouterCostUsd': 6.03},
+    {
+      'day': '2026-09-27',
+      'codexTokens': 1000,
+      'openRouterTokens': 0,
+      'openRouterCostUsd': 0,
+    },
+    {
+      'day': '2026-09-28',
+      'codexTokens': 14400,
+      'openRouterTokens': 2001000,
+      'openRouterCostUsd': 6.03,
+    },
   ],
   'chartNote': null,
   'models': [
@@ -150,53 +160,62 @@ void main() {
     expect(http.sent('GET', '/api/v1/usage').length, 2);
   });
 
-  testWidgets('the improvement card summarises ratings, tools and suggestions', (
-    tester,
-  ) async {
-    final http = FixtureHttp()
-      ..on('GET', '/api/v1/usage', {
-        ..._usage(),
-        'improvement': {
-          'thumbsUp': 8,
-          'thumbsDown': 2,
-          'previousThumbsUp': 5,
-          'previousThumbsDown': 5,
-          'trend': 'better',
-          'regenerates': 3,
-          'regenerateRate': 0.25,
-          'denials': 1,
-          'weakTools': [
-            {'tool': 'PostSlack', 'calls': 8, 'failed': 6, 'failureRate': 0.75},
-          ],
-          'skillsLearned': 2,
-          'proposals': {
-            'pending': 2,
-            'accepted': 1,
-            'applied': 2,
-            'dismissed': 1,
-            'undone': 0,
+  testWidgets(
+    'the improvement card summarises ratings, tools and suggestions',
+    (tester) async {
+      final http = FixtureHttp()
+        ..on('GET', '/api/v1/usage', {
+          ..._usage(),
+          'improvement': {
+            'thumbsUp': 8,
+            'thumbsDown': 2,
+            'previousThumbsUp': 5,
+            'previousThumbsDown': 5,
+            'trend': 'better',
+            'regenerates': 3,
+            'regenerateRate': 0.25,
+            'denials': 1,
+            'weakTools': [
+              {
+                'tool': 'PostSlack',
+                'calls': 8,
+                'failed': 6,
+                'failureRate': 0.75,
+              },
+            ],
+            'skillsLearned': 2,
+            'proposals': {
+              'pending': 2,
+              'accepted': 1,
+              'applied': 2,
+              'dismissed': 1,
+              'undone': 0,
+            },
+            'acceptanceRate': 0.75,
           },
-          'acceptanceRate': 0.75,
-        },
-      });
-    tester.view.physicalSize = const Size(900, 3000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
-      MaterialApp(home: UsageScreen(http: http.client())),
-    );
-    await tester.pumpAndSettle();
+        });
+      tester.view.physicalSize = const Size(900, 3000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(home: UsageScreen(http: http.client())),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('usage-improvement')), findsOneWidget);
-    expect(find.text('Jarvis is improving'), findsOneWidget);
-    expect(find.textContaining('8 liked, 2 not'), findsOneWidget);
-    expect(find.textContaining('better than the period before'), findsOneWidget);
-    expect(find.textContaining('Redid 25% of replies'), findsOneWidget);
-    expect(find.textContaining('PostSlack: failed 6 of 8'), findsOneWidget);
-    expect(find.textContaining('accept 75%'), findsOneWidget);
-    expect(find.text('2 to review'), findsOneWidget);
-  });
+      expect(find.byKey(const Key('usage-improvement')), findsOneWidget);
+      expect(find.text('Jarvis is improving'), findsOneWidget);
+      expect(find.textContaining('8 liked, 2 not'), findsOneWidget);
+      expect(
+        find.textContaining('better than the period before'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Redid 25% of replies'), findsOneWidget);
+      expect(find.textContaining('PostSlack: failed 6 of 8'), findsOneWidget);
+      expect(find.textContaining('accept 75%'), findsOneWidget);
+      expect(find.text('2 to review'), findsOneWidget);
+    },
+  );
 
   testWidgets('an older server without improvement data hides the card', (
     tester,
@@ -256,9 +275,15 @@ void main() {
     expect(find.text('38 s'), findsOneWidget);
     expect(find.text('9.1 s'), findsOneWidget);
     expect(find.text('62%'), findsOneWidget);
-    expect(find.textContaining('5.0% of 40 model calls failed'), findsOneWidget);
+    expect(
+      find.textContaining('5.0% of 40 model calls failed'),
+      findsOneWidget,
+    );
     expect(find.textContaining('3 turns failed, 1 stopped'), findsOneWidget);
-    expect(find.textContaining('12 approvals asked, 2 declined'), findsOneWidget);
+    expect(
+      find.textContaining('12 approvals asked, 2 declined'),
+      findsOneWidget,
+    );
     expect(find.textContaining('2 min 5 s on average'), findsOneWidget);
     expect(find.textContaining('Replies are slow'), findsOneWidget);
     expect(find.textContaining('You approve a lot by hand'), findsOneWidget);

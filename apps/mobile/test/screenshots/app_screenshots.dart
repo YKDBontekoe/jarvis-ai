@@ -526,8 +526,25 @@ void main() {
     await capture(tester, '17-settings');
   });
 
+  screenshotTest('home needs you at large text', (tester) async {
+    usePhone(tester, size: const Size(320, 640));
+    tester.platformDispatcher.textScaleFactorTestValue = 3;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await start(tester);
+    final needsYou = find.byKey(const Key('home-needs-you'));
+    await tester.ensureVisible(needsYou);
+    await settle(tester);
+    expect(
+      find.byKey(const Key('home-needs-you-stacked-actions')),
+      findsWidgets,
+    );
+    await capture(tester, '01h-home-needs-you-large-text');
+  });
+
   for (final dark in [false, true]) {
-    screenshotTest('learning evolution ${dark ? 'dark' : 'light'}', (tester) async {
+    screenshotTest('learning evolution ${dark ? 'dark' : 'light'}', (
+      tester,
+    ) async {
       usePhone(tester);
       await start(tester, dark: dark);
       await openTab(tester, 'you');
@@ -540,7 +557,10 @@ void main() {
         find.byKey(const Key('learning-autonomousEvolution')),
       );
       await settle(tester);
-      await capture(tester, '17b-learning-evolution-${dark ? 'dark' : 'light'}');
+      await capture(
+        tester,
+        '17b-learning-evolution-${dark ? 'dark' : 'light'}',
+      );
     });
   }
 

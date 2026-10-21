@@ -538,13 +538,13 @@ class UnreadCount extends StatelessWidget {
     final colors = JarvisColors.of(context);
     return Container(
       key: const Key('chat-unread-count'),
-      constraints: const BoxConstraints(minWidth: 22),
-      height: 22,
-      padding: const EdgeInsets.symmetric(horizontal: 7),
+      // A minimum, not a fixed height: at large text the digits grow and must not be cut off.
+      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: colors.accent,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         count > 99 ? '99+' : '$count',

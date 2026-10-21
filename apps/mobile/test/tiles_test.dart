@@ -756,9 +756,8 @@ void main() {
 
     test('the data source runs actions through the same code', () async {
       http.on('POST', '/api/v1/reminders/x1/complete', {});
-      final outcome = await TileDataSource(
-        http.client(),
-      ).act('reminders', 'done', 'x1');
+      final outcome = await TileDataSource(http.client())
+          .act('reminders', 'done', 'x1');
       expect(outcome.ok, isTrue);
     });
   });

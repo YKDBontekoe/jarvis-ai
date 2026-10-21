@@ -47,7 +47,8 @@ void main() {
   });
 
   const runId = '22222222-2222-2222-2222-222222222222';
-  const patch = 'diff --git a/src/A.cs b/src/A.cs\n'
+  const patch =
+      'diff --git a/src/A.cs b/src/A.cs\n'
       'index 1..2 100644\n--- a/src/A.cs\n+++ b/src/A.cs\n'
       '@@ -1,2 +1,2 @@\n keep\n-old line\n+new line\n';
 
@@ -102,7 +103,10 @@ void main() {
     expect(find.text('-old line'), findsOneWidget);
     await tester.tap(find.text('Open pull request'));
     await tester.pumpAndSettle();
-    expect(http.sent('POST', '/api/v1/coding/runs/$runId/pull-request'), hasLength(1));
+    expect(
+      http.sent('POST', '/api/v1/coding/runs/$runId/pull-request'),
+      hasLength(1),
+    );
     expect(find.text('Pull request #7'), findsOneWidget);
     expect(find.text('Approve & merge'), findsOneWidget);
   });
@@ -132,11 +136,17 @@ void main() {
     });
     await openDetail(tester, http);
 
-    expect(find.text('This change touches security-sensitive code.'), findsOneWidget);
+    expect(
+      find.text('This change touches security-sensitive code.'),
+      findsOneWidget,
+    );
     expect(find.text('Merging is blocked while checks fail.'), findsOneWidget);
     await tester.tap(find.text('Approve & merge'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(http.sent('POST', '/api/v1/coding/runs/$runId/pull-request/merge'), isEmpty);
+    expect(
+      http.sent('POST', '/api/v1/coding/runs/$runId/pull-request/merge'),
+      isEmpty,
+    );
   });
 
   testWidgets('a passing pull request merges only after confirmation', (
@@ -170,10 +180,16 @@ void main() {
 
     await tester.tap(find.text('Approve & merge'));
     await tester.pumpAndSettle();
-    expect(http.sent('POST', '/api/v1/coding/runs/$runId/pull-request/merge'), isEmpty);
+    expect(
+      http.sent('POST', '/api/v1/coding/runs/$runId/pull-request/merge'),
+      isEmpty,
+    );
     await tester.tap(find.text('Merge'));
     await tester.pumpAndSettle();
-    expect(http.sent('POST', '/api/v1/coding/runs/$runId/pull-request/merge'), hasLength(1));
+    expect(
+      http.sent('POST', '/api/v1/coding/runs/$runId/pull-request/merge'),
+      hasLength(1),
+    );
     expect(find.text('Merged'), findsOneWidget);
   });
 }

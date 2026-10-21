@@ -86,7 +86,10 @@ void main() {
 
   test('counts read naturally and leave out empty parts', () {
     expect(projectCountsLabel(_project()), '1 chat · 1 file · 1 task');
-    expect(projectCountsLabel(_project(chats: 3, files: 0)), '3 chats · 1 task');
+    expect(
+      projectCountsLabel(_project(chats: 3, files: 0)),
+      '3 chats · 1 task',
+    );
     expect(projectCountsLabel(_project(chats: 0, files: 0, tasks: 0)), 'Empty');
   });
 
@@ -146,7 +149,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove from project'));
     await tester.pumpAndSettle();
-    final sent = http.sent('PUT', '/api/v1/files/f1/project').single.body as Map;
+    final sent =
+        http.sent('PUT', '/api/v1/files/f1/project').single.body as Map;
     expect(sent.containsKey('projectId'), isTrue);
     expect(sent['projectId'], isNull);
 
@@ -235,28 +239,29 @@ void main() {
     });
   });
 
-  testWidgets('a project with no outcome invites one and clears the next step', (
-    tester,
-  ) async {
-    http
-      ..on('GET', '/api/v1/projects/$_id', _details())
-      ..on('PUT', '/api/v1/projects/$_id/focus', {
-        'project': _project(),
-        'nextAction': null,
-      });
-    await show(tester, ProjectScreen(http: http.client(), projectId: _id));
-    expect(find.text('What should this project achieve?'), findsOneWidget);
-    expect(find.text('Nothing chosen yet'), findsOneWidget);
+  testWidgets(
+    'a project with no outcome invites one and clears the next step',
+    (tester) async {
+      http
+        ..on('GET', '/api/v1/projects/$_id', _details())
+        ..on('PUT', '/api/v1/projects/$_id/focus', {
+          'project': _project(),
+          'nextAction': null,
+        });
+      await show(tester, ProjectScreen(http: http.client(), projectId: _id));
+      expect(find.text('What should this project achieve?'), findsOneWidget);
+      expect(find.text('Nothing chosen yet'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('project-focus')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('project-focus-save')));
-    await tester.pumpAndSettle();
-    final sent =
-        http.sent('PUT', '/api/v1/projects/$_id/focus').single.body as Map;
-    expect(sent['outcome'], isNull);
-    expect(sent['nextAction'], isNull);
-  });
+      await tester.tap(find.byKey(const Key('project-focus')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('project-focus-save')));
+      await tester.pumpAndSettle();
+      final sent =
+          http.sent('PUT', '/api/v1/projects/$_id/focus').single.body as Map;
+      expect(sent['outcome'], isNull);
+      expect(sent['nextAction'], isNull);
+    },
+  );
 
   testWidgets('a deleted project says so instead of failing', (tester) async {
     http.on('GET', '/api/v1/projects/$_id', null, status: 404);

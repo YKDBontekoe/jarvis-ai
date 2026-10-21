@@ -62,7 +62,7 @@ void main() {
           home: Scaffold(
             backgroundColor: JarvisColors.light.canvas,
             body: SafeArea(
-                child: Padding(
+              child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
                 child: Column(
                   children: [

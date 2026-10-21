@@ -41,53 +41,54 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('opens at the hit, highlights it for a moment, hides tool traffic', (
-    tester,
-  ) async {
-    http.on('GET', '/api/v1/conversations/c1/messages', {
-      'items': [
-        _message(4),
-        _message(5),
-        _message(6),
-        _message(7, role: 'tool'),
-      ],
-      'nextCursor': 'older',
-      'hasMore': true,
-      'newerCursor': null,
-      'hasNewer': false,
-      'anchorId': 'm5',
-    });
-    await show(tester);
+  testWidgets(
+    'opens at the hit, highlights it for a moment, hides tool traffic',
+    (tester) async {
+      http.on('GET', '/api/v1/conversations/c1/messages', {
+        'items': [
+          _message(4),
+          _message(5),
+          _message(6),
+          _message(7, role: 'tool'),
+        ],
+        'nextCursor': 'older',
+        'hasMore': true,
+        'newerCursor': null,
+        'hasNewer': false,
+        'anchorId': 'm5',
+      });
+      await show(tester);
 
-    final sent = http.sent('GET', '/api/v1/conversations/c1/messages').single;
-    expect(sent.query['around'], 'm5');
-    expect(find.text('Message number 5'), findsOneWidget);
-    expect(find.text('Message number 7'), findsNothing);
-    expect(find.byKey(const Key('message-context-older')), findsOneWidget);
-    expect(find.byKey(const Key('message-context-newer')), findsNothing);
-    expect(find.text('End of the conversation'), findsOneWidget);
+      final sent = http.sent('GET', '/api/v1/conversations/c1/messages').single;
+      expect(sent.query['around'], 'm5');
+      expect(find.text('Message number 5'), findsOneWidget);
+      expect(find.text('Message number 7'), findsNothing);
+      expect(find.byKey(const Key('message-context-older')), findsOneWidget);
+      expect(find.byKey(const Key('message-context-newer')), findsNothing);
+      expect(find.text('End of the conversation'), findsOneWidget);
 
-    var decoration =
-        tester
-                .widget<AnimatedContainer>(
-                  find.byKey(const Key('message-context-hit')),
-                )
-                .decoration!
-            as BoxDecoration;
-    expect(decoration.border, isNotNull);
-    expect(decoration.color, isNot(Colors.transparent));
+      var decoration =
+          tester
+                  .widget<AnimatedContainer>(
+                    find.byKey(const Key('message-context-hit')),
+                  )
+                  .decoration!
+              as BoxDecoration;
+      expect(decoration.border, isNotNull);
+      expect(decoration.color, isNot(Colors.transparent));
 
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pumpAndSettle();
-    decoration =
-        tester
-                .widget<AnimatedContainer>(
-                  find.byKey(const Key('message-context-hit')),
-                )
-                .decoration!
-            as BoxDecoration;
-    expect(decoration.color, Colors.transparent);
-  });
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+      decoration =
+          tester
+                  .widget<AnimatedContainer>(
+                    find.byKey(const Key('message-context-hit')),
+                  )
+                  .decoration!
+              as BoxDecoration;
+      expect(decoration.color, Colors.transparent);
+    },
+  );
 
   testWidgets('earlier and later messages load without repeating any', (
     tester,

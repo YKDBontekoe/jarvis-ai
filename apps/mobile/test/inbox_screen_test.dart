@@ -9,21 +9,26 @@ import 'support/fixture_http.dart';
 
 final _now = DateTime(2026, 10, 3, 12);
 
-Map<String, Object?> _thread(String id, String title, String state,
-        {int priority = 1, String? summary, String? reply}) =>
-    {
-      'id': id,
-      'source': 'whatsapp',
-      'title': title,
-      'counterparty': title,
-      'state': state,
-      'priority': priority,
-      'summary': summary,
-      'suggestedReply': reply,
-      'lastMessagePreview': 'Kun je morgen?',
-      'lastFromMe': false,
-      'lastMessageAt': '2026-10-03T09:00:00Z',
-    };
+Map<String, Object?> _thread(
+  String id,
+  String title,
+  String state, {
+  int priority = 1,
+  String? summary,
+  String? reply,
+}) => {
+  'id': id,
+  'source': 'whatsapp',
+  'title': title,
+  'counterparty': title,
+  'state': state,
+  'priority': priority,
+  'summary': summary,
+  'suggestedReply': reply,
+  'lastMessagePreview': 'Kun je morgen?',
+  'lastFromMe': false,
+  'lastMessageAt': '2026-10-03T09:00:00Z',
+};
 
 Map<String, Object?> _inbox() => {
   'threads': [
@@ -70,7 +75,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(home: InboxScreen(http: http.client(), now: _now)),
+      MaterialApp(
+        home: InboxScreen(http: http.client(), now: _now),
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -142,23 +149,24 @@ void main() {
     expect(post['direction'], 'i_owe');
   });
 
-  testWidgets('Plan today sends the promise as the source, only for accepted ones', (
-    tester,
-  ) async {
-    http.on('POST', '/api/v1/planner/today/items', {'id': 'i1'});
-    await show(tester);
-    await tester.tap(find.byKey(const Key('inbox-tab-commitments')));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'Plan today sends the promise as the source, only for accepted ones',
+    (tester) async {
+      http.on('POST', '/api/v1/planner/today/items', {'id': 'i1'});
+      await show(tester);
+      await tester.tap(find.byKey(const Key('inbox-tab-commitments')));
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('commitment-plan-c2')), findsNothing);
-    await tester.tap(find.byKey(const Key('commitment-plan-c1')));
-    await tester.pumpAndSettle();
+      expect(find.byKey(const Key('commitment-plan-c2')), findsNothing);
+      await tester.tap(find.byKey(const Key('commitment-plan-c1')));
+      await tester.pumpAndSettle();
 
-    final post = http.sent('POST', '/api/v1/planner/today/items').single;
-    expect((post.body as Map)['sourceRef'], 'commitment:c1');
-    expect(post.query['timeZone'], 'Europe/Amsterdam');
-    expect(find.textContaining('Added to today'), findsOneWidget);
-  });
+      final post = http.sent('POST', '/api/v1/planner/today/items').single;
+      expect((post.body as Map)['sourceRef'], 'commitment:c1');
+      expect(post.query['timeZone'], 'Europe/Amsterdam');
+      expect(find.textContaining('Added to today'), findsOneWidget);
+    },
+  );
 
   testWidgets('a refused plan shows the reason and no success note', (
     tester,
@@ -189,8 +197,18 @@ void main() {
             'draft': 'Hi Piet, a quick check on "Offerte sturen".',
           },
         ])
-        ..on('POST', '/api/v1/commitments/c2/follow-up/snooze', null, status: 204)
-        ..on('POST', '/api/v1/commitments/c2/follow-up/dismiss', null, status: 204);
+        ..on(
+          'POST',
+          '/api/v1/commitments/c2/follow-up/snooze',
+          null,
+          status: 204,
+        )
+        ..on(
+          'POST',
+          '/api/v1/commitments/c2/follow-up/dismiss',
+          null,
+          status: 204,
+        );
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
         SystemChannels.platform,
         (call) async => null,
@@ -209,7 +227,10 @@ void main() {
       await tester.tap(find.byKey(const Key('followup-snooze-c2')));
       await tester.pumpAndSettle();
       expect(
-        http.sent('POST', '/api/v1/commitments/c2/follow-up/snooze').single.body,
+        http
+            .sent('POST', '/api/v1/commitments/c2/follow-up/snooze')
+            .single
+            .body,
         {'days': 7},
       );
 

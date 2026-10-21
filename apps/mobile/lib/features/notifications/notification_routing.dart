@@ -8,8 +8,19 @@ bool opensDailyBriefing(String? type) => type == 'briefing.daily';
 
 bool opensWeeklyReview(String? type) => type == 'briefing.weekly';
 bool opensRoutineSuggestions(String? type) => type == 'routine.suggested';
+
+/// Self-improvement news: suggestions to review, an app Jarvis built, and what a reflection or dream changed.
 bool opensImprovementSuggestions(String? type) =>
-    type == 'improvement.suggested';
+    type == 'improvement.suggested' ||
+    type == 'improvement.capability_built' ||
+    type == 'learning.dreamed' ||
+    type == 'learning.reflected';
+
+/// A skill Jarvis learned, improved or turned off; the notification's source id is the skill.
+bool opensSkill(String? type) =>
+    type == 'skill.learned' ||
+    type == 'skill.improved' ||
+    type == 'skill.retired';
 bool opensHabits(String? type) => type == 'habit.checkin';
 bool opensPeople(String? type) =>
     type == 'people.birthday' ||

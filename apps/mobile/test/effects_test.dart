@@ -304,9 +304,7 @@ void main() {
     }
   });
 
-  testWidgets('the effects gallery plays every effect', (
-    tester,
-  ) async {
+  testWidgets('the effects gallery plays every effect', (tester) async {
     tester.view.physicalSize = const Size(800, 3000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);

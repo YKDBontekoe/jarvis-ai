@@ -24,7 +24,10 @@ void main() {
   setUp(() {
     http = FixtureHttp();
     http.on('GET', '/api/v1/library', {
-      'items': [_item('i1', 'Bees explained', 'web'), _item('i2', 'My idea', 'note')],
+      'items': [
+        _item('i1', 'Bees explained', 'web'),
+        _item('i2', 'My idea', 'note'),
+      ],
       'cards': {'total': 3, 'due': 2, 'new': 2, 'learned': 0},
     });
     http.on('GET', '/api/v1/library/cards/due', {
@@ -36,13 +39,18 @@ void main() {
     });
   });
 
-  Future<void> show(WidgetTester tester, {Future<void> Function(String)? open}) async {
+  Future<void> show(
+    WidgetTester tester, {
+    Future<void> Function(String)? open,
+  }) async {
     tester.view.physicalSize = const Size(800, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      MaterialApp(home: LibraryScreen(http: http.client(), openLink: open)),
+      MaterialApp(
+        home: LibraryScreen(http: http.client(), openLink: open),
+      ),
     );
     await tester.pumpAndSettle();
   }
@@ -57,7 +65,9 @@ void main() {
     expect(CardStatsData.fromJson(null).due, 0);
   });
 
-  testWidgets('lists saved items and opens one with its summary', (tester) async {
+  testWidgets('lists saved items and opens one with its summary', (
+    tester,
+  ) async {
     http.on('GET', '/api/v1/library/i1', _item('i1', 'Bees explained', 'web'));
     String? opened;
     await show(tester, open: (url) async => opened = url);
@@ -92,7 +102,10 @@ void main() {
   });
 
   testWidgets('deep research starts a task', (tester) async {
-    http.on('POST', '/api/v1/library/research', {'taskId': 't1', 'title': 'Research'}, status: 202);
+    http.on('POST', '/api/v1/library/research', {
+      'taskId': 't1',
+      'title': 'Research',
+    }, status: 202);
     await show(tester);
 
     await tester.tap(find.byKey(const Key('library-research')));
@@ -104,13 +117,20 @@ void main() {
     await tester.tap(find.byKey(const Key('library-dialog-save')));
     await tester.pumpAndSettle();
 
-    final post = http.sent('POST', '/api/v1/library/research').single.body as Map;
+    final post =
+        http.sent('POST', '/api/v1/library/research').single.body as Map;
     expect(post['question'], 'How do bees survive winter?');
     expect(find.textContaining('Research started'), findsOneWidget);
   });
 
-  testWidgets('reviewing a card reveals the answer then grades it', (tester) async {
-    http.on('POST', '/api/v1/library/cards/c1/review', {'id': 'c1', 'front': 'q', 'back': 'a'});
+  testWidgets('reviewing a card reveals the answer then grades it', (
+    tester,
+  ) async {
+    http.on('POST', '/api/v1/library/cards/c1/review', {
+      'id': 'c1',
+      'front': 'q',
+      'back': 'a',
+    });
     await show(tester);
 
     await tester.tap(find.byKey(const Key('library-tab-review')));
@@ -123,7 +143,8 @@ void main() {
     await tester.tap(find.byKey(const Key('flashcard-good')));
     await tester.pumpAndSettle();
 
-    final post = http.sent('POST', '/api/v1/library/cards/c1/review').single.body as Map;
+    final post =
+        http.sent('POST', '/api/v1/library/cards/c1/review').single.body as Map;
     expect(post['button'], 'good');
     expect(find.text('Where do they live?'), findsOneWidget);
   });

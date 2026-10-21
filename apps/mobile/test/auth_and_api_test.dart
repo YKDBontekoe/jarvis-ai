@@ -224,8 +224,7 @@ void main() {
         theme: buildJarvisTheme(),
         home: const Scaffold(
           body: JarvisMarkdown(
-            data:
-                '[secret](file:///tmp/secret) and [script](javascript:alert(1))',
+            data: '[secret](file:///tmp/secret) and [script](javascript:alert(1))',
           ),
         ),
       ),

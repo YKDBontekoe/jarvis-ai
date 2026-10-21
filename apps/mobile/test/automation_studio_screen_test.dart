@@ -39,7 +39,12 @@ void main() {
         'needsApproval': false,
         'successCriterion': 'On Fridays you see what is coming up. Success: nothing renews unnoticed.',
         'preview': [
-          {'label': 'Task', 'title': 'Bills due in the next 7 days', 'body': 'x', 'needsApproval': false},
+          {
+            'label': 'Task',
+            'title': 'Bills due in the next 7 days',
+            'body': 'x',
+            'needsApproval': false,
+          },
         ],
       },
     ]);
@@ -151,7 +156,8 @@ void main() {
     expect(find.byKey(const Key('webhook-url')), findsOneWidget);
     expect(find.textContaining('jwh_secret'), findsOneWidget);
     expect(
-      (http.sent('POST', '/api/v1/automations/webhooks').single.body as Map)['name'],
+      (http.sent('POST', '/api/v1/automations/webhooks').single.body
+          as Map)['name'],
       'Form',
     );
   });
@@ -196,19 +202,30 @@ void main() {
     expect(find.text('Message from Sanne'), findsOneWidget);
     expect(find.text('Its condition is not met.'), findsOneWidget);
     expect(find.byKey(const Key('studio-step')), findsNWidgets(2));
-    final body = http.sent('POST', '/api/v1/automations/r1/simulate').single.body as Map;
+    final body =
+        http.sent('POST', '/api/v1/automations/r1/simulate').single.body as Map;
     expect(body['title'], 'Sanne');
   });
 
-  testWidgets('a named template shows what it will do and what good looks like', (
-    tester,
-  ) async {
-    await show(tester);
+  testWidgets(
+    'a named template shows what it will do and what good looks like',
+    (tester) async {
+      await show(tester);
 
-    expect(find.byKey(const Key('template-preview-bill-reminder')), findsOneWidget);
-    expect(find.text('Then: Bills due in the next 7 days'), findsOneWidget);
-    expect(find.byKey(const Key('template-success-bill-reminder')), findsOneWidget);
-    expect(find.textContaining('nothing renews unnoticed'), findsOneWidget);
-    expect(find.byKey(const Key('template-success-urgent-message')), findsNothing);
-  });
+      expect(
+        find.byKey(const Key('template-preview-bill-reminder')),
+        findsOneWidget,
+      );
+      expect(find.text('Then: Bills due in the next 7 days'), findsOneWidget);
+      expect(
+        find.byKey(const Key('template-success-bill-reminder')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('nothing renews unnoticed'), findsOneWidget);
+      expect(
+        find.byKey(const Key('template-success-urgent-message')),
+        findsNothing,
+      );
+    },
+  );
 }

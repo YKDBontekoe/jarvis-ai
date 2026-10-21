@@ -22,9 +22,9 @@ void main() {
 
     expect(await store.read('https://jarvis.test/api/v1/tasks?'), '{"a":1}');
     expect(await store.read('https://jarvis.test/api/v1/other?'), isNull);
-    final names = Directory(
-      '${root.path}/offline_cache',
-    ).listSync().map((entity) => entity.uri.pathSegments.last);
+    final names = Directory('${root.path}/offline_cache')
+        .listSync()
+        .map((entity) => entity.uri.pathSegments.last);
     expect(names.single, matches(RegExp(r'^[0-9a-f]{16}\.json$')));
 
     await store.clear();

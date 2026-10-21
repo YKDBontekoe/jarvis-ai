@@ -12,8 +12,7 @@ const _channel = '11111111-1111-1111-1111-111111111111';
 const _chats = '/api/v1/channels/$_channel/chats';
 
 const _catchUp = {
-  'summary':
-      'Piet wil vrijdag samen eten en stelt Italiaans bij de haven voor. Hij vraagt om een tijd.',
+  'summary': 'Piet wil vrijdag samen eten en stelt Italiaans bij de haven voor. Hij vraagt om een tijd.',
   'toReply': [
     {'who': 'Piet', 'about': 'Welke tijd past je vrijdag?'},
     {'who': 'Sanne', 'about': 'Kom je zondag ook langs?'},

@@ -36,53 +36,41 @@ void main() {
   test('describeApiError prefers stable codes over HTTP status', () {
     expect(
       describeApiError(
-        _problemError(
-          {
-            'code': 'dependency_unavailable',
-            'detail': 'Voice service is temporarily unavailable.',
-            'status': 503,
-          },
-          status: 503,
-        ),
+        _problemError({
+          'code': 'dependency_unavailable',
+          'detail': 'Voice service is temporarily unavailable.',
+          'status': 503,
+        }, status: 503),
       ),
       'Voice service is temporarily unavailable.',
     );
     expect(
       describeApiError(
-        _problemError(
-          {
-            'code': 'authentication_required',
-            'detail': 'Authentication is required.',
-            'status': 401,
-          },
-          status: 401,
-        ),
+        _problemError({
+          'code': 'authentication_required',
+          'detail': 'Authentication is required.',
+          'status': 401,
+        }, status: 401),
       ),
       contains('sign-in has expired'),
     );
     expect(
       describeApiError(
-        _problemError(
-          {
-            'code': 'conflict',
-            'detail': 'Busy.',
-            'status': 409,
-          },
-          status: 409,
-        ),
+        _problemError({
+          'code': 'conflict',
+          'detail': 'Busy.',
+          'status': 409,
+        }, status: 409),
       ),
       'Busy.',
     );
   });
 
   test('isAuthExpired recognizes authentication_required code', () {
-    final error = _problemError(
-      {
-        'code': JarvisApiErrorCodes.authenticationRequired,
-        'status': 401,
-      },
-      status: 401,
-    );
+    final error = _problemError({
+      'code': JarvisApiErrorCodes.authenticationRequired,
+      'status': 401,
+    }, status: 401);
     expect(isAuthExpired(error, authEnabled: true), isTrue);
     expect(isAuthExpired(error, authEnabled: false), isFalse);
   });

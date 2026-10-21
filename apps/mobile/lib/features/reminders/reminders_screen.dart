@@ -14,12 +14,14 @@ import '../coding/coding_run_detail_screen.dart';
 import '../automations/automations_screen.dart';
 import '../habits/habits_screen.dart';
 import '../learning/learning_screen.dart';
+import '../skills/skills_screen.dart';
 import '../briefing/daily_briefing_screen.dart';
 import '../devices/device_sensors.dart';
 import '../devices/place_reminder_tracker.dart';
 import '../review/weekly_review_screen.dart';
 import '../notifications/notification_delivery_sheet.dart';
 import '../notifications/notification_details_screen.dart';
+import '../notifications/notification_presentation.dart';
 import '../notifications/notification_routing.dart';
 import '../../schedule_format.dart';
 import '../../api/mutation_queue.dart';
@@ -400,8 +402,7 @@ abstract class _RemindersController extends State<RemindersScreen>
         );
         if (mounted) {
           _showMessage(
-            queued.problem ??
-                'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not done yet.',
+            queued.problem ?? 'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not done yet.',
           );
         }
         return;
@@ -629,6 +630,14 @@ abstract class _RemindersController extends State<RemindersScreen>
           builder: (_) => AutomationsScreen(http: widget.http),
         ),
       );
+    } else if (opensSkill(type)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => sourceId == null
+              ? SkillsScreen(http: widget.http)
+              : SkillDetailScreen(http: widget.http, skillId: sourceId),
+        ),
+      );
     } else if (opensImprovementSuggestions(type)) {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
@@ -711,9 +720,8 @@ abstract class _RemindersController extends State<RemindersScreen>
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showMessage(String message) => _showError(message);

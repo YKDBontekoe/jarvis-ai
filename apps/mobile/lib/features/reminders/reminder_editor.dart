@@ -158,8 +158,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     setState(() {
       _locating = false;
       if (fix.latitude == null || fix.longitude == null) {
-        _placeError =
-            'Jarvis could not read your location. Allow location for Jarvis in Settings, then try again.';
+        _placeError = 'Jarvis could not read your location. Allow location for Jarvis in Settings, then try again.';
         return;
       }
       _spot = (
@@ -552,9 +551,8 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
             snapshot.hasData
                 ? 'Time zone: ${snapshot.data!.replaceAll('_', ' ')}'
                 : ' ',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: JarvisColors.of(context).muted,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: JarvisColors.of(context).muted),
           ),
         ),
       ),

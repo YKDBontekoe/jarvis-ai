@@ -47,6 +47,7 @@ import '../home/jarvis_home.dart';
 import '../tiles/app_tiles.dart';
 import '../tiles/tile_controller.dart';
 import '../people/people_screen.dart';
+import '../skills/skills_screen.dart';
 import '../settings/settings_view.dart';
 import '../search/command_palette.dart';
 import '../search/recent_searches_store.dart';

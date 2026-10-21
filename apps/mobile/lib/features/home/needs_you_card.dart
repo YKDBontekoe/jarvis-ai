@@ -140,15 +140,17 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Semantics(
-                            header: true,
-                            child: Text(
-                              'Needs you',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: -.5,
-                                color: colors.ink,
+                          Flexible(
+                            child: Semantics(
+                              header: true,
+                              child: Text(
+                                'Needs you',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -.5,
+                                  color: colors.ink,
+                                ),
                               ),
                             ),
                           ),
@@ -336,10 +338,21 @@ class _NeedsYouRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final (leading, actions) = _parts(context);
-    // A promise or decision is only useful with its date and who it is for, so these wrap instead of truncating.
-    final lines =
-        item.kind == NeedsYouKind.commitment ||
-            item.kind == NeedsYouKind.decision
+    // At large text the buttons cannot share a line with the title, so they move under it (playbook: stack from 1.5×).
+    final stacked = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+    final status = busy
+        ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : null;
+    // A promise or decision is only useful with its date and who it is for, so these wrap instead of truncating;
+    // at large text one line holds a word or two, so every row gets room to say what it is.
+    final lines = stacked
+        ? 3
+        : item.kind == NeedsYouKind.commitment ||
+              item.kind == NeedsYouKind.decision
         ? 2
         : 1;
     return Semantics(
@@ -363,6 +376,9 @@ class _NeedsYouRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: stacked
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.center,
                 children: [
                   leading,
                   const SizedBox(width: 14),
@@ -423,17 +439,31 @@ class _NeedsYouRow extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (busy)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    ...actions,
+                  if (!stacked) ...[
+                    const SizedBox(width: 8),
+                    ?status,
+                    if (status == null) ...actions,
+                  ],
                 ],
               ),
+              if (stacked)
+                Padding(
+                  key: const Key('home-needs-you-stacked-actions'),
+                  padding: const EdgeInsets.only(left: 58, top: 10),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child:
+                        status ??
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final action in actions)
+                              if (action is! SizedBox) action,
+                          ],
+                        ),
+                  ),
+                ),
               if ((http, item.chat, replies) case (
                 final http?,
                 final chat?,

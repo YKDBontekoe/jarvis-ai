@@ -36,9 +36,8 @@ void main() {
       MaterialApp(
         theme: buildJarvisTheme(),
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(disableAnimations: reducedMotion),
+          data: MediaQuery.of(context)
+              .copyWith(disableAnimations: reducedMotion),
           child: child!,
         ),
         home: Scaffold(

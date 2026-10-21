@@ -35,8 +35,13 @@ Map<String, Object?> _timeline() => {
     {
       'date': '2026-10-03',
       'events': [
-        _event('journal:1', 'journal', 'Journal entry', '2026-10-03',
-            detail: 'mood 4/5 · great run'),
+        _event(
+          'journal:1',
+          'journal',
+          'Journal entry',
+          '2026-10-03',
+          detail: 'mood 4/5 · great run',
+        ),
         _event('expense:1', 'expense', 'Spent €12.00 at Bagels', '2026-10-03'),
       ],
     },
@@ -98,7 +103,9 @@ void main() {
       {
         'year': 2025,
         'date': '2025-10-03',
-        'events': [_event('journal:9', 'journal', 'Last year entry', '2025-10-03')],
+        'events': [
+          _event('journal:9', 'journal', 'Last year entry', '2025-10-03'),
+        ],
       },
     ]);
     await show(tester);

@@ -192,6 +192,16 @@ mixin _ChatScreenPush on _ChatScreenController {
       _openUtility('learning');
       return;
     }
+    if (opensSkill(type)) {
+      if (sourceId == null) {
+        _openUtility('skills');
+      } else {
+        unawaited(
+          _openPushedDetail(SkillDetailScreen(http: _http, skillId: sourceId)),
+        );
+      }
+      return;
+    }
     if (opensPeople(type)) {
       if (sourceId == null) {
         _openUtility('people');
