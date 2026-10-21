@@ -22,7 +22,9 @@ public sealed class HomeBriefingService(
     IUserMcpServerRegistry mcpServers,
     INotificationRepository notifications,
     ICommitmentService commitments,
-    IDecisionRepository decisions) : IHomeBriefingService
+    IDecisionRepository decisions,
+    Jarvis.Application.Improvements.IImprovementRepository? improvements = null,
+    Jarvis.Application.Skills.ISkillRepository? skills = null) : IHomeBriefingService
 {
     /// <summary>A briefing older than this belongs to an earlier day and is not shown.</summary>
     public static readonly TimeSpan BriefingFreshness = TimeSpan.FromHours(18);
@@ -67,6 +69,7 @@ public sealed class HomeBriefingService(
         var dueCommitments = HomeAttention.Commitments(
             await commitments.ListAsync(ownerId, null, CommitmentStatuses.Open, false, cancellationToken), today);
         var dueDecisions = HomeAttention.Decisions(await decisions.ListAsync(ownerId, cancellationToken), today);
+        var notes = await notifications.ListNotificationsAsync(ownerId, cancellationToken);
         var packs = new List<HomePackDto>();
         foreach (var pack in IntegrationPackCatalog.All)
         {
@@ -90,16 +93,26 @@ public sealed class HomeBriefingService(
                 device.Latitude is not null && device.Longitude is not null, device.ReportedAt),
             brief is null ? null : new HomeBriefingScheduleDto(brief.Enabled, brief.LocalTime, brief.TimeZoneId),
             packs,
-            await LatestBriefingAsync(ownerId, now, cancellationToken),
+            PickLatestBriefing(notes, now),
             dueCommitments,
-            dueDecisions);
+            dueDecisions,
+            await LearningAsync(ownerId, notes, now, cancellationToken));
     }
 
-    private async Task<HomeBriefingNoteDto?> LatestBriefingAsync(Guid ownerId, DateTimeOffset now,
-        CancellationToken cancellationToken)
+    /// <summary>Self-improvement for Home; a failure here only leaves the section out.</summary>
+    private async Task<HomeLearningDto?> LearningAsync(Guid ownerId, IReadOnlyList<NotificationRecord> notes,
+        DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var items = await notifications.ListNotificationsAsync(ownerId, cancellationToken);
-        return PickLatestBriefing(items, now);
+        if (improvements is null || skills is null) return null;
+        try
+        {
+            return HomeLearning.Build(await improvements.ListAsync(ownerId, cancellationToken), notes,
+                await skills.ListAsync(ownerId, cancellationToken), now);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return null;
+        }
     }
 
     /// <summary>The newest morning briefing that still belongs to today, or null.</summary>

@@ -185,6 +185,7 @@ Jarvis learns from how replies land, not only from what the owner says. All of i
 | `review` | **Review miner**: a skill or memory present in at least 3 thumbs-down replies and at most 1 thumbs-up, or a tool failing at least 5 times with a failure rate above 50% over 7 days | `disable_skill` turns the skill off (undo turns it back on); `note` only records that the owner has seen it. Evidence only: retrieval ranking is never changed |
 | `lesson` | **Lesson miner**: a tool that was part of at least 2 turns in 7 days that went wrong (the tool failed, the owner corrected the reply, asked for it again, rated it down, or declined its approval). A correction is matched to the reply just before it in that conversation. The background model drafts one imperative sentence (240 characters at most) from the tool name, counts, reasons and error kinds only; at most 3 drafts a night, none for a tool that already has a lesson in force | Puts the lesson in force. At 3 or more incidents (confidence 0.8) and with `autoApplyLowRiskMemory` on it is `applied` at once and audited; otherwise it waits as `pending`. Undo takes it out. At most 20 are in force |
 | `skill_refine` | **Skill refiner**: an active, unlocked skill with at least 3 counted runs of which at most 60% went well. The background model redrafts its description and instructions from its own text plus, from the runs, tool names, counts and error kinds only; at most 2 redrafts a night; one proposal per skill version | Never applied on its own. Accepting rewrites the skill only while it is still at the version the redraft was written for; undo restores the earlier text as a new revision. Locked (owner-written) skills are never offered |
+| `capability` | **Gap miner**: a `capability_gap` label reported in at least 2 conversations within 30 days. With `autonomousEvolution`, the nightly builder may attach a tested self-built app (see [Self-evolution](#self-evolution)) | With a tested app: activates exactly that draft; undo pauses it. Without one: records that the owner wants it, and the builder takes it first |
 
 Dismissed and undone fingerprints never come back (tool reports reopen after a month, since a tool can break again). Skill and review proposals never apply on their own.
 
@@ -192,7 +193,39 @@ Dismissed and undone fingerprints never come back (tool reports reopen after a m
 
 Reflection also receives counts of corrections, regenerations and declined approvals since the last review (`reply_signals`, never text) as a hint for tone and format learning.
 
-Settings (`learning`): `captureSignals`, `traceRetentionDays`, `proposeImprovements`, `autoApplyLowRiskMemory`.
+Settings (`learning`): `captureSignals`, `traceRetentionDays`, `proposeImprovements`, `autoApplyLowRiskMemory`,
+`autonomousEvolution` (default off, see below).
+
+## Self-evolution
+
+Besides the nightly miners, Jarvis improves itself during turns and, when allowed, overnight:
+
+- **Skills know their tools.** A skill can list up to 10 `requiredTools` (exact tool names, `skills.required_tools`).
+  `AgentToolCatalog` holds the tools the current agent can call; the skills block marks a skill whose tools are missing
+  as unavailable, `LoadSkill` refuses it with the missing names, and `SaveSkill` refuses tool names the agent cannot
+  call. Changing only the tool list updates it without a new revision. After `ActivateCustomMcpServer`, Jarvis is told
+  to save a skill naming the new app's tools, so later turns find it.
+- **Self-insight.** `ListSkills` shows version, uses and "went well x of y"; `RetireSkill` turns off a learned, unlocked
+  skill (audited `skill.retired`, the owner is notified and can switch it back on). `ListLessons` shows the lessons in
+  force with their helped/hurt counts; `RecordLesson` lets Jarvis write one itself after a tool went wrong. It goes
+  through `ProposeLessonAsync` with the miner's fingerprint (`lesson:tool:{tool}:{month}`) at confidence 0.8, so it is
+  in force at once only with `autoApplyLowRiskMemory`, one per tool, and the nightly counter switches it off if it hurts.
+- **Capability gaps.** When nothing can do what was asked, Jarvis calls `ReportCapabilityGap`. The signal
+  (`capability_gap`) keeps only a short label in `category` (`CapabilityGapRules.NormalizeSlug`: 3 to 48 characters, at
+  most six words, no runs of four or more digits, no `@` or URLs). The miner offers a gap reported in at least 2
+  conversations within 30 days as a `capability` proposal (fingerprint `gap:{label}`). Accepting one without an app
+  records that the owner wants it; accepting one with a tested app activates exactly that draft's hash
+  (`CustomMcpServerManager.ActivateAsync`), and undo pauses the app.
+- **Autonomous evolution** (`autonomousEvolution`, off by default, needs `proposeImprovements`). After each dream the
+  `RunCapabilityEvolution` activity (its own 20-minute budget, never retried, behind the `capability-evolution` workflow
+  patch) picks one open gap: accepted before pending, then most conversations; at most 3 attempts, a week apart.
+  `ModelCapabilityBuilder` asks the reasoning model for one self-built MCP server (it sees only the label and the
+  template), saves it through the normal `WriteCustomMcpServer` path under a name no other app uses, tests it in the
+  isolated MCP runner (calling a tool only when it needs no keys) and feeds errors back, at most 3 rounds. A passing
+  draft is filed on the proposal (`buildStatus: built`, app id, hash, tools, keys) and the owner is notified
+  (`improvement.capability_built`); the model may also answer `not_feasible`. Nothing is ever switched on without the
+  owner accepting. Audited as `improvement.capability_attempted` with ids and outcome only.
+- **On Home.** `GET /home` carries `learning` (`HomeLearning.Build`): pending proposals become Needs you rows (a tested app first, with "Switch on"), and what Jarvis did by itself this week (skills learned or retired, applied lessons and memories) fills the "Jarvis is learning" card with the step that reverses each.
 
 ## Usage tracking
 

@@ -7,9 +7,11 @@ namespace Jarvis.Api.Endpoints;
 
 public sealed record SkillDto(Guid Id, string Name, string Description, string Instructions, string Source,
     string Status, bool IsLocked, int Version, int UseCount, DateTimeOffset? LastUsedAt, DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt, int OutcomeRuns = 0, int OutcomeSuccesses = 0);
+    DateTimeOffset UpdatedAt, int OutcomeRuns = 0, int OutcomeSuccesses = 0,
+    IReadOnlyList<string>? RequiredTools = null);
 public sealed record SkillDetailsDto(SkillDto Skill, IReadOnlyList<SkillRevisionRecord> Revisions);
-public sealed record SaveSkillRequest(string? Name, string? Description, string? Instructions);
+public sealed record SaveSkillRequest(string? Name, string? Description, string? Instructions,
+    IReadOnlyList<string>? RequiredTools = null);
 public sealed record SkillStatusRequest(string? Status);
 public sealed record SkillLockRequest(bool Locked);
 public sealed record ImportSkillRequest(string? Markdown);
@@ -36,7 +38,8 @@ internal static class SkillEndpoints
 
         skills.MapPost("", async (SaveSkillRequest request, ISkillRepository repository, IAuditEventStore audit,
                 ICurrentUser currentUser, CancellationToken ct) =>
-            await SaveAsync(new SkillDraft(request.Name ?? "", request.Description ?? "", request.Instructions ?? ""),
+            await SaveAsync(new SkillDraft(request.Name ?? "", request.Description ?? "", request.Instructions ?? "",
+                    request.RequiredTools),
                 SkillSources.User, "Created in the app", repository, audit, logger, currentUser, ct, created: true))
             .WithName("CreateSkill");
 
@@ -46,7 +49,7 @@ internal static class SkillEndpoints
             var existing = await repository.GetAsync(id, currentUser.OwnerId, ct);
             if (existing is null) return Results.NotFound();
             return await SaveAsync(new SkillDraft(existing.Name, request.Description ?? existing.Description,
-                    request.Instructions ?? existing.Instructions), SkillSources.User, "Edited in the app",
+                    request.Instructions ?? existing.Instructions, request.RequiredTools), SkillSources.User, "Edited in the app",
                 repository, audit, logger, currentUser, ct, created: false);
         }).WithName("UpdateSkill");
 
@@ -128,5 +131,6 @@ internal static class SkillEndpoints
 
     private static SkillDto ToDto(SkillRecord skill) => new(skill.Id, skill.Name, skill.Description,
         skill.Instructions, skill.Source, skill.Status, skill.IsLocked, skill.Version, skill.UseCount,
-        skill.LastUsedAt, skill.CreatedAt, skill.UpdatedAt, skill.OutcomeRuns, skill.OutcomeSuccesses);
+        skill.LastUsedAt, skill.CreatedAt, skill.UpdatedAt, skill.OutcomeRuns, skill.OutcomeSuccesses,
+        skill.RequiredTools);
 }

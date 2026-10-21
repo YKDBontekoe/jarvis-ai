@@ -7,6 +7,8 @@ internal sealed class InMemoryImprovementRepository : IImprovementRepository
 {
     private readonly List<ImprovementProposal> _items = [];
 
+    public IReadOnlyList<ImprovementProposal> Items => _items;
+
     public Task<IReadOnlyList<ImprovementProposal>> ListAsync(Guid ownerId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ImprovementProposal>>(
             _items.Where(item => item.OwnerId == ownerId).OrderByDescending(item => item.UpdatedAt).ToArray());

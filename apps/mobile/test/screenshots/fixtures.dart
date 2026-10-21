@@ -208,6 +208,48 @@ Map<String, Object?> home() {
     'packs': [
       {'name': 'Calendar', 'installed': true},
     ],
+    'learning': {
+      'waiting': [
+        {
+          'id': 'imp1',
+          'kind': 'capability',
+          'title': 'Switch on “Trains”',
+          'detail': 'An app Jarvis built and tested for live train departures',
+          'acceptLabel': 'Switch on',
+          'createdAt': _iso(now.subtract(const Duration(hours: 13))),
+        },
+      ],
+      'changes': [
+        {
+          'id': 'ch1',
+          'kind': 'skill_learned',
+          'title': 'Learned “weekly-review”',
+          'detail': 'Run the Friday review with wins first.',
+          'action': 'disable_skill',
+          'target': 's1',
+          'at': _iso(now.subtract(const Duration(hours: 20))),
+        },
+        {
+          'id': 'ch2',
+          'kind': 'lesson',
+          'title': 'New rule for create reminder',
+          'detail': "Use the owner's time zone after two corrections.",
+          'action': 'undo',
+          'target': 'imp2',
+          'at': _iso(now.subtract(const Duration(days: 2))),
+        },
+        {
+          'id': 'ch3',
+          'kind': 'skill_retired',
+          'title': 'Turned off “old-meal-plan”',
+          'detail': 'Went well 1 of 6 times.',
+          'action': 'enable_skill',
+          'target': 's2',
+          'at': _iso(now.subtract(const Duration(days: 3))),
+        },
+      ],
+      'changesThisWeek': 3,
+    },
   };
 }
 
@@ -874,7 +916,73 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   },
   'GET /api/v1/conversations/*': {'items': <Object>[]},
   'GET /api/v1/approvals': withApproval ? approvals() : <Object>[],
+  'GET /api/v1/learning/status': {
+    'settings': {
+      'heartbeatEnabled': true,
+      'heartbeatMinutes': 60,
+      'learnPersona': true,
+      'autoCreateSkills': true,
+      'autoActivateSkills': false,
+      'proactiveCheckIns': true,
+      'quietHoursStart': 22,
+      'quietHoursEnd': 7,
+      'dreamingEnabled': true,
+      'dreamingHour': 3,
+      'captureSignals': true,
+      'proposeImprovements': true,
+      'autoApplyLowRiskMemory': true,
+      'autonomousEvolution': true,
+    },
+    'state': {'lastSummary': 'Saved 2 memories and improved 1 skill.'},
+    'dreaming': {'lastSummary': null, 'diary': <Object>[]},
+    'activity': <Object>[],
+  },
+  'GET /api/v1/improvements': [
+    {
+      'id': 'imp1',
+      'kind': 'capability',
+      'title': 'Switch on “Trains”, an app Jarvis built for live train departures',
+      'evidence':
+          'Needed in 3 conversations (4 times) with no tool for it. Jarvis wrote a draft app and it passed a test in the isolated runner (tools: get_departures). Accept to switch it on; review its code first under Apps.',
+      'confidence': 0.7,
+      'status': 'pending',
+      'createdAt': '2026-10-21T03:00:00Z',
+      'updatedAt': '2026-10-21T03:00:00Z',
+      'canUndo': false,
+      'acceptLabel': 'Switch on',
+    },
+    {
+      'id': 'imp2',
+      'kind': 'capability',
+      'title': 'Jarvis keeps lacking: control hue lights',
+      'evidence':
+          'Needed in 2 conversations (2 times) with no tool for it. Accept to ask Jarvis to build or connect an app for it.',
+      'confidence': 0.6,
+      'status': 'pending',
+      'createdAt': '2026-10-20T03:00:00Z',
+      'updatedAt': '2026-10-20T03:00:00Z',
+      'canUndo': false,
+      'acceptLabel': 'I want this',
+    },
+  ],
   'GET /api/v1/notifications': [
+    {
+      'id': 'n2',
+      'type': 'improvement.capability_built',
+      'title': 'Jarvis built a draft app: Trains',
+      'body':
+          'For live train departures. It passed a test; review it in Settings → Learning to switch it on.',
+      'createdAt': '2026-10-21T03:12:00Z',
+    },
+    {
+      'id': 'n3',
+      'type': 'skill.learned',
+      'title': 'Jarvis learned a new skill: weekly-review',
+      'body':
+          'Run the Friday review with wins first. Review it under Settings → Skills to activate it.',
+      'sourceId': 's1',
+      'createdAt': '2026-10-20T18:40:00Z',
+    },
     {'id': 'n1', 'type': 'reminder.due', 'title': 'Water the basil'},
   ],
   'GET /api/v1/projects': projects(),

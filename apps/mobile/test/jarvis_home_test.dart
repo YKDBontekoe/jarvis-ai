@@ -328,6 +328,124 @@ void main() {
     expect(find.byKey(const Key('home-needs-you-clear')), findsOneWidget);
   });
 
+  testWidgets('an app Jarvis built is switched on from Needs you', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/home', {
+      'approvals': <Object>[],
+      'learning': {
+        'waiting': [
+          {
+            'id': 'p1',
+            'kind': 'capability',
+            'title': 'Switch on “Trains”',
+            'detail': 'An app Jarvis built and tested for live train departures',
+            'acceptLabel': 'Switch on',
+          },
+        ],
+        'changes': <Object>[],
+        'changesThisWeek': 0,
+      },
+    });
+    http.on('POST', '/api/v1/improvements/p1/accept', {'id': 'p1'});
+    await show(tester);
+    expect(find.text('Switch on “Trains”'), findsOneWidget);
+    http.on('GET', '/api/v1/home', {'approvals': <Object>[]});
+    await tester.tap(find.byKey(const Key('home-needs-you-button-Switch on')));
+    await tester.pumpAndSettle();
+    expect(http.sent('POST', '/api/v1/improvements/p1/accept'), hasLength(1));
+    expect(find.text('Switch on “Trains”'), findsNothing);
+  });
+
+  testWidgets('what Jarvis changed itself can be undone and put away', (
+    tester,
+  ) async {
+    Map<String, Object?> learning(List<Object> changes) => {
+      'approvals': <Object>[],
+      'learning': {
+        'waiting': <Object>[],
+        'changes': changes,
+        'changesThisWeek': changes.length,
+      },
+    };
+    final changes = <Object>[
+      {
+        'id': 'c1',
+        'kind': 'skill_learned',
+        'title': 'Learned “weekly-review”',
+        'detail': 'Run the Friday review with wins first.',
+        'action': 'disable_skill',
+        'target': 's1',
+        'at': _iso(now.subtract(const Duration(hours: 3))),
+      },
+      {
+        'id': 'c2',
+        'kind': 'lesson',
+        'title': 'New rule for create reminder',
+        'detail': "Use the owner's time zone.",
+        'action': 'undo',
+        'target': 'p2',
+        'at': _iso(now.subtract(const Duration(hours: 5))),
+      },
+    ];
+    http.on('GET', '/api/v1/home', learning(changes));
+    http.on('POST', '/api/v1/skills/s1/status', {'id': 's1'});
+    http.on('POST', '/api/v1/improvements/p2/undo', null, status: 204);
+    await show(tester);
+
+    final card = find.byKey(const Key('home-learning'));
+    await reveal(tester, card);
+    expect(find.text('2 changes this week'), findsOneWidget);
+    expect(find.text('Learned “weekly-review”'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('home-learning-action-c1')));
+    await tester.pumpAndSettle();
+    expect(
+      http.sent('POST', '/api/v1/skills/s1/status').single.body,
+      {'status': 'disabled'},
+    );
+
+    await reveal(tester, find.byKey(const Key('home-learning-action-c2')));
+    await tester.tap(find.byKey(const Key('home-learning-action-c2')));
+    await tester.pumpAndSettle();
+    expect(http.sent('POST', '/api/v1/improvements/p2/undo'), hasLength(1));
+
+    await reveal(tester, find.byKey(const Key('home-learning-seen')));
+    await tester.tap(find.byKey(const Key('home-learning-seen')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-learning')), findsNothing);
+  });
+
+  testWidgets('opening Learning from the card puts it away', (tester) async {
+    http.on('GET', '/api/v1/home', {
+      'approvals': <Object>[],
+      'learning': {
+        'waiting': <Object>[],
+        'changes': [
+          {
+            'id': 'c1',
+            'kind': 'memory',
+            'title': 'Remembered something',
+            'detail': 'Prefers window seats.',
+            'action': 'undo',
+            'target': 'p1',
+            'at': _iso(now.subtract(const Duration(hours: 1))),
+          },
+        ],
+        'changesThisWeek': 4,
+      },
+    });
+    await show(tester);
+    await reveal(tester, find.byKey(const Key('home-learning')));
+    expect(find.text('4 changes this week'), findsOneWidget);
+    expect(find.text('3 more in Learning ›'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('home-learning-open')));
+    await tester.pumpAndSettle();
+    expect(opened, contains('learning'));
+    expect(find.byKey(const Key('home-learning')), findsNothing);
+  });
+
   testWidgets('people waiting on a reply open their chat or ask for a draft', (
     tester,
   ) async {

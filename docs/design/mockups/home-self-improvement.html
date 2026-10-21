@@ -1,0 +1,266 @@
+<title>Home Self-Improvement</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap">
+<style>
+/* Layout: a review board of phone frames side by side, each labelled with what it proposes; stacks on narrow screens. */
+:root {
+  --canvas: #f7f7fa; --surface: #ffffff; --surface-muted: #efeff4; --outline: #e6e6ec; --outline-strong: #d3d3de;
+  --ink: #16161d; --ink-soft: #5a5b68; --muted: #8a8b9a; --on-ink: #ffffff;
+  --accent: #5b4ef0; --accent-deep: #4338ca; --accent-soft: #eeedfe;
+  --warning: #b45309; --warning-soft: #fcf3e6; --info: #2563eb; --info-soft: #e7eefd;
+  --board: #ececf2; --shadow: 0 1px 2px rgba(22,22,29,.04), 0 8px 24px rgba(22,22,29,.06);
+  --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --canvas: #0f0f14; --surface: #18181f; --surface-muted: #202029; --outline: #26262f; --outline-strong: #363642;
+  --ink: #f2f2f7; --ink-soft: #a9aab8; --muted: #7c7d8d; --on-ink: #0f0f14;
+  --accent: #8f86ff; --accent-deep: #c4c0ff; --accent-soft: #221f45;
+  --warning: #fbbf24; --warning-soft: #3a2a12; --info: #7aa2ff; --info-soft: #1a2347;
+  --board: #09090d; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --canvas: #0f0f14; --surface: #18181f; --surface-muted: #202029; --outline: #26262f; --outline-strong: #363642;
+  --ink: #f2f2f7; --ink-soft: #a9aab8; --muted: #7c7d8d; --on-ink: #0f0f14;
+  --accent: #8f86ff; --accent-deep: #c4c0ff; --accent-soft: #221f45;
+  --warning: #fbbf24; --warning-soft: #3a2a12; --info: #7aa2ff; --info-soft: #1a2347;
+  --board: #09090d; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35); color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--board); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.4;
+  padding-block: 32px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+header.intro { max-width: 1240px; margin: 0 auto 28px; display: grid; gap: 8px }
+header.intro h1 { font-size: 30px; font-weight: 700; letter-spacing: -1px; margin: 0; text-wrap: balance }
+header.intro p { margin: 0; max-width: 70ch; color: var(--ink-soft) }
+.boards { max-width: 1240px; margin: 0 auto; display: grid; gap: 28px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: start }
+.board { display: grid; gap: 12px; min-width: 0 }
+.board > .label { display: grid; gap: 4px }
+.tag { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--accent) }
+.tag.alt { color: var(--muted) }
+.board h2 { font-size: 17px; font-weight: 600; letter-spacing: -.3px; margin: 0 }
+.board .note { font-size: 13px; color: var(--ink-soft); margin: 0 }
+.phone { background: var(--canvas); border-radius: 36px; border: 1px solid var(--outline-strong); padding: 18px 16px 22px;
+  max-width: 393px; width: 100%; display: grid; gap: 14px; box-shadow: var(--shadow) }
+.phone.big { font-size: 22px }
+.status { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--ink); padding: 0 8px 4px; font-variant-numeric: tabular-nums }
+.section-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 0 4px }
+.section-title h3 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.5px; display: flex; gap: 8px; align-items: center }
+.count { background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; border-radius: 999px; min-width: 22px; height: 22px; display: inline-grid; place-items: center; padding: 0 6px; font-variant-numeric: tabular-nums }
+.link { color: var(--ink); font-size: 14px; font-weight: 500 }
+.card { background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); overflow: hidden }
+.row { display: flex; gap: 14px; align-items: center; padding: 14px 12px 14px 16px; border-top: 1px solid var(--outline) }
+.row:first-child { border-top: 0 }
+.row.stack { flex-wrap: wrap; align-items: flex-start }
+.avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; flex: none }
+.avatar svg { width: 21px; height: 21px }
+.a-accent { background: var(--accent-soft); color: var(--accent) }
+.a-warn { background: var(--warning-soft); color: var(--warning) }
+.a-info { background: var(--info-soft); color: var(--info) }
+.a-muted { background: var(--surface-muted); color: var(--ink-soft) }
+.text { flex: 1; min-width: 0; display: grid; gap: 2px }
+.title { font-weight: 600; font-size: 15.5px; letter-spacing: -.2px }
+.detail { font-size: 13px; color: var(--ink-soft) }
+.detail.warn { color: var(--warning) }
+.caps { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted) }
+.caps.accent { color: var(--accent) }
+.actions { display: flex; gap: 6px; flex: none }
+.row.stack .actions { flex-basis: 100%; padding-left: 58px; flex-wrap: wrap }
+.btn { border-radius: 12px; padding: 8px 13px; font: 600 13.5px var(--font); border: 0; background: var(--surface-muted); color: var(--ink); min-height: 36px }
+.btn.primary { background: var(--ink); color: var(--on-ink) }
+.btn.quiet { background: none; color: var(--ink-soft); padding-inline: 6px }
+.more { text-align: center; padding: 14px; color: var(--accent); font-weight: 500; font-size: 14.5px; border-top: 1px solid var(--outline) }
+.learn-head { display: flex; gap: 12px; align-items: center; padding: 16px 16px 6px }
+.learn-head .text .title { font-size: 16px }
+.change { display: flex; gap: 12px; align-items: center; padding: 10px 16px; font-size: 14px }
+.dot { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; flex: none }
+.dot svg { width: 15px; height: 15px }
+.change .text .title { font-size: 14.5px; font-weight: 500 }
+.undo { font-size: 13.5px; font-weight: 600; color: var(--accent); flex: none }
+.foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px 14px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--outline); margin-top: 4px }
+.foot b { color: var(--ink); font-weight: 500 }
+.notif { background: var(--surface); border: 1px solid var(--outline); border-radius: 18px; padding: 14px 14px 12px 16px; display: flex; gap: 14px; align-items: flex-start }
+.notif.read { background: var(--canvas) }
+.notif .text { gap: 3px }
+.notif .body { font-size: 13.5px; color: var(--ink-soft) }
+.notif .meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; font-size: 12.5px; color: var(--muted) }
+.notif .meta .go { color: var(--accent); font-weight: 600 }
+.unread { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex: none }
+.group { font-size: 13px; font-weight: 600; color: var(--muted); padding: 4px 4px 0 }
+.big .title { font-size: 31px } .big .detail { font-size: 26px } .big .btn { font-size: 27px; padding: 12px 18px }
+.big .avatar { width: 52px; height: 52px } .big .section-title h3 { font-size: 36px } .big .row.stack .actions { padding-left: 66px }
+.callout { font-size: 12.5px; color: var(--ink-soft); background: var(--surface); border: 1px dashed var(--outline-strong); border-radius: 14px; padding: 10px 12px }
+.callout b { color: var(--ink) }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="puzzle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4a2 2 0 1 1 4 0v2h4v4h-2a2 2 0 1 0 0 4h2v4h-4v-2a2 2 0 1 0-4 0v2H6v-4h2a2 2 0 1 0 0-4H6V6h4z"/></symbol>
+  <symbol id="wand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 15 9M14 4v3M19 9h-3M18 5l-2 2M10 4l.5 1.5M20 14l-1.5-.5"/></symbol>
+  <symbol id="note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1 1 1.7V16h5v-.4c0-.7.4-1.3 1-1.7A6 6 0 0 0 12 3z"/></symbol>
+  <symbol id="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M8 16 16 8"/></symbol>
+  <symbol id="brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3h0V4zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3V4z"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 21h4"/></symbol>
+  <symbol id="shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4 3 7 7 9 4-2 7-5 7-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V6a1.5 1.5 0 0 1 3 0v5M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-.5a6 6 0 0 1-5-2.7L3 14a1.5 1.5 0 0 1 2.5-1.6L8 15"/></symbol>
+</svg>
+
+<header class="intro">
+  <span class="tag">Jarvis · Home · proposal for review</span>
+  <h1>Showing what Jarvis changed about itself</h1>
+  <p>Self-improvement now produces two kinds of things: decisions only you can make (switch on an app Jarvis built, keep a skill it wrote) and changes it already made that you may want to undo. These boards put each where Home's principles say it belongs, fix the overflowing rows at large text, and make notifications say what happened and where to go.</p>
+</header>
+
+<main class="boards">
+
+  <!-- 1. Recommended -->
+  <section class="board">
+    <div class="label">
+      <span class="tag">1 · Recommended</span>
+      <h2>Decisions in Needs you, changes in their own card</h2>
+      <p class="note">A suggestion that waits on you is just another Needs you row, with its real action. What Jarvis changed on its own sits lower in a calm "Jarvis is learning" card with Undo on each line.</p>
+    </div>
+    <div class="phone">
+      <div class="status"><span>16:56</span><span>●●● 82%</span></div>
+      <div class="section-title"><h3>Needs you <span class="count">4</span></h3><span class="link">See all</span></div>
+      <div class="card">
+        <div class="row">
+          <div class="avatar a-accent"><svg><use href="#shield"/></svg></div>
+          <div class="text"><span class="title">Send a WhatsApp message</span><span class="detail">Waiting 4 min</span></div>
+          <div class="actions"><button class="btn primary">Review</button></div>
+        </div>
+        <div class="row">
+          <div class="avatar a-accent"><svg><use href="#puzzle"/></svg></div>
+          <div class="text"><span class="title">Switch on “Trains”</span><span class="detail">An app Jarvis built and tested for live train departures</span></div>
+          <div class="actions"><button class="btn">Not now</button><button class="btn primary">Switch on</button></div>
+        </div>
+        <div class="row">
+          <div class="avatar a-warn"><svg><use href="#bell"/></svg></div>
+          <div class="text"><span class="title">Water the basil</span><span class="detail">Due now</span></div>
+          <div class="actions"><button class="btn">+10 min</button><button class="btn primary">Done</button></div>
+        </div>
+        <div class="more">Show 1 more</div>
+      </div>
+
+      <div class="card">
+        <div class="learn-head">
+          <div class="avatar a-accent"><svg><use href="#wand"/></svg></div>
+          <div class="text"><span class="caps accent">Jarvis is learning</span><span class="title">3 changes this week</span></div>
+        </div>
+        <div class="change">
+          <div class="dot a-accent"><svg><use href="#wand"/></svg></div>
+          <div class="text"><span class="title">Learned “weekly-review”</span><span class="detail">From how you ran it on Friday</span></div>
+          <span class="undo">Undo</span>
+        </div>
+        <div class="change">
+          <div class="dot a-info"><svg><use href="#note"/></svg></div>
+          <div class="text"><span class="title">New rule for reminders</span><span class="detail">Uses your time zone after 2 corrections</span></div>
+          <span class="undo">Undo</span>
+        </div>
+        <div class="change">
+          <div class="dot a-muted"><svg><use href="#off"/></svg></div>
+          <div class="text"><span class="title">Turned off “old-meal-plan”</span><span class="detail">Went well 1 of 6 times</span></div>
+          <span class="undo">Turn on</span>
+        </div>
+        <div class="foot"><span>Reply rating up 12% on last week</span><b>Learning ›</b></div>
+      </div>
+      <p class="callout"><b>Rules.</b> The card appears only when something changed in the last 7 days, shows at most 3 lines, and hides once you open Learning. It never takes the dark focal style; Right now keeps that.</p>
+    </div>
+  </section>
+
+  <!-- 2. Alternative -->
+  <section class="board">
+    <div class="label">
+      <span class="tag alt">2 · Alternative</span>
+      <h2>One "Jarvis improved" card for both</h2>
+      <p class="note">Simpler, but a decision you need to make sits below everything else on Home, and the card mixes "do this" with "fyi".</p>
+    </div>
+    <div class="phone">
+      <div class="status"><span>16:56</span><span>●●● 82%</span></div>
+      <div class="card">
+        <div class="learn-head">
+          <div class="avatar a-accent"><svg><use href="#wand"/></svg></div>
+          <div class="text"><span class="caps accent">Jarvis improved</span><span class="title">1 to review · 3 changes</span></div>
+        </div>
+        <div class="row stack" style="border-top:0">
+          <div class="avatar a-accent"><svg><use href="#puzzle"/></svg></div>
+          <div class="text"><span class="title">Switch on “Trains”</span><span class="detail">Built and tested for live train departures</span></div>
+          <div class="actions"><button class="btn">Not now</button><button class="btn primary">Switch on</button></div>
+        </div>
+        <div class="change">
+          <div class="dot a-accent"><svg><use href="#wand"/></svg></div>
+          <div class="text"><span class="title">Learned “weekly-review”</span></div>
+          <span class="undo">Undo</span>
+        </div>
+        <div class="change">
+          <div class="dot a-info"><svg><use href="#note"/></svg></div>
+          <div class="text"><span class="title">New rule for reminders</span></div>
+          <span class="undo">Undo</span>
+        </div>
+        <div class="foot"><span>2 more in Learning</span><b>Learning ›</b></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Large text fix -->
+  <section class="board">
+    <div class="label">
+      <span class="tag">3 · Fix</span>
+      <h2>Needs you at 3× text on a small phone</h2>
+      <p class="note">Today the buttons sit beside the title and push past the edge. From 1.5× text they move under the title, as the playbook already asks, titles get up to three lines, and the count badge grows with the text. (Built.)</p>
+    </div>
+    <div class="phone big">
+      <div class="section-title"><h3>Needs you <span class="count">4</span></h3></div>
+      <div class="card">
+        <div class="row stack">
+          <div class="avatar a-warn"><svg><use href="#bell"/></svg></div>
+          <div class="text"><span class="title">Water the basil</span><span class="detail">Due now</span></div>
+          <div class="actions"><button class="btn">+10 min</button><button class="btn primary">Done</button></div>
+        </div>
+        <div class="row stack">
+          <div class="avatar a-accent"><svg><use href="#hand"/></svg></div>
+          <div class="text"><span class="title">Send Rosa the pitch deck</span><span class="detail warn">Overdue · 2 days</span></div>
+          <div class="actions"><button class="btn">Open</button><button class="btn primary">Done</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Notifications -->
+  <section class="board">
+    <div class="label">
+      <span class="tag">4 · Fix</span>
+      <h2>Notifications that say what happened</h2>
+      <p class="note">Each row gets a caps label for what kind of thing it is, its own icon, the body text, and one clear next step. "How it was delivered" becomes a quiet ⓘ button so it stops competing with the content. (Built.)</p>
+    </div>
+    <div class="phone">
+      <div class="group">Today</div>
+      <div class="notif">
+        <div class="avatar a-accent"><svg><use href="#puzzle"/></svg></div>
+        <div class="text">
+          <span class="caps accent">App ready to switch on</span>
+          <span class="title">Jarvis built a draft app: Trains</span>
+          <span class="body">For live train departures. It passed a test; switch it on when you're ready.</span>
+          <span class="meta"><span>03:12</span><span class="go">Review in Learning ›</span></span>
+        </div>
+        <span class="unread"></span>
+      </div>
+      <div class="notif">
+        <div class="avatar a-accent"><svg><use href="#wand"/></svg></div>
+        <div class="text">
+          <span class="caps accent">Jarvis learned</span>
+          <span class="title">New skill: weekly-review</span>
+          <span class="body">Run the Friday review with wins first. Waiting for your review.</span>
+          <span class="meta"><span>Yesterday 18:40</span><span class="go">Open skill ›</span></span>
+        </div>
+        <span class="unread"></span>
+      </div>
+      <div class="notif read">
+        <div class="avatar a-warn"><svg><use href="#bell"/></svg></div>
+        <div class="text">
+          <span class="caps">Reminder</span>
+          <span class="title">Water the basil</span>
+          <span class="meta"><span>Mon 09:00</span></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>

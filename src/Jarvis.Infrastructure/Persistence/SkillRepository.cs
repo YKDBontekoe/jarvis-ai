@@ -21,9 +21,11 @@ public sealed class SkillEntity
     public int OutcomeRuns { get; set; }
     public int OutcomeSuccesses { get; set; }
     public DateTimeOffset? OutcomeCountedAt { get; set; }
+    public string[] RequiredTools { get; set; } = [];
 
     public SkillRecord ToRecord() => new(Id, OwnerId, Name, Description, Instructions, Source, Status, IsLocked,
-        Version, UseCount, LastUsedAt, CreatedAt, UpdatedAt, OutcomeRuns, OutcomeSuccesses, OutcomeCountedAt);
+        Version, UseCount, LastUsedAt, CreatedAt, UpdatedAt, OutcomeRuns, OutcomeSuccesses, OutcomeCountedAt,
+        RequiredTools);
 }
 
 public sealed class SkillRevisionEntity
@@ -91,6 +93,14 @@ public sealed class SkillRepository(JarvisDbContext db) : ISkillRepository
         }
         else if (existing.Description == draft.Description && existing.Instructions == draft.Instructions)
         {
+            // Which tools a skill needs is bookkeeping, not a new procedure: no revision, and its counts stay.
+            if (draft.RequiredTools is { } tools && !tools.SequenceEqual(existing.RequiredTools, StringComparer.Ordinal))
+            {
+                existing.RequiredTools = [.. tools];
+                existing.UpdatedAt = now;
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
             return existing.ToRecord();
         }
 
@@ -101,6 +111,7 @@ public sealed class SkillRepository(JarvisDbContext db) : ISkillRepository
             existing.Status = SkillStatuses.Proposed;
         existing.Description = draft.Description;
         existing.Instructions = draft.Instructions;
+        if (draft.RequiredTools is { } required) existing.RequiredTools = [.. required];
         existing.Version++;
         // The counts describe how the previous text did; the new version starts from nothing.
         existing.OutcomeRuns = 0;

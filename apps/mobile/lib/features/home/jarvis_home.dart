@@ -31,7 +31,9 @@ import 'noticed_card.dart';
 import 'right_now_card.dart';
 import 'home_insights.dart';
 import 'home_widget_sync.dart';
+import 'learning_card.dart';
 import 'needs_you_card.dart';
+import '../skills/skills_screen.dart';
 import 'get_started_card.dart';
 import 'next_up.dart' hide greetingFor;
 import '../../l10n/l10n.dart';
@@ -113,6 +115,10 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   /// Needs you rows whose server call failed, so the card brings them back.
   final Set<String> _failed = {};
 
+  /// Up to when the person has seen what Jarvis changed about itself; newer changes show in the learning card.
+  DateTime? _learningSeenAt;
+  final Set<String> _learningPending = {};
+
   /// Drives the parallax glow, the receding greeting and the compact header.
   final _scroll = ScrollController();
 
@@ -129,6 +135,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_loadLearningSeen());
     widget.layout.addListener(_layoutChanged);
     widget.chats.addListener(_rebuild);
     _tick = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -580,7 +587,119 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
         widget.onOpen('inbox');
       case (NeedsYouKind.decision, _):
         widget.onOpen('decisions');
+      case (NeedsYouKind.improvement, NeedsYouAction.accept):
+        await _decideImprovement(item, accept: true);
+      case (NeedsYouKind.improvement, NeedsYouAction.dismiss):
+        await _decideImprovement(item, accept: false);
+      case (NeedsYouKind.improvement, _):
+        widget.onOpen('learning');
     }
+  }
+
+  Future<void> _loadLearningSeen() async {
+    final seen = await LearningSeenStore.read();
+    if (mounted && seen != null) setState(() => _learningSeenAt = seen);
+  }
+
+  /// Puts the learning card away until Jarvis changes something new.
+  void _learningSeen() {
+    final now = DateTime.now();
+    setState(() => _learningSeenAt = now);
+    unawaited(LearningSeenStore.mark(now));
+  }
+
+  /// Reverses one change Jarvis made by itself, or opens the skill it improved.
+  Future<void> _learningAction(LearningChange change) async {
+    if (change.action == 'open_skill') {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              SkillDetailScreen(http: widget.source.http, skillId: change.target),
+        ),
+      );
+      return;
+    }
+    if (_learningPending.contains(change.id)) return;
+    setState(() => _learningPending.add(change.id));
+    var ok = true;
+    try {
+      final http = widget.source.http;
+      switch (change.action) {
+        case 'disable_skill' || 'enable_skill':
+          await http.post<dynamic>(
+            '/api/v1/skills/${change.target}/status',
+            data: {
+              'status': change.action == 'enable_skill' ? 'active' : 'disabled',
+            },
+          );
+        default:
+          await http.post<dynamic>('/api/v1/improvements/${change.target}/undo');
+      }
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) return;
+    setState(() => _learningPending.remove(change.id));
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            !ok
+                ? 'Jarvis could not change that. Try again in Learning.'
+                : change.action == 'enable_skill'
+                ? 'Switched back on'
+                : 'Undone',
+          ),
+        ),
+      );
+    widget.source.invalidate();
+    final briefing = await widget.source.briefing();
+    if (mounted) setState(() => _briefing = briefing);
+  }
+
+  /// Accepts or turns down a suggestion from Jarvis's improvement loop. Accepting a built app switches on exactly
+  /// the draft that passed its test; the server refuses if the code changed. A failure brings the row back.
+  Future<void> _decideImprovement(NeedsYouItem item, {required bool accept}) async {
+    final id = item.id;
+    if (_pending.contains(id)) return;
+    setState(() {
+      _pending.add(id);
+      _failed.remove(id);
+    });
+    var ok = true;
+    try {
+      await widget.source.http.post<dynamic>(
+        '/api/v1/improvements/$id/${accept ? 'accept' : 'dismiss'}',
+      );
+    } catch (_) {
+      ok = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _pending.remove(id);
+      if (ok) {
+        _failed.remove(id);
+      } else {
+        _failed.add(id);
+      }
+    });
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            !ok
+                ? 'Jarvis could not save that. Try again in Learning.'
+                : accept
+                ? 'Done: ${item.acceptLabel ?? 'accepted'}. You can undo it in Learning.'
+                : 'Turned down. Jarvis will not suggest it again.',
+          ),
+        ),
+      );
+    widget.source.invalidate();
+    final briefing = await widget.source.briefing();
+    if (mounted) setState(() => _briefing = briefing);
   }
 
   /// Marks an accepted promise done. A failure brings its row back.
@@ -847,6 +966,37 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                             onFollowUp: widget.onSuggestion == null
                                 ? null
                                 : () => _ask.text = 'About my morning brief: ',
+                          ),
+                        ),
+                      ),
+                    if (LearningChange.fromBriefing(
+                          _briefing,
+                          seenAt: _learningSeenAt,
+                        )
+                        case final changes when changes.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: FadeSlideIn(
+                          index: 5,
+                          child: LearningCard(
+                            changes: changes,
+                            // Once some were marked seen, the server's weekly count would include those.
+                            total: _learningSeenAt != null
+                                ? changes.length
+                                : asJsonInt(
+                                    jsonObject(
+                                      _briefing?['learning'],
+                                    )?['changesThisWeek'],
+                                    changes.length,
+                                  ),
+                            pending: _learningPending,
+                            onAction: (change) =>
+                                unawaited(_learningAction(change)),
+                            onSeen: _learningSeen,
+                            onOpenLearning: () {
+                              _learningSeen();
+                              widget.onOpen('learning');
+                            },
                           ),
                         ),
                       ),

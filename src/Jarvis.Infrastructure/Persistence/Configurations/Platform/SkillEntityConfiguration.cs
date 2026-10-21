@@ -25,6 +25,8 @@ internal sealed class SkillEntityConfiguration : IEntityTypeConfiguration<SkillE
             builder.Property(x => x.OutcomeRuns).HasColumnName("outcome_runs").HasDefaultValue(0);
             builder.Property(x => x.OutcomeSuccesses).HasColumnName("outcome_successes").HasDefaultValue(0);
             builder.Property(x => x.OutcomeCountedAt).HasColumnName("outcome_counted_at");
+            builder.Property(x => x.RequiredTools).HasColumnName("required_tools").HasColumnType("text[]")
+                .HasDefaultValueSql("'{}'::text[]").IsRequired();
             builder.HasIndex(x => new { x.OwnerId, x.Name }).IsUnique();
             builder.HasIndex(x => new { x.OwnerId, x.Status });
         }

@@ -19,12 +19,21 @@ public static class SkillStatuses
 public sealed record SkillRecord(Guid Id, Guid OwnerId, string Name, string Description, string Instructions,
     string Source, string Status, bool IsLocked, int Version, int UseCount, DateTimeOffset? LastUsedAt,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int OutcomeRuns = 0, int OutcomeSuccesses = 0,
-    DateTimeOffset? OutcomeCountedAt = null);
+    DateTimeOffset? OutcomeCountedAt = null, IReadOnlyList<string>? RequiredToolList = null)
+{
+    /// <summary>Exact tool names the skill relies on; it is only usable in a turn that offers all of them.</summary>
+    public IReadOnlyList<string> RequiredTools => RequiredToolList ?? [];
+}
 
 public sealed record SkillRevisionRecord(int Version, string Description, string Instructions, string Source,
     string? ChangeNote, DateTimeOffset CreatedAt);
 
-public sealed record SkillDraft(string Name, string Description, string Instructions);
+/// <summary>
+/// A skill to save. <paramref name="RequiredTools"/> null keeps the tools an existing skill already lists; an empty list
+/// clears them.
+/// </summary>
+public sealed record SkillDraft(string Name, string Description, string Instructions,
+    IReadOnlyList<string>? RequiredTools = null);
 
 public interface ISkillRepository
 {

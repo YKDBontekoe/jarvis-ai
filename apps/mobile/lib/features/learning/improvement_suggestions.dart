@@ -65,15 +65,20 @@ class ImprovementSuggestionsSection extends StatelessWidget {
   }
 }
 
-String _acceptLabel(String kind) => switch (kind) {
-  'memory' => 'Remember it',
-  'skill' => 'Save skill',
-  _ => 'Accept',
-};
+/// The server names what accepting does when it depends on the proposal
+/// (a capability with a tested app is switched on); otherwise the kind does.
+String _acceptLabel(Map<String, dynamic> item, String kind) =>
+    asJsonString(item['acceptLabel']) ??
+    switch (kind) {
+      'memory' => 'Remember it',
+      'skill' => 'Save skill',
+      _ => 'Accept',
+    };
 
 IconData _icon(String kind) => switch (kind) {
   'memory' => PhosphorIconsRegular.brain,
   'skill' => PhosphorIconsRegular.magicWand,
+  'capability' => PhosphorIconsRegular.puzzlePiece,
   _ => PhosphorIconsRegular.lightbulb,
 };
 
@@ -124,20 +129,22 @@ class _WaitingCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          // Wraps so both buttons stay whole at large text on a narrow phone.
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 4,
             children: [
               TextButton(
                 key: Key('improvement-dismiss-$id'),
                 onPressed: busy || id.isEmpty ? null : () => onDismiss(id),
                 child: const Text('Not for me'),
               ),
-              const SizedBox(width: 8),
               FilledButton.tonal(
                 key: Key('improvement-accept-$id'),
                 onPressed: busy || id.isEmpty ? null : () => onAccept(id),
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 36)),
-                child: Text(_acceptLabel(kind)),
+                child: Text(_acceptLabel(item, kind)),
               ),
             ],
           ),

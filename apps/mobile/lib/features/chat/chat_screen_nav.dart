@@ -297,6 +297,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       }
       await _auth.signOut();
       await RecentSearchesStore.clearAll();
+      await LearningSeenStore.clear();
       await _drafts.clear();
       await ComposerDrafts.clearAll();
       _outboxTimer?.cancel();

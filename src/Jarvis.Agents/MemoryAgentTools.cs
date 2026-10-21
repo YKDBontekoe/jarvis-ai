@@ -180,6 +180,9 @@ internal sealed partial class MemoryAgentTools(IMemoryService memories, MemoryRe
     internal static bool LooksLikeSecret(string text) =>
         SecretKeyword().IsMatch(text) || TokenLikeValue().IsMatch(text);
 
+    /// <summary>A literal credential value, for code where <c>api_key = os.environ[...]</c> is normal.</summary>
+    internal static bool ContainsTokenValue(string text) => TokenLikeValue().IsMatch(text);
+
     private static string Normalize(string value) =>
         Whitespace().Replace(value.Trim().TrimEnd('.').ToLowerInvariant(), " ");
 

@@ -526,6 +526,74 @@ void main() {
     await capture(tester, '17-settings');
   });
 
+  for (final dark in [false, true]) {
+    screenshotTest('home learning ${dark ? 'dark' : 'light'}', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      final card = find.byKey(const Key('home-learning'));
+      // Clear of the compact header that covers the top once Home scrolls.
+      await Scrollable.ensureVisible(tester.element(card), alignment: .2);
+      await settle(tester);
+      await capture(tester, '01i-home-learning-${dark ? 'dark' : 'light'}');
+    });
+    screenshotTest('home suggestion row ${dark ? 'dark' : 'light'}', (tester) async {
+      usePhone(tester);
+      // A quieter day: Needs you lists the most urgent eight, so a suggestion only shows when there is room.
+      http = ScreenshotHttp({
+        ...fixtureRoutes(withApproval: false),
+        'GET /api/v1/home': {
+          ...home(),
+          'approvals': <Object>[],
+          'commitments': <Object>[],
+          'decisions': <Object>[],
+        },
+      });
+      debugJarvisHttpAdapter = http;
+      await start(tester, dark: dark);
+      final row = find.byKey(const Key('home-needs-you-improvement-imp1'));
+      await Scrollable.ensureVisible(tester.element(row), alignment: .4);
+      await settle(tester);
+      await capture(tester, '01j-home-suggestion-${dark ? 'dark' : 'light'}');
+    });
+  }
+
+  screenshotTest('home needs you at large text', (tester) async {
+    usePhone(tester, size: const Size(320, 640));
+    tester.platformDispatcher.textScaleFactorTestValue = 3;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await start(tester);
+    final needsYou = find.byKey(const Key('home-needs-you'));
+    await tester.ensureVisible(needsYou);
+    await settle(tester);
+    expect(
+      find.byKey(const Key('home-needs-you-stacked-actions')),
+      findsWidgets,
+    );
+    await capture(tester, '01h-home-needs-you-large-text');
+    final learning = find.byKey(const Key('home-learning'));
+    await Scrollable.ensureVisible(tester.element(learning), alignment: .2);
+    await settle(tester);
+    await capture(tester, '01h-home-learning-large-text');
+  });
+
+  for (final dark in [false, true]) {
+    screenshotTest('learning evolution ${dark ? 'dark' : 'light'}', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openTab(tester, 'you');
+      final entry = find.byKey(const Key('settings-learning'));
+      await tester.ensureVisible(entry);
+      await settle(tester);
+      await tester.tap(entry);
+      await settle(tester);
+      await tester.ensureVisible(
+        find.byKey(const Key('learning-autonomousEvolution')),
+      );
+      await settle(tester);
+      await capture(tester, '17b-learning-evolution-${dark ? 'dark' : 'light'}');
+    });
+  }
+
   screenshotTest('voice', (tester) async {
     usePhone(tester);
     await start(tester, dark: true);

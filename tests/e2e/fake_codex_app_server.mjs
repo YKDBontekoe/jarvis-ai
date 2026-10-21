@@ -134,6 +134,11 @@ function plan(prompt) {
     return text(JSON.stringify({ lesson: `Check the inputs before calling ${tool}, and try a narrower call first.` }));
   }
 
+  // The unattended app builder: the fixture has no network for the MCP runner, so it judges the gap not feasible,
+  // which exercises the whole evolution path short of running code.
+  if (prompt.includes('You build a small MCP server for the Jarvis assistant'))
+    return text(JSON.stringify({ feasible: false, reason: 'The fixture model cannot reach any API.' }));
+
   const conversation = parseConversation(prompt);
   const tools = new Set([...prompt.matchAll(/^- ([A-Za-z_]+): /gm)].map(match => match[1]));
   const request = conversation.request;
@@ -228,6 +233,12 @@ function plan(prompt) {
       return call('LearnPreference', { category, statement, confidence: 0.95 });
     }
     return text(`Understood — I'll remember that. ${last}`);
+  }
+
+  if (/\blive train (departures|times)\b/.test(lower) && has('ReportCapabilityGap')) {
+    if (results.length === 0) return call('ReportCapabilityGap', { capability: 'live train departures' });
+    return text("I can't look up live train departures yet — none of my tools can reach a train timetable. " +
+      'If you need it now, I can look for an app or build one.');
   }
 
   if (/\buse (my|the) ([a-z-]+) skill\b/.test(lower) && has('LoadSkill')) {

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Integrations;
+using Jarvis.Application.Skills;
 using Jarvis.Mcp;
 
 namespace Jarvis.Agents;
@@ -103,12 +104,19 @@ internal sealed class CustomMcpAgentTools(ICustomMcpServerStore store, IUserMcpS
             var tested = server.LastTest is { Ok: true } test && test.Sha256 == server.ActiveSha256
                 ? ""
                 : " This revision has not passed a test yet.";
-            return $"'{server.Name}' revision {server.ActiveRevision} is live (server id {server.RegistryServerId}).{tested} {next}";
+            return $"'{server.Name}' revision {server.ActiveRevision} is live (server id {server.RegistryServerId}).{tested} {next}" +
+                   SkillHint(server.LastTest?.Tools);
         }
         catch (CustomMcpScriptException exception) { return "Not activated: " + string.Join(" ", exception.Errors); }
         catch (CustomMcpReviewException exception) when (exception.Code == "not_tested") { return "Not activated: this exact code has not passed a test. Call TestCustomMcpServer first. Only the user can decide to switch it on without a test."; }
         catch (ArgumentException exception) { return $"Not activated: {exception.Message}"; }
     }
+
+    /// <summary>A new app is only found again if a skill says when to reach for it.</summary>
+    internal static string SkillHint(IReadOnlyList<string>? tools) => tools is not { Count: > 0 }
+        ? string.Empty
+        : " Then save a short skill with SaveSkill on when and how to use it, with requiredTools [" +
+          string.Join(", ", tools.Take(SkillMarkdown.MaxRequiredTools)) + "], so later turns know it exists.";
 
     [Description("List the MCP servers Jarvis wrote for this user, with their ids, revisions, whether a draft is waiting for approval, and the last test result. Read-only.")]
     public async Task<string> ListCustomMcpServersAsync(CancellationToken cancellationToken = default)

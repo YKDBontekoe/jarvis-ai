@@ -15,8 +15,14 @@ public static class LearningSignalKinds
     public const string Correction = "correction";
     public const string ToolFailure = "tool_failure";
 
+    /// <summary>
+    /// Jarvis was asked for something no tool could do. The only text kept is a short label in <c>category</c>
+    /// (<see cref="Improvements.CapabilityGapRules.NormalizeSlug"/>), never the request.
+    /// </summary>
+    public const string CapabilityGap = "capability_gap";
+
     public static readonly IReadOnlyList<string> All =
-        [Regenerate, ApprovalDenied, ThumbsUp, ThumbsDown, Correction, ToolFailure];
+        [Regenerate, ApprovalDenied, ThumbsUp, ThumbsDown, Correction, ToolFailure, CapabilityGap];
 }
 
 public static class TurnKinds

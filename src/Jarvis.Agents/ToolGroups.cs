@@ -105,7 +105,8 @@ public static partial class ToolGroups
             ["PrepareMeeting", "DebriefMeeting", "DraftMeetingFollowUp"],
             MeetingKeywords()),
         new("timeline", "Life timeline, on this day, life insights, routine and self-improvement suggestions",
-            ["QueryTimeline", "OnThisDay", "GetLifeInsights", "GetRoutineSuggestions", "GetImprovementProposals"],
+            ["QueryTimeline", "OnThisDay", "GetLifeInsights", "GetRoutineSuggestions", "GetImprovementProposals",
+             "ListLessons"],
             TimelineKeywords()),
         new("automations", "Rules that run on a schedule or trigger: list, create, preview, templates, enable, run",
             ["ListAutomations", "CreateAutomation", "PreviewAutomation", "ListAutomationTemplates",
@@ -328,7 +329,7 @@ public static partial class ToolGroups
     [GeneratedRegex(@"\b(meeting|agenda|debrief|prep(are)? (me )?for|follow[- ]?up|standup|stand-up|1[:-]1|one[- ]on[- ]one|vergadering|overleg|bespreking|afspraak met|voorbereiden)", KeywordOptions)]
     private static partial Regex MeetingKeywords();
 
-    [GeneratedRegex(@"\b(timeline|on this day|this day last|years? ago|insight|routine|pattern|improvement|tijdlijn|vandaag \d+ jaar|jaar geleden|inzicht|patroon|verbeter)", KeywordOptions)]
+    [GeneratedRegex(@"\b(timeline|on this day|this day last|years? ago|insight|routine|pattern|improvement|lessons?\b|learned|tijdlijn|vandaag \d+ jaar|jaar geleden|inzicht|patroon|verbeter|geleerd|lessen)", KeywordOptions)]
     private static partial Regex TimelineKeywords();
 
     [GeneratedRegex(@"\b(automation|automate|every (day|morning|evening|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|whenever|rule|template|automatisch|automatiseer|elke (dag|ochtend|avond|week)|regel)", KeywordOptions)]

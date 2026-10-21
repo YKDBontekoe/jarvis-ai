@@ -20,6 +20,10 @@ internal static class ImprovementEndpoints
         group.MapPost("/refresh", async (IImprovementMiner miner, ICurrentUser user, CancellationToken ct) =>
             Results.Ok(await miner.RefreshAsync(user.OwnerId, ct))).WithName("RefreshImprovements");
 
+        // The nightly unattended build, on demand: still needs the owner's autonomous-evolution setting, never activates.
+        group.MapPost("/evolve", async (ICapabilityEvolutionService evolution, ICurrentUser user, CancellationToken ct) =>
+            Results.Ok(new { built = await evolution.EvolveAsync(user.OwnerId, ct) })).WithName("EvolveCapabilities");
+
         group.MapPost("/{id:guid}/accept", async (Guid id, IImprovementService improvements, ICurrentUser user,
             CancellationToken ct) =>
             await improvements.AcceptAsync(id, user.OwnerId, ct) is { } view

@@ -262,6 +262,73 @@ void main() {
     expect(http.sent('POST', '/api/v1/notifications/n2/read'), hasLength(1));
   });
 
+  testWidgets(
+    'self-improvement notifications say what they are and open where they point',
+    (tester) async {
+      final now = DateTime.now().toUtc().toIso8601String();
+      http.on('GET', '/api/v1/reminders', <Object>[]);
+      http.on('GET', '/api/v1/notifications', [
+        {
+          'id': 'n1',
+          'type': 'skill.learned',
+          'title': 'Jarvis learned a new skill: weekly-review',
+          'body': 'Run the Friday review with wins first.',
+          'sourceId': 's1',
+          'createdAt': now,
+          'readAt': null,
+        },
+        {
+          'id': 'n2',
+          'type': 'improvement.capability_built',
+          'title': 'Jarvis built a draft app: Trains',
+          'body': 'For live train departures.',
+          'createdAt': now,
+          'readAt': null,
+        },
+      ]);
+      http.on('POST', '/api/v1/notifications/n1/read', <String, Object>{});
+      http.on('GET', '/api/v1/skills/s1', {
+        'skill': {
+          'id': 's1',
+          'name': 'weekly-review',
+          'description': 'Run the Friday review with wins first.',
+          'instructions': '1. List wins.',
+          'source': 'learned',
+          'status': 'proposed',
+          'isLocked': false,
+          'version': 1,
+          'useCount': 0,
+        },
+        'revisions': <Object>[],
+      });
+      tester.view.physicalSize = const Size(900, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildJarvisTheme(),
+          home: RemindersScreen(
+            http: http.client(),
+            initialTab: RemindersTab.notifications,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('JARVIS LEARNED'), findsOneWidget);
+      expect(find.text('Open skill ›'), findsOneWidget);
+      expect(find.text('APP READY TO SWITCH ON'), findsOneWidget);
+      expect(find.text('Review in Learning ›'), findsOneWidget);
+      expect(find.byTooltip('How it was delivered'), findsNWidgets(2));
+
+      await tester.tap(find.byKey(const Key('notification-n1')));
+      await tester.pumpAndSettle();
+      expect(http.sent('POST', '/api/v1/notifications/n1/read'), hasLength(1));
+      expect(http.sent('GET', '/api/v1/skills/s1'), isNotEmpty);
+    },
+  );
+
   testWidgets('an approval notification can be approved in place', (
     tester,
   ) async {

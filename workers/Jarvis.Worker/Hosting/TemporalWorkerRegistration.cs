@@ -47,6 +47,7 @@ internal static class TemporalWorkerRegistration
         "DeliverDailyBriefing",
         "RunAssistantHeartbeat",
         "RunAssistantDreaming",
+        "RunCapabilityEvolution",
         "ExecuteAutomationRun",
         "CompleteAutomationRunAfterApproval",
         "CloseAutomationRun",
@@ -109,6 +110,7 @@ internal static class TemporalWorkerRegistration
             .AddActivity(briefings.DeliverAsync)
             .AddActivity(heartbeat.RunAsync)
             .AddActivity(dreaming.RunAsync)
+            .AddActivity(dreaming.EvolveAsync)
             .AddActivity(people.RunAsync)
             .AddActivity(automationRuns.ExecuteAsync)
             .AddActivity(automationRuns.CompleteAfterApprovalAsync)

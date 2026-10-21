@@ -16,28 +16,32 @@ internal sealed class SkillToolContributor(
     INotificationRepository notifications,
     IAuditEventStore audit,
     ICurrentUser currentUser,
-    Jarvis.Application.Learning.ITurnTraceCollector? trace = null) : IAgentToolContributor
+    Jarvis.Application.Learning.ITurnTraceCollector? trace = null,
+    AgentToolCatalog? catalog = null) : IAgentToolContributor
 {
     public IEnumerable<AITool> GetTools(AgentBuildContext context)
     {
-        var tools = new SkillAgentTools(skills, settings, notifications, audit, currentUser, context.Profile, trace);
+        var tools = new SkillAgentTools(skills, settings, notifications, audit, currentUser, context.Profile, trace,
+            catalog);
         yield return AIFunctionFactory.Create(tools.LoadSkillAsync);
         yield return AIFunctionFactory.Create(tools.ListSkillsAsync);
         yield return AIFunctionFactory.Create(tools.SaveSkillAsync);
+        yield return AIFunctionFactory.Create(tools.RetireSkillAsync);
     }
 }
 
-internal sealed class SkillContextContributor(ISkillRepository skills) : IAgentContextContributor
+internal sealed class SkillContextContributor(ISkillRepository skills, AgentToolCatalog? catalog = null)
+    : IAgentContextContributor
 {
     public int Order => 20;
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
-        [new SkillsContextProvider(skills, context.OwnerId, context.Profile)];
+        [new SkillsContextProvider(skills, context.OwnerId, context.Profile, catalog)];
 }
 
 /// <summary>Progressive disclosure: only skill names and descriptions enter each turn; bodies load on demand.</summary>
 internal sealed class SkillsContextProvider(ISkillRepository skills, Guid ownerId,
-    AssistantProfileSnapshot? profile) : MessageAIContextProvider
+    AssistantProfileSnapshot? profile, AgentToolCatalog? catalog = null) : MessageAIContextProvider
 {
     internal const string Prefix = "Available skills";
     private const int MaxListed = 40;
@@ -56,9 +60,16 @@ internal sealed class SkillsContextProvider(ISkillRepository skills, Guid ownerI
         builder.Append(Prefix).AppendLine(" (your own saved procedures; call LoadSkill with the name before following one):");
         if (active.Length == 0) builder.AppendLine("- none yet");
         foreach (var skill in active)
-            builder.Append("- ").Append(skill.Name).Append(": ").AppendLine(skill.Description);
+        {
+            builder.Append("- ").Append(skill.Name).Append(": ").Append(skill.Description);
+            var missing = catalog?.Missing(skill.RequiredTools) ?? [];
+            if (missing.Count > 0) builder.Append(" (unavailable now: needs ").Append(string.Join(", ", missing)).Append(')');
+            builder.AppendLine();
+        }
         builder.Append("When you finish a non-trivial multi-step task you expect to repeat, or the user teaches you how they ")
-            .Append("like something done, save or improve a skill with SaveSkill. Keep skills short and specific.");
+            .Append("like something done, save or improve a skill with SaveSkill, listing in requiredTools the app tools it ")
+            .Append("calls. Keep skills short and specific. If a request needs a capability none of your tools has, call ")
+            .Append("ReportCapabilityGap before answering.");
         return [new ChatMessage(ChatRole.User, builder.ToString())];
     }
 }

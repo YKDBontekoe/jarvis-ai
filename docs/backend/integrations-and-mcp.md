@@ -77,6 +77,10 @@ When nothing in the catalog fits and the service has an API, Jarvis can write th
 | Test | `TestCustomMcpServer` / `POST /custom-mcp-servers/{id}/test` (approval) | Runs the draft in the MCP runner, lists tools, optionally calls one. Returns the tool output and the last 4 KB of stderr with the server's key values removed, so Jarvis can fix its own code. Saved as `lastTest`. |
 | Activate | `ActivateCustomMcpServer` / `POST …/activate {sha256}` (approval) | Makes the draft live only if its hash still matches what was reviewed, and switches the registry entry on. |
 
+With `autonomousEvolution` on, the nightly pass can also write and test a draft for a capability Jarvis keeps lacking
+(`ModelCapabilityBuilder`); it never activates it. The owner switches it on by accepting the `capability` proposal, which
+activates exactly the tested hash. See [memory-knowledge-learning.md](memory-knowledge-learning.md#self-evolution).
+
 Rules (`CustomMcpScriptValidator`, checked on save, activation, and again in the runner):
 
 - One Python file, at most 64 KB, with exactly one PEP 723 `# /// script` block holding only `requires-python`

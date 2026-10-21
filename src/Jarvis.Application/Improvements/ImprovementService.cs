@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Jarvis.Application.Audit;
+using Jarvis.Application.Integrations;
 using Jarvis.Application.Memory;
 using Jarvis.Application.Settings;
 using Jarvis.Application.Skills;
@@ -16,7 +17,9 @@ public sealed class ImprovementService(
     IOwnerSettingsStore settings,
     IAuditEventStore audit,
     TimeProvider? timeProvider = null,
-    Memory.IDoNotLearnService? doNotLearn = null) : IImprovementService
+    Memory.IDoNotLearnService? doNotLearn = null,
+    ICustomMcpServerStore? customServers = null,
+    IUserMcpServerRegistry? mcpRegistry = null) : IImprovementService
 {
     private const int MaxTitle = 300;
     private const int MaxEvidence = 600;
@@ -236,7 +239,9 @@ public sealed class ImprovementService(
             return null;
         }
 
-        if (resulting is null && proposal.Kind != ImprovementKinds.Review) return null;
+        // A review note, or a capability with no draft yet (the owner saying they want it), changes nothing to point at.
+        if (resulting is null && proposal.Kind is not (ImprovementKinds.Review or ImprovementKinds.Capability))
+            return null;
         var accepted = proposal with
         {
             Status = ImprovementStatuses.Accepted, ResultingRef = resulting, UpdatedAt = _clock.GetUtcNow()
@@ -308,6 +313,25 @@ public sealed class ImprovementService(
             case ImprovementKinds.Lesson:
                 // The proposal itself is the lesson: accepting puts it in force, undo takes it out again.
                 return ReadLesson(proposal) is null ? throw new JsonException("Empty lesson payload.") : proposal.Id;
+            case ImprovementKinds.Capability:
+            {
+                var payload = ImprovementMiner.ReadCapability(proposal.PayloadJson)
+                              ?? throw new JsonException("Empty capability payload.");
+                if (!payload.IsBuilt) return null;
+                if (customServers is null || mcpRegistry is null)
+                    throw new ArgumentException("Self-built apps are not available in this process.");
+                try
+                {
+                    // Exactly the draft that passed its test: if the code changed since, activation refuses.
+                    var (server, _, _) = await CustomMcpServerManager.ActivateAsync(ownerId,
+                        payload.CustomServerId!.Value, payload.Sha256, customServers, mcpRegistry, cancellationToken);
+                    return server.Id;
+                }
+                catch (CustomMcpScriptException exception)
+                {
+                    throw new ArgumentException(string.Join(" ", exception.Errors));
+                }
+            }
             case ImprovementKinds.Review:
             {
                 var payload = JsonSerializer.Deserialize<ReviewPayload>(proposal.PayloadJson, JsonOptions)
@@ -341,6 +365,11 @@ public sealed class ImprovementService(
                 break;
             case ImprovementKinds.SkillRefine:
                 await RestoreSkillTextAsync(ownerId, proposal, reference, cancellationToken);
+                break;
+            case ImprovementKinds.Capability when customServers is not null && mcpRegistry is not null:
+                // The app and its code stay; pausing it takes its tools out of use.
+                if (await customServers.GetAsync(ownerId, reference, cancellationToken) is { } app)
+                    await mcpRegistry.SetEnabledAsync(ownerId, app.Server.RegistryServerId, false, cancellationToken);
                 break;
         }
     }
@@ -410,7 +439,10 @@ public sealed class ImprovementService(
 
     private static ImprovementView ToView(ImprovementProposal proposal) =>
         new(proposal.Id, proposal.Kind, proposal.Title, proposal.Evidence, proposal.Confidence, proposal.Status,
-            proposal.CreatedAt, proposal.UpdatedAt);
+            proposal.CreatedAt, proposal.UpdatedAt,
+            proposal.Kind == ImprovementKinds.Capability
+                ? ImprovementMiner.ReadCapability(proposal.PayloadJson) is { IsBuilt: true } ? "Switch on" : "I want this"
+                : null);
 
     private static string Limit(string? text, int max)
     {

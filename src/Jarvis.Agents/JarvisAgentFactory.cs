@@ -111,6 +111,7 @@ public sealed class JarvisAgentFactory(
             tools.Add(tool);
         }
 
+        services.GetService<AgentToolCatalog>()?.Set(toolNames);
         return tools;
     }
 

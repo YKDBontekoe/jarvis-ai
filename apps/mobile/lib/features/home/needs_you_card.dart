@@ -13,7 +13,7 @@ import '../tiles/tile_card.dart' show tileRadius;
 import 'home_insights.dart';
 
 /// What a row's button asked for.
-enum NeedsYouAction { open, done, snooze, reply, draft }
+enum NeedsYouAction { open, done, snooze, reply, draft, accept, dismiss }
 
 /// Everything waiting on the person, in one card. A row slides away the
 /// moment it is handled, and the card shrinks to a single line once nothing
@@ -73,7 +73,10 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
 
   void _act(NeedsYouItem item, NeedsYouAction action) {
     final resolves =
-        action == NeedsYouAction.done || action == NeedsYouAction.snooze;
+        action == NeedsYouAction.done ||
+        action == NeedsYouAction.snooze ||
+        action == NeedsYouAction.accept ||
+        action == NeedsYouAction.dismiss;
     if (!resolves) {
       widget.onAction(item, action);
       return;
@@ -140,15 +143,17 @@ class _NeedsYouCardState extends State<NeedsYouCard> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Semantics(
-                            header: true,
-                            child: Text(
-                              'Needs you',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: -.5,
-                                color: colors.ink,
+                          Flexible(
+                            child: Semantics(
+                              header: true,
+                              child: Text(
+                                'Needs you',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -.5,
+                                  color: colors.ink,
+                                ),
                               ),
                             ),
                           ),
@@ -336,10 +341,25 @@ class _NeedsYouRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final (leading, actions) = _parts(context);
-    // A promise or decision is only useful with its date and who it is for, so these wrap instead of truncating.
-    final lines =
-        item.kind == NeedsYouKind.commitment ||
-            item.kind == NeedsYouKind.decision
+    // At large text the buttons cannot share a line with the title, so they move under it (playbook: stack from 1.5×).
+    // A suggestion's buttons are worded by the server and two of them rarely fit beside a title, so they always do.
+    final stacked =
+        item.kind == NeedsYouKind.improvement ||
+        MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+    final status = busy
+        ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : null;
+    // A promise or decision is only useful with its date and who it is for, so these wrap instead of truncating;
+    // at large text one line holds a word or two, so every row gets room to say what it is.
+    final lines = MediaQuery.textScalerOf(context).scale(1) >= 1.5
+        ? 3
+        : item.kind == NeedsYouKind.commitment ||
+              item.kind == NeedsYouKind.decision ||
+              item.kind == NeedsYouKind.improvement
         ? 2
         : 1;
     return Semantics(
@@ -363,6 +383,9 @@ class _NeedsYouRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: stacked
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.center,
                 children: [
                   leading,
                   const SizedBox(width: 14),
@@ -423,17 +446,31 @@ class _NeedsYouRow extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (busy)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    ...actions,
+                  if (!stacked) ...[
+                    const SizedBox(width: 8),
+                    ?status,
+                    if (status == null) ...actions,
+                  ],
                 ],
               ),
+              if (stacked)
+                Padding(
+                  key: const Key('home-needs-you-stacked-actions'),
+                  padding: const EdgeInsets.only(left: 58, top: 10),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child:
+                        status ??
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final action in actions)
+                              if (action is! SizedBox) action,
+                          ],
+                        ),
+                  ),
+                ),
               if ((http, item.chat, replies) case (
                 final http?,
                 final chat?,
@@ -535,6 +572,32 @@ class _NeedsYouRow extends StatelessWidget {
       NeedsYouKind.task => (
         icon(PhosphorIconsRegular.robot, colors.info, colors.infoSoft),
         [_RowButton('Open', onTap: () => onAction(NeedsYouAction.open))],
+      ),
+      NeedsYouKind.improvement => (
+        icon(
+          switch (item.variant) {
+            'capability' => PhosphorIconsRegular.puzzlePiece,
+            'skill' || 'skill_refine' => PhosphorIconsRegular.magicWand,
+            'memory' => PhosphorIconsRegular.brain,
+            _ => PhosphorIconsRegular.lightbulb,
+          },
+          colors.accent,
+          colors.accentSoft,
+        ),
+        [
+          _RowButton(
+            'Not for me',
+            semantic: 'Turn down: ${item.title}',
+            onTap: () => onAction(NeedsYouAction.dismiss),
+          ),
+          const SizedBox(width: 6),
+          _RowButton(
+            item.acceptLabel ?? 'Accept',
+            primary: true,
+            semantic: '${item.acceptLabel ?? 'Accept'}: ${item.title}',
+            onTap: () => onAction(NeedsYouAction.accept),
+          ),
+        ],
       ),
       NeedsYouKind.catchUp => (
         icon(PhosphorIconsRegular.sparkle, colors.accent, colors.accentSoft),

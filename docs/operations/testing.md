@@ -92,7 +92,10 @@ need no model and run in seconds; `-- --model` adds lesson drafting with a real 
 extraction eval; the Codex-backed dreaming and drafting evals are run by hand. They are not part of pull request CI.
 
 Lesson and skill-refinement flows that need seeded failures run against the smoke stack:
-`JARVIS_E2E_PG_CONTAINER=<postgres container> scripts/dev/smoke.sh test failure_lessons_flow.mjs skill_refinement_flow.mjs`.
+`JARVIS_E2E_PG_CONTAINER=<postgres container> scripts/dev/smoke.sh test failure_lessons_flow.mjs skill_refinement_flow.mjs self_evolution_flow.mjs`.
+`self_evolution_flow.mjs` reports a capability gap in two chats, mines it, runs `/improvements/evolve` (the fixture model
+judges it not feasible, since the runner has no network there) and accepts it. In cloud sessions Docker Hub may answer
+429; pulling the stack's images from `mirror.gcr.io/<image>` and tagging them with the plain name works around it.
 
 ## CI expectations
 

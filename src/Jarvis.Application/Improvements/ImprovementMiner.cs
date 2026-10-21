@@ -7,7 +7,8 @@ using Jarvis.Application.Skills;
 namespace Jarvis.Application.Improvements;
 
 /// <summary>How many proposals one mining pass added.</summary>
-public sealed record MiningResult(int Skills, int Reviews, int Lessons = 0, int Refinements = 0);
+public sealed record MiningResult(int Skills, int Reviews, int Lessons = 0, int Refinements = 0,
+    int Capabilities = 0);
 
 /// <summary>Drafts the instructions of a skill from a tool sequence Jarvis keeps repeating. Returns null if nothing usable.</summary>
 public interface ISkillDrafter
@@ -56,8 +57,46 @@ public sealed class ImprovementMiner(
         var added = new MiningResult(await MineSkillsAsync(ownerId, traces, now, cancellationToken),
             await MineReviewsAsync(ownerId, traces, signals, now, since, cancellationToken),
             await MineLessonsAsync(ownerId, traces, signals, now, owner.AutoApplyLowRiskMemory, cancellationToken),
-            await MineRefinementsAsync(ownerId, traces, signals, cancellationToken));
+            await MineRefinementsAsync(ownerId, traces, signals, cancellationToken),
+            await MineCapabilityGapsAsync(ownerId, signals, now, cancellationToken));
         return added;
+    }
+
+    /// <summary>
+    /// Offers each capability Jarvis lacked in several conversations. A gap already offered keeps its build state; one
+    /// with a tested draft stays offered after its reports age out, since the draft is still waiting for the owner.
+    /// </summary>
+    private async Task<int> MineCapabilityGapsAsync(Guid ownerId, IReadOnlyList<LearningSignalRecord> signals,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var candidates = new List<ProposalCandidate>();
+        var offered = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var finding in CapabilityGapMinerEngine.Mine(signals, now))
+        {
+            var existing = await repository.FindByFingerprintAsync(ownerId, finding.Fingerprint, cancellationToken);
+            var payload = (existing is null ? null : ReadCapability(existing.PayloadJson)) ??
+                          new CapabilityPayload(finding.Slug, 0, 0);
+            payload = payload with { Reports = finding.Reports, Conversations = finding.Conversations };
+            offered.Add(finding.Fingerprint);
+            candidates.Add(new ProposalCandidate(ImprovementKinds.Capability, finding.Fingerprint,
+                CapabilityText.Title(payload), CapabilityText.Evidence(payload),
+                CapabilityGapMinerEngine.Confidence(finding), JsonSerializer.Serialize(payload, JsonOptions)));
+        }
+
+        foreach (var waiting in (await repository.ListAsync(ownerId, cancellationToken)).Where(item =>
+                     item.Kind == ImprovementKinds.Capability && item.Status == ImprovementStatuses.Pending &&
+                     !offered.Contains(item.Fingerprint) && ReadCapability(item.PayloadJson) is { IsBuilt: true }))
+            candidates.Add(new ProposalCandidate(waiting.Kind, waiting.Fingerprint, waiting.Title, waiting.Evidence,
+                waiting.Confidence, waiting.PayloadJson));
+
+        return await improvements.SyncAsync(ownerId, CapabilityGapRules.FingerprintPrefix, candidates,
+            cancellationToken);
+    }
+
+    internal static CapabilityPayload? ReadCapability(string json)
+    {
+        try { return JsonSerializer.Deserialize<CapabilityPayload>(json, JsonOptions) is { Slug.Length: > 0 } payload ? payload : null; }
+        catch (JsonException) { return null; }
     }
 
     /// <summary>Adds last night's runs and how they went to each skill's current version.</summary>
