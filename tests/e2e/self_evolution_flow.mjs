@@ -58,6 +58,13 @@ try {
   assert.equal(gap.title, 'Jarvis keeps lacking: live train departures');
   assert.equal(gap.acceptLabel, 'I want this');
 
+  console.log('Home lists it under Needs you...');
+  const waiting = (await request('GET', '/home')).learning?.waiting ?? [];
+  const row = waiting.find(item => item.id === gap.id);
+  assert.ok(row, `the gap on Home: ${JSON.stringify(waiting)}`);
+  assert.equal(row.title, 'Jarvis keeps lacking live train departures');
+  assert.equal(row.acceptLabel, 'I want this');
+
   console.log('Nothing is built while the owner has not allowed it...');
   assert.equal((await request('POST', '/improvements/evolve')).built, 0);
   assert.equal(sql(`select payload_json::jsonb ->> 'attempts' from improvement_proposals where fingerprint = '${fingerprint}'`), '0');

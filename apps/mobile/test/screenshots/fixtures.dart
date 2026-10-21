@@ -208,6 +208,48 @@ Map<String, Object?> home() {
     'packs': [
       {'name': 'Calendar', 'installed': true},
     ],
+    'learning': {
+      'waiting': [
+        {
+          'id': 'imp1',
+          'kind': 'capability',
+          'title': 'Switch on “Trains”',
+          'detail': 'An app Jarvis built and tested for live train departures',
+          'acceptLabel': 'Switch on',
+          'createdAt': _iso(now.subtract(const Duration(hours: 13))),
+        },
+      ],
+      'changes': [
+        {
+          'id': 'ch1',
+          'kind': 'skill_learned',
+          'title': 'Learned “weekly-review”',
+          'detail': 'Run the Friday review with wins first.',
+          'action': 'disable_skill',
+          'target': 's1',
+          'at': _iso(now.subtract(const Duration(hours: 20))),
+        },
+        {
+          'id': 'ch2',
+          'kind': 'lesson',
+          'title': 'New rule for create reminder',
+          'detail': "Use the owner's time zone after two corrections.",
+          'action': 'undo',
+          'target': 'imp2',
+          'at': _iso(now.subtract(const Duration(days: 2))),
+        },
+        {
+          'id': 'ch3',
+          'kind': 'skill_retired',
+          'title': 'Turned off “old-meal-plan”',
+          'detail': 'Went well 1 of 6 times.',
+          'action': 'enable_skill',
+          'target': 's2',
+          'at': _iso(now.subtract(const Duration(days: 3))),
+        },
+      ],
+      'changesThisWeek': 3,
+    },
   };
 }
 

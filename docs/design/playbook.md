@@ -116,6 +116,8 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 | `TypingDots` | `ui/typing_dots.dart` | Jarvis is writing |
 | `RightNowCard`, `showWhySheet` | `features/home/right_now_card.dart` | The one leading card on Home |
 | `NeedsYouCard` | `features/home/needs_you_card.dart` | Things waiting on the owner |
+| `LearningCard`, `LearningSeenStore` | `features/home/learning_card.dart` | "Jarvis is learning": what Jarvis changed about itself this week, each line with the step that reverses it |
+| `notificationLook` | `features/notifications/notification_presentation.dart` | Caps label, icon, tone and next step for each notification type |
 | `NoticedCard`, `EveningCard`, `DayOneCard`, `BriefCard`, `AskBar` | `features/home/` | Home sections |
 | `HeroCard`, `FeatureRow`, `PillAction`, `GroupLabel`, `SoftButton`, `InkButton` | `ui/feature_kit.dart` | The vocabulary for feature screens. One `HeroCard` (ink card, caps label, headline, optional segmented progress, footer) leads the screen; everything under it is `FeatureRow`s (icon badge, caps caption, title, detail, trailing, pill actions; entrance stagger; stacks under the text at large sizes) grouped by a `GroupLabel` (caps, optional count). Actions are `PillAction` (ink when primary, tonal otherwise, `compact` for several per row, `onDark` on a hero). Never bare `TextButton`s in cards. |
 | `PersonPanel` | `features/whatsapp/person_panel.dart` | About a person, beside a chat on wide screens |
@@ -126,11 +128,14 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 
 - **Right now card.** One slot at the top of Home that morphs between `soon` (countdown), `brief`, `battery` and `wind_down` (tomorrow). It has colours per moment, at most two actions, a reason line, and a Why sheet with the facts plus Not now / Fewer cards like this. It replaces Next up only when the server sends a hero (`/home/context`).
 - **Needs you.**
-  - Order: approvals, then due reminders, then people waiting, then tasks, then catch-ups.
+  - Order: approvals, then due reminders, then people waiting, then tasks, then suggestions from Jarvis's own improvement loop, then catch-ups.
+  - A suggestion row ("Switch on “Trains”") always puts its two buttons (Not for me, and the server's accept label) under the text, since server-worded labels rarely fit beside a title. Every row stacks its buttons from 1.5× text and then gets up to three lines of title.
   - People are ranked by `waitingOnYou` (`features/home/home_insights.dart`): close people first, then how far past your usual reply time, then who has waited longest. The Ask bar and the Chats "Waiting on you" section use the same ranking.
   - The card shows 3 rows, picking the first of each kind before any second one ("Show N more").
   - The first one-to-one chat gets quick replies.
   - An empty card collapses to "You're all caught up".
+- **Jarvis is learning.** Below the brief, a calm card (never the dark focal style) lists up to three things Jarvis changed by itself in the last 7 days (a learned or retired skill, a lesson, a memory it saved), each with Undo, Turn on or Open, and "N changes this week". Decisions only the owner can make are not here; they are Needs you rows. "Got it" and "Learning ›" mark everything up to now as seen on this phone (`LearningSeenStore`, cleared on sign-out), so the card returns only when something new happens. Board: [mockups/home-self-improvement.html](mockups/home-self-improvement.html).
+- **Notifications.** Each row says what kind of thing it is in a caps label above the title (`notificationLook`: "JARVIS LEARNED", "APP READY TO SWITCH ON", "REMINDER"), with a tinted icon in the type's tone, the body, the time and the next step tapping takes ("Review in Learning ›"). Delivery details sit behind a quiet ⓘ, which joins the time line from 1.5× text. A new notification type gets an entry in `notificationLook` and, when it has a destination, in `notification_routing.dart`.
 - **Jarvis noticed.** One insight at a time (swipe or dots), with evidence and an optional confidence bar. Its actions: Set it up (draft routine), Say hi (opens the chat), Plan a message, and Not useful.
 - **Evening (from 18:00) and day one.**
   - The evening card (your day plus tomorrow) replaces the brief.

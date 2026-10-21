@@ -225,6 +225,7 @@ Besides the nightly miners, Jarvis improves itself during turns and, when allowe
   draft is filed on the proposal (`buildStatus: built`, app id, hash, tools, keys) and the owner is notified
   (`improvement.capability_built`); the model may also answer `not_feasible`. Nothing is ever switched on without the
   owner accepting. Audited as `improvement.capability_attempted` with ids and outcome only.
+- **On Home.** `GET /home` carries `learning` (`HomeLearning.Build`): pending proposals become Needs you rows (a tested app first, with "Switch on"), and what Jarvis did by itself this week (skills learned or retired, applied lessons and memories) fills the "Jarvis is learning" card with the step that reverses each.
 
 ## Usage tracking
 

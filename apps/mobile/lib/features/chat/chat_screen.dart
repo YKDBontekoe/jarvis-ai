@@ -44,6 +44,7 @@ import '../chats/chat_list.dart';
 import '../chats/chats_screen.dart';
 import '../everything/everything_screen.dart';
 import '../home/jarvis_home.dart';
+import '../home/learning_card.dart' show LearningSeenStore;
 import '../tiles/app_tiles.dart';
 import '../tiles/tile_controller.dart';
 import '../people/people_screen.dart';

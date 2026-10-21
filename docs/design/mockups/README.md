@@ -5,6 +5,7 @@ HTML boards for proposed screens. Open a file in a browser to view it. The Artif
 | Board | File | Review copy | Status |
 |-------|------|-------------|--------|
 | Home and Chats redesign: Home morning, Chats All, Chats Unread with swipe and hold preview, Home evening, plus the refined "smart" boards | Artifact only (a Design canvas, not exported) | https://claude.ai/artifact/WMq4EK4n1ZGnuKWuzxwVFp | Built (Home, Chats, Right now, Needs you, noticed, evening, day one, quick replies) |
+| Showing self-improvement on Home, Needs you at large text, clearer notifications | [home-self-improvement.html](home-self-improvement.html) | https://claude.ai/artifact/CF7Z6QDriRQKtbfHLbMpVq | Built: option 1 (suggestions in Needs you, "Jarvis is learning" card), the large-text fix and notifications. The card's footer links to Learning instead of showing a reply-rating trend |
 | Modern tab bar and compact Home header | [home-header-nav.html](home-header-nav.html) | https://claude.ai/artifact/59vvhDS3yFaNpM9K4er5fr | Approved direction: "two glass pieces" (not the island alternative). Not built yet |
 
 ## Adding a board

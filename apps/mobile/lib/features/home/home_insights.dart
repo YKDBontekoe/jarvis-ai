@@ -126,6 +126,9 @@ enum NeedsYouKind {
   decision,
   person,
   task,
+
+  /// A suggestion from Jarvis's own improvement loop that only the person can decide, such as switching on an app it built.
+  improvement,
   catchUp,
 }
 
@@ -142,6 +145,8 @@ class NeedsYouItem {
     this.chats = const [],
     this.relationship,
     this.hint,
+    this.acceptLabel,
+    this.variant,
   });
 
   final NeedsYouKind kind;
@@ -161,6 +166,12 @@ class NeedsYouItem {
 
   /// A quieter third line, such as "You reply in ~20 min".
   final String? hint;
+
+  /// For [NeedsYouKind.improvement]: what accepting does, worded by the server ("Switch on", "Save skill").
+  final String? acceptLabel;
+
+  /// For [NeedsYouKind.improvement]: the proposal kind ("capability", "skill", …), which picks the icon.
+  final String? variant;
 }
 
 /// WhatsApp chats waiting on a reply: people before groups (groups only when
@@ -188,7 +199,8 @@ List<ChatListItem> waitingOnYou(ChatList? chats, DateTime now) {
 
 /// What needs the person now, most urgent first: approvals Jarvis is waiting
 /// on, reminders that are due, promises due or late, decisions to review,
-/// people waiting for a reply, tasks that stopped to ask, and catch-ups.
+/// people waiting for a reply, tasks that stopped to ask, suggestions from
+/// Jarvis's own improvement loop, and catch-ups.
 ///
 /// A promise or decision brings its own reminder, so that reminder is left out
 /// here: the same obligation never shows twice.
@@ -319,6 +331,23 @@ List<NeedsYouItem> needsYouItems({
         id: id,
         title: title,
         detail: 'A task stopped to ask you something',
+      ),
+    );
+  }
+  for (final suggestion in jsonMaps(
+    jsonObject(briefing?['learning'])?['waiting'],
+  )) {
+    final id = asJsonString(suggestion['id']);
+    final title = asJsonString(suggestion['title']);
+    if (id == null || title == null) continue;
+    items.add(
+      NeedsYouItem(
+        kind: NeedsYouKind.improvement,
+        id: id,
+        title: title,
+        detail: asJsonString(suggestion['detail']) ?? '',
+        acceptLabel: asJsonString(suggestion['acceptLabel']) ?? 'Accept',
+        variant: asJsonString(suggestion['kind']),
       ),
     );
   }
