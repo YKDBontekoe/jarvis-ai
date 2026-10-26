@@ -58,6 +58,9 @@ jobs:
       - name: Production Temporal bootstrap on both networks
         run: python3 -m unittest -v tests/integration/compose/test_temporal_bootstrap.py
 
+      - name: Production browser and private-network egress policy
+        run: python3 -m unittest -v tests/integration/compose/test_browser_bootstrap.py
+
   integration:
     name: Integration tests
     runs-on: ubuntu-latest

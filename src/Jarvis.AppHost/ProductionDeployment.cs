@@ -275,7 +275,7 @@ internal static class ProductionDeployment
             if (features.Browser)
             {
                 s.Env(JarvisMcpServers.Browser("http://playwright-mcp:8931/mcp"));
-                s.After("playwright-mcp", Healthy).After("browser-egress-proxy", Started);
+                s.After("playwright-mcp", Healthy).After("browser-egress-proxy", Healthy);
                 s.Networks.Add("agents");
             }
         });
@@ -362,6 +362,8 @@ internal static class ProductionDeployment
 
     private static void AddBrowser(this IDistributedApplicationBuilder builder)
     {
+        var proxyConfigHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(
+            Path.Combine(builder.AppHostDirectory, "..", "..", "infra", "compose", "browser", "squid.conf"))));
         builder.Service("playwright-mcp", $"{JarvisImages.Playwright}:latest", s =>
         {
             s.Restart = "unless-stopped";
@@ -390,6 +392,10 @@ internal static class ProductionDeployment
             s.Limit("512m", "1.0");
             s.SecurityOpt = ["no-new-privileges:true"];
             s.Command = ["-N", "-f", "/etc/squid/squid.conf"];
+            // A bind-mount edit alone does not reload Squid's in-memory ACLs.
+            s.Env(("JARVIS_BROWSER_PROXY_CONFIG_SHA256", proxyConfigHash));
+            s.Healthcheck = Check(["CMD", "bash", "-ec", "exec 3<>/dev/tcp/127.0.0.1/3128"],
+                "5s", "3s", 12, "10s");
             s.Networks = ["agents", "browser-egress"];
         });
     }

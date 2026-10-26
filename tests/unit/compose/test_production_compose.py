@@ -220,6 +220,17 @@ class ProductionComposeTests(unittest.TestCase):
         self.assertEqual({"7880/tcp", "7881/tcp"} | {f"{port}/udp" for port in range(50000, 50101)}, ports)
         self.assertTrue(self.mounts("livekit", "infra/livekit/production-tunnel.yaml", self.all))
 
+    def test_browser_proxy_has_healthcheck_and_blocks_api_replacement_until_healthy(self):
+        proxy = self.service("browser-egress-proxy", self.all)
+        self.assertIn("3128", proxy["healthcheck"]["test"][-1])
+        expected = hashlib.sha256((REPO_ROOT / "infra/compose/browser/squid.conf").read_bytes()).hexdigest()
+        self.assertEqual(expected, proxy["environment"]["JARVIS_BROWSER_PROXY_CONFIG_SHA256"].lower())
+        api = self.service("jarvis-api", self.all)
+        self.assertEqual("service_healthy", api["depends_on"]["browser-egress-proxy"]["condition"])
+        self.assertTrue(proxy["read_only"])
+        self.assertFalse(proxy.get("ports"))
+        self.assertFalse(self.service("playwright-mcp", self.all).get("ports"))
+
     def test_all_features_add_their_services_and_settings(self) -> None:
         api = self.service("jarvis-api", self.all)
         self.assertEqual("github", api["environment"]["Mcp__Servers__github__Name"])

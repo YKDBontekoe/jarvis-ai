@@ -97,6 +97,17 @@ if [[ "${namespace_exit}" != "0" ]]; then
   exit 1
 fi
 
+# Optional browser services must be healthy before Compose may replace the API that depends on them.
+# A listening MCP endpoint alone does not mean its egress proxy has started successfully.
+compose_services="$(jarvis_compose config --services)"
+if grep -Fxq "playwright-mcp" <<<"${compose_services}"; then
+  if ! jarvis_compose up -d --no-build --wait --wait-timeout 180 browser-egress-proxy playwright-mcp; then
+    echo "Browser preflight failed; existing application containers have not been replaced." >&2
+    jarvis_compose ps --all browser-egress-proxy playwright-mcp >&2 || true
+    exit 1
+  fi
+fi
+
 jarvis_compose up \
   -d --no-build --remove-orphans
 
