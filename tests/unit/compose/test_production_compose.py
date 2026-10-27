@@ -220,6 +220,18 @@ class ProductionComposeTests(unittest.TestCase):
         self.assertEqual({"7880/tcp", "7881/tcp"} | {f"{port}/udp" for port in range(50000, 50101)}, ports)
         self.assertTrue(self.mounts("livekit", "infra/livekit/production-tunnel.yaml", self.all))
 
+    def test_browser_launch_policy_is_mounted_read_only_and_reloads_on_change(self):
+        browser = self.service("playwright-mcp", self.all)
+        self.assertEqual(["sh", "/etc/jarvis-browser/launch.sh"], browser["entrypoint"])
+        data = b""
+        for name in ["launch.sh", "user-agent.mjs"]:
+            path = "infra/compose/browser/" + name
+            mount = next(v for v in browser["volumes"] if v.get("source", "").endswith(path))
+            self.assertTrue(mount["read_only"])
+            data += (REPO_ROOT / path).read_bytes()
+        self.assertEqual(hashlib.sha256(data).hexdigest(),
+                         browser["environment"]["JARVIS_BROWSER_LAUNCH_CONFIG_SHA256"].lower())
+
     def test_browser_proxy_has_healthcheck_and_blocks_api_replacement_until_healthy(self):
         proxy = self.service("browser-egress-proxy", self.all)
         self.assertIn("3128", proxy["healthcheck"]["test"][-1])

@@ -67,7 +67,13 @@ async function proxy(method, target) {
     name: 'browser_navigate', arguments: { url: 'https://example.com/' } } });
   assert(!page.isError, JSON.stringify(page));
   assert(page.content.some(c => c.text?.includes('Example Domain')), 'real browser must render the public page');
-  console.log(JSON.stringify({ mcp: 'connected', page: 'Example Domain', publicHttp: 'allowed',
+  const identity = await rpc({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: {
+    name: 'browser_evaluate', arguments: { function: '() => navigator.userAgent' } } });
+  assert(!identity.isError, JSON.stringify(identity));
+  const userAgent = identity.content.filter(c => c.text).map(c => c.text).join(' ');
+  assert(userAgent.includes('Chrome/'), 'browser must expose a Chromium-compatible user-agent');
+  assert(!userAgent.includes('HeadlessChrome'), 'user-agent must not carry the headless-only product token');
+  console.log(JSON.stringify({ userAgent: 'chromium-compatible', mcp: 'connected', page: 'Example Domain', publicHttp: 'allowed',
     publicHttps: 'allowed', blockedTargets: 13, unsafePorts: 'blocked' }));
 })().catch(error => { console.error(error); process.exitCode = 1; });
 """

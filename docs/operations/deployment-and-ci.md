@@ -20,6 +20,13 @@ stack includes Playwright, its egress proxy and the API's MCP connection; enabli
 hand-written file is not the current setup. This is a separate server browser session, not the phone's existing
 browser session or password store. Do not send passwords in chat.
 
+The browser launcher uses a standard Chromium user-agent derived from the installed browser version. Some sites
+return a bot-block page with HTTP 500 for the default `HeadlessChrome` token even though their login page is healthy.
+The launcher runs `chromium --version` locally; it does not visit a site or read an existing browser profile. An
+optional `JARVIS_BROWSER_USER_AGENT` in the host production env overrides the default. Launcher hashes force
+container recreation when this policy changes. Site authentication and challenges still require the normal flow;
+a 500 alone must not be treated as proof of a general site outage.
+
 The API waits for both browser services to be healthy. Deployment checks them before replacing the existing API
 and worker, so a proxy configuration/startup failure preserves the running application. A configuration hash
 forces Squid to restart when its mounted policy changes, rather than retaining the previous in-memory ACLs. The browser integration

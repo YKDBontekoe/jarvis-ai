@@ -364,11 +364,19 @@ internal static class ProductionDeployment
     {
         var proxyConfigHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(
             Path.Combine(builder.AppHostDirectory, "..", "..", "infra", "compose", "browser", "squid.conf"))));
+        var browserDirectory = Path.Combine(builder.AppHostDirectory, "..", "..", "infra", "compose", "browser");
+        var launchConfigHash = Convert.ToHexString(SHA256.HashData(
+            File.ReadAllBytes(Path.Combine(browserDirectory, "launch.sh"))
+                .Concat(File.ReadAllBytes(Path.Combine(browserDirectory, "user-agent.mjs"))).ToArray()));
         builder.Service("playwright-mcp", $"{JarvisImages.Playwright}:latest", s =>
         {
             s.Restart = "unless-stopped";
             s.Init = true;
-            s.Entrypoint = ["node", "/app/cli.js", "--headless", "--browser", "chromium", "--no-sandbox"];
+            s.Entrypoint = ["sh", "/etc/jarvis-browser/launch.sh"];
+            s.Volumes.Add(Bind("./infra/compose/browser/launch.sh", "/etc/jarvis-browser/launch.sh", readOnly: true));
+            s.Volumes.Add(Bind("./infra/compose/browser/user-agent.mjs", "/etc/jarvis-browser/user-agent.mjs", readOnly: true));
+            s.Env(("JARVIS_BROWSER_LAUNCH_CONFIG_SHA256", launchConfigHash),
+                ("JARVIS_BROWSER_USER_AGENT", "${JARVIS_BROWSER_USER_AGENT:-}"));
             s.Command = ["--port", "8931", "--host", "0.0.0.0", "--allowed-hosts", "playwright-mcp:8931",
                 "--block-service-workers", "--proxy-server", "http://browser-egress-proxy:3128"];
             s.ReadOnly = true;
