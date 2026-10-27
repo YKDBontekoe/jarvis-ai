@@ -29,7 +29,10 @@ jarvis_compose() {
         jarvis-api) echo api-test ;;
         jarvis-worker) echo worker-test ;;
       esac ;;
-    up) if [[ "${*: -1}" = temporal-namespace && "$TEST_SCENARIO" = start-error ]]; then return 1; fi ;;
+    config) [[ "$TEST_SCENARIO" != browser-* ]] || echo playwright-mcp ;;
+    up)
+      if [[ "${*: -1}" = temporal-namespace && "$TEST_SCENARIO" = start-error ]]; then return 1; fi
+      if [[ "${*: -1}" = playwright-mcp && "$TEST_SCENARIO" = browser-error ]]; then return 1; fi ;;
     logs) echo "namespace setup diagnostic" ;;
   esac
   return 0
@@ -67,6 +70,20 @@ exit 0
                                         "JARVIS_API_IMAGE": "ghcr.io/test/jarvis/api:new",
                                         "JARVIS_WORKER_IMAGE": "ghcr.io/test/jarvis/worker:new"})
             return result, calls.read_text()
+
+    def test_browser_failure_preserves_the_running_api_and_worker(self):
+        result, calls = self.run_deploy("browser-error")
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("Browser preflight failed", result.stderr)
+        self.assertIn("--wait --wait-timeout 180 browser-egress-proxy playwright-mcp", calls)
+        self.assertNotIn("--remove-orphans", calls)
+        self.assertNotIn("docker image rm", calls)
+
+    def test_browser_readiness_is_checked_before_replacing_the_api(self):
+        result, calls = self.run_deploy("browser-success")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertLess(calls.index("--wait --wait-timeout 180 browser-egress-proxy playwright-mcp"),
+                        calls.index("--remove-orphans"))
 
     def test_namespace_failure_keeps_application_containers_and_reports_logs(self):
         result, calls = self.run_deploy("failed")

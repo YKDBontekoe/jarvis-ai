@@ -14,6 +14,19 @@ Optional parts are AppHost features, chosen with `JARVIS_FEATURES` (repository v
 `github`, `home-assistant`, `coding`, `tunnel`. `DEPLOY_COMPOSE_FILES` from older setups maps its overlay names to
 the same features (`scripts/deploy/compose-env.sh`).
 
+Browser automation needs the `browser` feature. Set repository variable `JARVIS_FEATURES` to include `browser`
+(and retain any existing features such as `tunnel`), then deploy through the production approval flow. The generated
+stack includes Playwright, its egress proxy and the API's MCP connection; enabling a Compose profile on an old
+hand-written file is not the current setup. This is a separate server browser session, not the phone's existing
+browser session or password store. Do not send passwords in chat.
+
+The API waits for both browser services to be healthy. Deployment checks them before replacing the existing API
+and worker, so a proxy configuration/startup failure preserves the running application. A configuration hash
+forces Squid to restart when its mounted policy changes, rather than retaining the previous in-memory ACLs. The browser integration
+check in CI opens a public HTTPS page through MCP and confirms HTTP/CONNECT requests to private, loopback,
+metadata and IPv4-mapped private addresses are denied. It uses disposable containers without host ports or sessions.
+
+
 - **MCP runner** for owner-installed connectors, and the nightly **backup** service
 
 - **Caddy** edge TLS, built on the host from `infra/caddy/Dockerfile` with the layer4 plugin
