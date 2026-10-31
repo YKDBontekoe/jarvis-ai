@@ -18,6 +18,8 @@ advisory in `tests/.editorconfig` until the existing call sites are migrated; ne
 scripts/ci/run-python-unit-tests.sh
 python3 -m unittest tests/unit/compose/test_production_compose.py   # needs a .NET 10 SDK (or Docker) and docker compose
 python3 -m unittest tests/unit/compose/test_remote_up.py           # failure ordering with Docker/Compose stubs
+python3 -m unittest tests/unit/compose/test_prepare_host.py        # private disk cache on fresh/existing hosts
+python3 -m unittest tests/integration/compose/test_mcp_cache.py    # disk cache execution/reuse, ephemeral session homes
 python3 -m unittest tests/integration/compose/test_temporal_bootstrap.py  # disposable production Temporal stack
 python3 -m unittest tests/integration/compose/test_browser_bootstrap.py   # real browser + proxy, public page only
 ```

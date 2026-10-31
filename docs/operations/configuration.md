@@ -87,6 +87,10 @@ about 14 ms per query and 8 ms per memory for the default model, in PyTorch; the
 
 Runner side: `McpRunner__ListenUrl`, `McpRunner__MaxProcesses` (default 16), `McpRunner__MaxSessionMinutes` (default 120), `McpRunner__WorkRoot`, `McpRunner__CacheRoot`, and `McpRunner__PassEnvironment` (comma-separated variables copied from the runner's own environment into connectors, for an egress proxy or CA bundle).
 
+Production mounts `MCP_RUNNER_CACHE_DIR` at `/cache` for reusable npm/uv packages. Host preparation fills it with
+`$JARVIS_DATA_DIR/mcp-cache` and creates it with mode `0700`; the deployment user needs write access and the
+filesystem must allow execution. It uses disk storage, while session homes remain in the runner's `/tmp` tmpfs.
+
 `Mcp__Registry__BaseUrl` — MCP registry for the in-app catalog (default `https://registry.modelcontextprotocol.io`; empty turns the catalog off).
 
 `Mcp__Servers__0__*` — Name, Transport (`stdio` | `streamableHttp`), Command/Endpoint, AllowedTools, AutoApprovedTools, CredentialProvider, CredentialEnvironmentVariables, CredentialHeaders.

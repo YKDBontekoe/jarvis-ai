@@ -30,6 +30,7 @@ REQUIRED_ENV = {
     "CODEX_HOME_DIR": "/tmp/codex-home",
     "JARVIS_DATA_PROTECTION_KEYS_DIR": "/tmp/jarvis-data-protection-keys",
     "JARVIS_BACKUP_DIR": "/tmp/jarvis-backups",
+    "MCP_RUNNER_CACHE_DIR": "/tmp/jarvis-mcp-cache",
     "MCP_RUNNER_TOKEN": "mcp-runner-test-token-0123456789abcdef",
     "AUTH_ISSUER": "https://jarvis.example.com",
     "AUTH_AUDIENCE": "jarvis-api",
@@ -175,6 +176,22 @@ class ProductionComposeTests(unittest.TestCase):
         self.assertEqual(["ALL"], runner["cap_drop"])
         self.assertEqual(512, runner["deploy"]["resources"]["limits"]["pids"])
         self.assertNotIn("ports", runner)
+
+    def test_mcp_package_cache_uses_disk_but_session_homes_stay_ephemeral(self) -> None:
+        for project in (self.base, self.all):
+            runner = self.service("mcp-runner", project)
+            cache = next(v for v in runner["volumes"] if v["target"] == "/cache")
+            self.assertEqual("bind", cache["type"])
+            self.assertEqual(REQUIRED_ENV["MCP_RUNNER_CACHE_DIR"], cache["source"])
+            self.assertFalse(cache.get("read_only", False))
+            self.assertEqual(["/tmp:rw,exec,nosuid,nodev,size=1g"], runner["tmpfs"])
+            self.assertEqual("/cache", runner["environment"]["McpRunner__CacheRoot"])
+            self.assertEqual("/tmp/mcp-runner", runner["environment"]["McpRunner__WorkRoot"])
+            self.assertTrue(runner["read_only"])
+            self.assertEqual(["no-new-privileges:true"], runner["security_opt"])
+            for name, service in project["services"].items():
+                if name != "mcp-runner":
+                    self.assertNotIn(cache["source"], [v.get("source") for v in service.get("volumes", [])])
 
     def test_nothing_mounts_the_docker_socket(self) -> None:
         for project in (self.base, self.all):

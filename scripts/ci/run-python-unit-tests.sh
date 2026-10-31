@@ -8,4 +8,5 @@ python3 -m unittest \
   tests/unit/altstore/test_generate_source.py \
   tests/unit/release/test_semver.py \
   tests/unit/release/test_orchestrate_checks.py \
+  tests/unit/compose/test_prepare_host.py \
   tests/unit/compose/test_remote_up.py

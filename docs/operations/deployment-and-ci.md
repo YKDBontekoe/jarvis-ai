@@ -58,6 +58,17 @@ the server's Codex CLI happens in the app (`/api/v1/settings/models/codex/sign-i
 
 Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh` (generate, pull, migrate, replace, health-check), `scripts/deploy/publish-compose.sh`, `scripts/deploy/compose-env.sh`.
 
+The MCP runner's downloaded npm/uv packages use a disk cache at `MCP_RUNNER_CACHE_DIR`, defaulting to
+`$JARVIS_DATA_DIR/mcp-cache` (`$HOME/jarvis-data/mcp-cache` without an override). Host preparation adds the setting
+to existing env files and creates a new directory with mode `0700`, owned by the deployment user. As with the
+other private data directories, a custom `JARVIS_UID:JARVIS_GID` must be able to write it. The filesystem must
+allow execution. No GitHub secret is needed. The first approved deploy recreates the runner and
+its old tmpfs package cache is discarded; connector packages download again on first use. Session homes remain
+temporary. Later deployments reuse the disk cache, which is disposable and is not part of database backups.
+
+Disk caches can accumulate package versions. To reset this cache, stop the MCP runner before removing only the
+contents of its configured cache directory, then start the runner again. Do not remove the parent data directory.
+
 Before replacing the API and worker, the deploy starts the Temporal prerequisites and waits for
 `temporal-namespace` to exit successfully. A failure prints the schema/server/namespace logs and stops the deploy
 with the existing application containers intact. Temporal's RPC listeners explicitly bind `0.0.0.0` inside the
