@@ -125,12 +125,17 @@ Connector stderr is discarded because packages may print their own keys.
 runner. Operator host binaries such as `github-mcp-server` still run in the API image.
 
 In the production deployment the runner has no database networks and no Docker socket. It runs as `JARVIS_UID` on a
-read-only root with dropped capabilities, a PID and memory limit, and tmpfs for work and package caches. It
+read-only root with dropped capabilities, a PID and memory limit, and tmpfs for session work. It
 reaches the internet through `mcp-egress`, and the API and worker reach it through the internal `mcp` network.
-Its `/cache` and `/tmp` tmpfs mounts explicitly allow execution: npm package entrypoints, uv tools and downloaded
-Python run from those directories. Docker's default `noexec` would make a downloaded connector stop with exit
-code 126 before MCP initialization. This permission applies only to the runner; its root remains read-only and
-it still drops all capabilities, runs as the service user, and uses `nosuid`, `nodev` and `no-new-privileges`.
+Package caches in `/cache` are a private disk-backed bind mount (`MCP_RUNNER_CACHE_DIR`, automatically prepared
+under `JARVIS_DATA_DIR/mcp-cache` with mode `0700`). Large npm/uv downloads therefore do not pin RAM or swap as
+tmpfs files, and can be reused after a container is recreated. Only the runner mounts this directory; session
+homes and state files stay under `/tmp/mcp-runner` and are deleted when the connection ends. The cache is
+disposable, shared package storage, not a credential or session store, and is excluded from database backups.
+The cache filesystem must allow execution: npm entrypoints and downloaded Python run there. The `/tmp` tmpfs
+also explicitly allows execution, with `nosuid,nodev`; Docker's default `noexec` would stop downloaded connectors
+before MCP initialization. The runner keeps its non-root service user, dropped capabilities, read-only root,
+and `no-new-privileges` with either mount type.
 Nonzero connector exit codes are logged without stderr or credential values so startup failures can be diagnosed.
 Aspire starts the same runner as the `mcp-runner` resource. Without `McpRunner:Url`, connectors run in-process
 as before (tests).
