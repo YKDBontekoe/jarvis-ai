@@ -16,12 +16,15 @@ public sealed class FederatedSearchService(
     private readonly IFederatedSearchProvider[] _providers = providers.ToArray();
 
     public async Task<FederatedSearchResponse> SearchAsync(Guid ownerId, string query,
-        IReadOnlySet<string>? kindsFilter, CancellationToken cancellationToken, SearchWindow? window = null)
+        IReadOnlySet<string>? kindsFilter, CancellationToken cancellationToken, SearchWindow? window = null,
+        Guid? conversationId = null)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(ownerId, Guid.Empty);
         var normalizedQuery = SearchRanking.NormalizeQuery(query);
         if (normalizedQuery.Length is < 1 or > 2_000)
             return new FederatedSearchResponse([], []);
+        if (conversationId is { } scope)
+            return await SearchInConversationAsync(ownerId, scope, normalizedQuery, window, cancellationToken);
 
         if (kindsFilter is { Count: > 0 } && !SearchResultKinds.IsValidFilter(kindsFilter))
             return new FederatedSearchResponse([], []);
@@ -38,6 +41,48 @@ public sealed class FederatedSearchService(
             .Where(hit => window is null || window.Contains(hit.Timestamp)).ToList();
         var ranked = RankAndCap(merged, normalizedQuery);
         return new FederatedSearchResponse(ranked, statuses);
+    }
+
+    /// <summary>
+    /// Every match inside one conversation, newest first. Only providers that know how to search a single
+    /// conversation take part, and none of the cross-kind ranking or capping applies.
+    /// </summary>
+    private async Task<FederatedSearchResponse> SearchInConversationAsync(Guid ownerId, Guid conversationId,
+        string query, SearchWindow? window, CancellationToken cancellationToken)
+    {
+        var statuses = new List<SearchProviderStatus>();
+        var results = new List<FederatedSearchResult>();
+        foreach (var provider in _providers.OfType<IConversationScopedSearchProvider>())
+        {
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(_options.ProviderTimeout);
+                await using var scope = scopeFactory?.CreateAsyncScope();
+                var isolated = scope?.ServiceProvider.GetServices<IFederatedSearchProvider>()
+                    .OfType<IConversationScopedSearchProvider>()
+                    .FirstOrDefault(candidate => candidate.ProviderId == provider.ProviderId) ?? provider;
+                results.AddRange(await isolated.SearchInConversationAsync(ownerId, conversationId, query,
+                    _options.MaxInConversation, timeout.Token));
+                statuses.Add(new SearchProviderStatus(provider.ProviderId, true, null));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Search provider {ProviderId} failed inside a conversation for owner {OwnerId}.",
+                    provider.ProviderId, ownerId);
+                statuses.Add(new SearchProviderStatus(provider.ProviderId, false, "Search provider unavailable."));
+            }
+        }
+        var ordered = results
+            .Where(hit => window is null || window.Contains(hit.Timestamp))
+            .OrderByDescending(hit => hit.Timestamp ?? DateTimeOffset.MinValue)
+            .Take(_options.MaxInConversation)
+            .ToList();
+        return new FederatedSearchResponse(ordered, statuses);
     }
 
     private async Task<(SearchProviderStatus Status, IReadOnlyList<FederatedSearchResult> Results)> QueryProviderAsync(

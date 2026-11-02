@@ -260,6 +260,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _createAndOpenConversation();
   Future<void> _switchConversationProfile();
   void _openUtility(String destination);
+  Future<void> _findInChat();
   bool _canActOnMessage(MessageEntry entry);
   Future<void> _saveToLibrary(MessageEntry entry);
   Future<void> _remindFromMessage(MessageEntry entry);

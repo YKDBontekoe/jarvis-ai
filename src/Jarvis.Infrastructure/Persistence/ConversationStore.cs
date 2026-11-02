@@ -194,7 +194,7 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
     }
 
     public async Task<IReadOnlyList<MessageSearchHit>> SearchMessagesAsync(Guid ownerId, string query, int limit,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, Guid? conversationId = null)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
         var trimmed = query.Trim();
@@ -205,6 +205,7 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
                 from message in db.Messages.AsNoTracking()
                 join conversation in db.Conversations.AsNoTracking() on message.ConversationId equals conversation.Id
                 where conversation.OwnerId == ownerId &&
+                      (conversationId == null || conversation.Id == conversationId) &&
                       (message.Role == "user" || message.Role == "assistant") &&
                       EF.Functions.ILike(message.Content, pattern, "\\") &&
                       !db.Tasks.Any(task => task.ConversationId == conversation.Id)

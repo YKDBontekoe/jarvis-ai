@@ -383,7 +383,8 @@ public sealed class DecisionSearchProvider(IDecisionService decisions) : IFedera
 /// Message hits are for the owner's own search screen: <c>SearchEverything</c> leaves them out, so a profile that is
 /// restricted from the owner's other chats never reads them.
 /// </summary>
-public sealed class MessageSearchProvider(IConversationStore conversations) : IFederatedSearchProvider
+public sealed class MessageSearchProvider(IConversationStore conversations)
+    : IConversationScopedSearchProvider
 {
     public const int ExcerptLength = 180;
     public string ProviderId => "messages";
@@ -393,6 +394,16 @@ public sealed class MessageSearchProvider(IConversationStore conversations) : IF
         CancellationToken cancellationToken)
     {
         var hits = await conversations.SearchMessagesAsync(ownerId, query, limit, cancellationToken);
+        return hits.Select(hit => new FederatedSearchResult(SearchResultKinds.Message, hit.Message.Id.ToString(),
+            hit.ConversationTitle, (hit.Message.Role == "user" ? "You: " : "Jarvis: ") + Excerpt(hit.Message.Content, query),
+            hit.Message.CreatedAt, SearchRoutes.Message(hit.Message.ConversationId, hit.Message.Id), .6, false)).ToArray();
+    }
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchInConversationAsync(Guid ownerId,
+        Guid conversationId, string query, int limit, CancellationToken cancellationToken)
+    {
+        // The store joins the owner, so a conversation that is not the owner's finds nothing.
+        var hits = await conversations.SearchMessagesAsync(ownerId, query, limit, cancellationToken, conversationId);
         return hits.Select(hit => new FederatedSearchResult(SearchResultKinds.Message, hit.Message.Id.ToString(),
             hit.ConversationTitle, (hit.Message.Role == "user" ? "You: " : "Jarvis: ") + Excerpt(hit.Message.Content, query),
             hit.Message.CreatedAt, SearchRoutes.Message(hit.Message.ConversationId, hit.Message.Id), .6, false)).ToArray();

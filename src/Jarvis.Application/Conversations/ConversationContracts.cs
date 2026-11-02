@@ -24,7 +24,7 @@ public interface IConversationStore
     /// conversations of background tasks are left out.
     /// </summary>
     Task<IReadOnlyList<MessageSearchHit>> SearchMessagesAsync(Guid ownerId, string query, int limit,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, Guid? conversationId = null);
 
     /// <summary>One message with its conversation's title, only when the conversation is the owner's.</summary>
     Task<MessageSearchHit?> FindMessageAsync(Guid ownerId, Guid messageId, CancellationToken cancellationToken);

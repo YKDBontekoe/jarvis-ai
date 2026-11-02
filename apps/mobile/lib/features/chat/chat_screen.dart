@@ -57,6 +57,7 @@ import '../settings/settings_view.dart';
 import '../search/command_palette.dart';
 import '../search/recent_searches_store.dart';
 import '../search/search_navigation.dart';
+import '../search/find_in_chat_screen.dart';
 import '../search/search_screen.dart';
 import '../projects/project_style.dart';
 import '../shell/jarvis_tab_bar.dart';

@@ -11,6 +11,10 @@ federatedSearch(
   String query, {
   Set<String>? kinds,
   DateTime? from,
+
+  /// Searches only inside this conversation, its whole transcript, newest first.
+  String? conversationId,
+  CancelToken? cancelToken,
 }) async {
   final trimmed = query.trim();
   if (trimmed.isEmpty) {
@@ -21,8 +25,10 @@ federatedSearch(
   }
   final response = await http.get<Object?>(
     '/api/v1/search',
+    cancelToken: cancelToken,
     queryParameters: {
       'query': trimmed,
+      'conversationId': ?conversationId,
       if (kinds != null && kinds.isNotEmpty) 'kinds': kinds.join(','),
       if (from != null)
         'from':

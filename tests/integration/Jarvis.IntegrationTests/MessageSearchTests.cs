@@ -52,6 +52,36 @@ public sealed class MessageSearchTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_search_inside_one_conversation_finds_messages_beyond_the_loaded_page_and_only_there()
+    {
+        var owner = Guid.CreateVersion7();
+        var other = Guid.CreateVersion7();
+        await using var database = CreateDbContext();
+        var store = new ConversationStore(database);
+        var chat = await store.CreateAsync(owner, "Trip", CancellationToken.None);
+        var elsewhere = await store.CreateAsync(owner, "Other", CancellationToken.None);
+        var foreign = await store.CreateAsync(other, "Not yours", CancellationToken.None);
+        // An early match followed by well over a page of unrelated messages.
+        var early = new Message(chat.Id, "user", "Did we settle the hotel?");
+        await store.AddMessageAsync(early, CancellationToken.None);
+        for (var i = 0; i < 130; i++)
+            await store.AddMessageAsync(new Message(chat.Id, i % 2 == 0 ? "user" : "assistant", $"filler {i}"),
+                CancellationToken.None);
+        await store.AddMessageAsync(new Message(elsewhere.Id, "user", "hotel in another chat"), CancellationToken.None);
+        await store.AddMessageAsync(new Message(foreign.Id, "user", "hotel in someone else's chat"),
+            CancellationToken.None);
+
+        var inChat = await store.SearchMessagesAsync(owner, "hotel", 50, CancellationToken.None, chat.Id);
+        Assert.Equal(early.Id, Assert.Single(inChat).Message.Id);
+
+        // Without a scope the owner's other chat shows up too, never someone else's.
+        Assert.Equal(2, (await store.SearchMessagesAsync(owner, "hotel", 50, CancellationToken.None)).Count);
+        // Someone else's conversation id finds nothing for this owner.
+        Assert.Empty(await store.SearchMessagesAsync(owner, "hotel", 50, CancellationToken.None, foreign.Id));
+        Assert.Empty(await store.SearchMessagesAsync(other, "hotel", 50, CancellationToken.None, chat.Id));
+    }
+
+    [Fact]
     public async Task Hides_task_conversations_because_their_transcripts_open_from_Tasks()
     {
         var owner = Guid.CreateVersion7();

@@ -314,6 +314,19 @@ mixin _ChatScreenUi on _ChatScreenController {
                       _showConversationSummary();
                     },
                   ),
+                if (_conversationId != null && _hasMessages)
+                  ListTile(
+                    key: const Key('menu-find-in-chat'),
+                    leading: const IconBadge(
+                      icon: PhosphorIconsRegular.magnifyingGlass,
+                    ),
+                    title: const Text('Find in chat'),
+                    subtitle: const Text('Search the whole conversation'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      unawaited(_findInChat());
+                    },
+                  ),
                 action(
                   'Attach chat sources',
                   'Limit file search to selected documents',
