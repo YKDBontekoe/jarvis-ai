@@ -74,48 +74,54 @@ class _MessageBubbleState extends State<MessageBubble> {
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(PhosphorIconsRegular.copy),
-              title: const Text('Copy'),
-              onTap: () => Navigator.pop(sheetContext, 'copy'),
-            ),
-            ListTile(
-              key: const Key('message-share'),
-              leading: const Icon(PhosphorIconsRegular.shareNetwork),
-              title: const Text('Share'),
-              onTap: () => Navigator.pop(sheetContext, 'share'),
-            ),
-            if (widget.onEdit != null)
+        // Scrolls on short screens and at large text, so no action is cut off.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               ListTile(
-                leading: const Icon(PhosphorIconsRegular.pencilSimple),
-                title: const Text('Edit as new message'),
-                subtitle: const Text('Puts this text back in the message box'),
-                onTap: () => Navigator.pop(sheetContext, 'edit'),
+                leading: const Icon(PhosphorIconsRegular.copy),
+                title: const Text('Copy'),
+                onTap: () => Navigator.pop(sheetContext, 'copy'),
               ),
-            if (widget.onSaveToLibrary != null)
               ListTile(
-                key: const Key('message-save-library'),
-                leading: const Icon(PhosphorIconsRegular.bookmarkSimple),
-                title: const Text('Save to Library'),
-                onTap: () => Navigator.pop(sheetContext, 'library'),
+                key: const Key('message-share'),
+                leading: const Icon(PhosphorIconsRegular.shareNetwork),
+                title: const Text('Share'),
+                onTap: () => Navigator.pop(sheetContext, 'share'),
               ),
-            if (widget.onRemindMe != null)
+              if (widget.onEdit != null)
+                ListTile(
+                  leading: const Icon(PhosphorIconsRegular.pencilSimple),
+                  title: const Text('Edit as new message'),
+                  subtitle: const Text(
+                    'Puts this text back in the message box',
+                  ),
+                  onTap: () => Navigator.pop(sheetContext, 'edit'),
+                ),
+              if (widget.onSaveToLibrary != null)
+                ListTile(
+                  key: const Key('message-save-library'),
+                  leading: const Icon(PhosphorIconsRegular.bookmarkSimple),
+                  title: const Text('Save to Library'),
+                  onTap: () => Navigator.pop(sheetContext, 'library'),
+                ),
+              if (widget.onRemindMe != null)
+                ListTile(
+                  key: const Key('message-remind-me'),
+                  leading: const Icon(PhosphorIconsRegular.alarm),
+                  title: const Text('Remind me'),
+                  onTap: () => Navigator.pop(sheetContext, 'remind'),
+                ),
               ListTile(
-                key: const Key('message-remind-me'),
-                leading: const Icon(PhosphorIconsRegular.alarm),
-                title: const Text('Remind me'),
-                onTap: () => Navigator.pop(sheetContext, 'remind'),
+                leading: const Icon(PhosphorIconsRegular.cursor),
+                title: const Text('Select text'),
+                onTap: () => Navigator.pop(sheetContext, 'select'),
               ),
-            ListTile(
-              leading: const Icon(PhosphorIconsRegular.cursor),
-              title: const Text('Select text'),
-              onTap: () => Navigator.pop(sheetContext, 'select'),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
