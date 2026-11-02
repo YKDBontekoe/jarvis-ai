@@ -240,6 +240,16 @@ final List<TileSpec> tileSpecs = [
     fallback: 'Documents Jarvis can search',
   ),
   const TileSpec(
+    id: 'captures',
+    description: 'Review what you shared into Jarvis from other apps.',
+    name: 'Captures',
+    icon: PhosphorIconsRegular.tray,
+    category: TileCategory.know,
+    sizes: [_icon, _strip],
+    destination: 'captures',
+    fallback: 'Shared from other apps',
+  ),
+  const TileSpec(
     id: 'graph',
     description: 'Explore connections between people and ideas.',
     name: 'Knowledge graph',

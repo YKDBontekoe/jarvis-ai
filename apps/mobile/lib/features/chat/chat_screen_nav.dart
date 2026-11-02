@@ -20,6 +20,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       },
       onAskInChat:
           utilityBaseDestination(destination) == 'integrations' ||
+              destination == 'captures' ||
               destination == 'journal' ||
               destination.startsWith(appDestinationPrefix)
           ? (prompt) {
@@ -27,6 +28,12 @@ mixin _ChatScreenNav on _ChatScreenController {
               unawaited(_send(prompt));
             }
           : null,
+      onOpenDestination: (target) {
+        if (!_isWide && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        _openUtility(target);
+      },
       onQuickCreateDone: (message) => _quickCreateDone(destination, message),
     );
     final base = utilityBaseDestination(destination);
@@ -363,6 +370,11 @@ mixin _ChatScreenNav on _ChatScreenController {
       _tabMemory.clear();
       _unreadReply = null;
       _dismissedStrips.clear();
+      IncomingRoutes.instance.clear();
+      await CaptureStore.instance.clear();
+      // Nothing of this account stays on the home screen widget.
+      unawaited(HomeWidgetSync.instance.clear());
+      unawaited(AppShortcuts.clear());
       _tileSource.reset();
       _tiles.reset();
       await hub?.stop();

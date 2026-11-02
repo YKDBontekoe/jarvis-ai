@@ -103,7 +103,7 @@ mixin _ChatScreenPush on _ChatScreenController {
         content: Text(notification?.title ?? 'Jarvis needs your attention.'),
         action: SnackBarAction(
           label: 'Open',
-          onPressed: () => _handlePushPayload(message.data),
+          onPressed: () => _offerPush(message.data),
         ),
       ),
     );
@@ -114,7 +114,7 @@ mixin _ChatScreenPush on _ChatScreenController {
   void _onPushOpened(RemoteMessage message) {
     final action = notificationQuickAction(message.actionIdentifier);
     if (action == null) {
-      _handlePushPayload(message.data);
+      _offerPush(message.data);
       return;
     }
     final notificationId = asJsonString(message.data['notificationId']);
@@ -150,12 +150,22 @@ mixin _ChatScreenPush on _ChatScreenController {
       SnackBar(
         content: Text(message),
         action: failed
-            ? SnackBarAction(
-                label: 'Open',
-                onPressed: () => _handlePushPayload(data),
-              )
+            ? SnackBarAction(label: 'Open', onPressed: () => _offerPush(data))
             : null,
       ),
+    );
+  }
+
+  /// A notification tap goes through the shared queue: it waits for sign-in and
+  /// for the app lock, and a launch message plus an opened-app event for the
+  /// same notification open it once.
+  void _offerPush(Map<String, dynamic> data) {
+    final notificationId = asJsonString(data['notificationId']);
+    IncomingRoutes.instance.offer(
+      'notification',
+      'notification',
+      id: notificationId == null ? null : 'notification:$notificationId',
+      run: () => _handlePushPayload(data),
     );
   }
 

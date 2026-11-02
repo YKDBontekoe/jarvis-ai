@@ -258,22 +258,27 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     _syncWidget();
   }
 
-  /// Hands the iOS widget what Home now shows.
+  /// Hands the iOS widget what Home now shows, or only counts when the owner
+  /// chose to hide details.
   void _syncWidget() {
     final now = _now;
-    unawaited(
-      HomeWidgetSync.instance.push(
+    final needs = needsYouItems(
+      now: now,
+      briefing: _briefing,
+      chats: widget.chats,
+    );
+    final context = _context;
+    unawaited(() async {
+      final hide = await WidgetPrivacy.hideDetails();
+      await HomeWidgetSync.instance.push(
         HomeWidgetPayload.build(
           now: now,
-          context: _context,
-          needsYou: needsYouItems(
-            now: now,
-            briefing: _briefing,
-            chats: widget.chats,
-          ),
+          context: context,
+          needsYou: needs,
+          hideDetails: hide,
         ),
-      ),
-    );
+      );
+    }());
   }
 
   /// Fetches the context again after something on it changed.

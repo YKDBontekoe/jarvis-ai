@@ -244,6 +244,68 @@ mixin _ChatScreenUi on _ChatScreenController {
     );
   }
 
+  /// Starts capturing for this account and shows what was shared while the app was away.
+  Future<void> _bindCaptures() async {
+    if (usesDebugJarvisHttpAdapter) return;
+    await CaptureStore.instance.bind(_http.options.baseUrl);
+    await _presentNewCaptures();
+  }
+
+  /// Offers the Captures page once for captures the owner has not seen. It does
+  /// not send anything to the assistant: the page asks what to do with each.
+  Future<void> _presentNewCaptures() async {
+    if (usesDebugJarvisHttpAdapter || _signedOut || _signingOut) return;
+    await CaptureStore.instance.refresh();
+    final newest = CaptureStore.instance.newest;
+    if (newest != null && await CaptureStore.instance.hasUnpresented()) {
+      IncomingRoutes.instance.offer(
+        'capture',
+        'captures',
+        id: 'captures:${newest.id}',
+      );
+    }
+  }
+
+  /// True when the app can show something opened from outside: the session is
+  /// restored and signed in, and the app lock (if on) is open.
+  bool get _canOpenIncoming =>
+      mounted &&
+      !_signedOut &&
+      !_signingOut &&
+      !_restoringSession &&
+      !(AppLockScope.maybeOf(context)?.locked ?? false);
+
+  /// Opens whatever is waiting in [IncomingRoutes] once the app is ready for it.
+  /// Called when something arrives, and again when the session is restored, the
+  /// owner signs in, or the app unlocks.
+  void _drainIncomingRoutes() {
+    if (!IncomingRoutes.instance.hasPending || !_canOpenIncoming) return;
+    final route = IncomingRoutes.instance.take();
+    if (route == null) return;
+    if (route.run != null) {
+      route.run!();
+      return;
+    }
+    _openIncoming(route.destination);
+  }
+
+  void _openIncoming(String destination) {
+    switch (destination) {
+      case 'ask':
+        _presentChat();
+      case 'voice':
+        _openTile('voice');
+      case 'chats':
+        _selectTab(JarvisTab.chats);
+      case 'home':
+        _selectTab(JarvisTab.home);
+      case final chat when chat.startsWith('chat:'):
+        unawaited(_presentConversation(chat.substring(5)));
+      default:
+        _openUtility(destination);
+    }
+  }
+
   /// The one line above the dock, or none: Jarvis writing, a reply that
   /// finished while away, or the most pressing thing that needs the owner.
   DockStripData? _dockStrip() {

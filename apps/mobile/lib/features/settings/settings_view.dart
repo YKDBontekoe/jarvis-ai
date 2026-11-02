@@ -25,6 +25,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         destination: 'appearance',
       ),
       (
+        title: 'Widgets',
+        subtitle: 'What the home screen widgets show',
+        icon: PhosphorIconsRegular.eyeSlash,
+        destination: 'widget-privacy',
+      ),
+      (
         title: 'Face ID lock',
         subtitle: 'Lock Jarvis when you leave the app',
         icon: PhosphorIconsRegular.lockSimple,
@@ -229,6 +235,16 @@ const settingAliases = <String, List<String>>{
     'text size',
     'tekstgrootte',
     'motion',
+  ],
+  'widget-privacy': [
+    'widget',
+    'widgets',
+    'home screen',
+    'startscherm',
+    'hide',
+    'verbergen',
+    'privacy',
+    'lock screen',
   ],
   'app-lock': [
     'face id',

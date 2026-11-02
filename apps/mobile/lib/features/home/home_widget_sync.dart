@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'home_context.dart';
 import 'home_insights.dart';
@@ -17,12 +18,28 @@ class HomeWidgetPayload {
 
   /// The Right now card (or the next plan), how much needs you and the
   /// first three of those things.
+  ///
+  /// With [hideDetails] nothing personal is written: the widget shows only how
+  /// many things need you, never their titles, names or the day's plan.
   static HomeWidgetPayload build({
     required DateTime now,
     HomeContext? context,
     List<NeedsYouItem> needsYou = const [],
+    bool hideDetails = false,
   }) {
     final hero = context?.hero;
+    if (hideDetails) {
+      return HomeWidgetPayload({
+        'hero_kind': 'hidden',
+        'hero_title': 'Jarvis',
+        'hero_detail': '',
+        'day_line': '',
+        'needs_count': needsYou.length,
+        'needs_items': '[]',
+        'hide_details': true,
+        'updated_at': now.toUtc().millisecondsSinceEpoch,
+      });
+    }
     return HomeWidgetPayload({
       'hero_kind': hero?.kind ?? 'none',
       'hero_title': hero?.title ?? 'Nothing pressing',
@@ -35,6 +52,7 @@ class HomeWidgetPayload {
         for (final item in needsYou.take(3))
           {'title': item.title, 'detail': item.detail, 'kind': item.kind.name},
       ]),
+      'hide_details': false,
       'updated_at': now.toUtc().millisecondsSinceEpoch,
     });
   }
@@ -97,6 +115,38 @@ class HomeWidgetSync {
     }
   }
 
+  /// Removes everything the widget was given: on sign-out, so the next person
+  /// to see the home screen sees nothing of this account.
+  Future<void> clear() async {
+    _last = null;
+    if (!supported()) return;
+    try {
+      if (!_ready) {
+        await HomeWidget.setAppGroupId(appGroup);
+        _ready = true;
+      }
+      for (final key in payloadKeys) {
+        await HomeWidget.saveWidgetData<Object>(key, null);
+      }
+      await HomeWidget.updateWidget(iOSName: iOSName);
+    } catch (_) {
+      // No widget installed, or the App Group is not set up yet.
+    }
+  }
+
+  /// Every key written for the widget, so [clear] removes all of them.
+  static const payloadKeys = [
+    'hero_kind',
+    'hero_title',
+    'hero_detail',
+    'hero_starts_at',
+    'day_line',
+    'needs_count',
+    'needs_items',
+    'hide_details',
+    'updated_at',
+  ];
+
   /// Where a tap on the widget asked to go: `ask`, `voice`, `chats` or `home`,
   /// including the tap that launched the app.
   Stream<String> clicks() async* {
@@ -115,9 +165,39 @@ class HomeWidgetSync {
   }
 }
 
-/// `jarvis://ask?homeWidget` → `ask`. Anything else is ignored.
+/// `jarvis://ask?homeWidget` → `ask`. The same addresses are used by the
+/// widgets, the Shortcuts app and the Share Extension. Anything else is ignored.
 String? widgetDestination(Uri? uri) {
   if (uri == null || uri.scheme != 'jarvis') return null;
   final host = uri.host;
-  return const {'ask', 'voice', 'chats', 'home'}.contains(host) ? host : null;
+  return const {'ask', 'voice', 'chats', 'home', 'captures'}.contains(host)
+      ? host
+      : null;
+}
+
+/// Whether the widgets show only counts. Off by default; kept on this device.
+class WidgetPrivacy {
+  const WidgetPrivacy._();
+
+  static const hideDetailsKey = 'jarvis.widget.hide_details';
+
+  static Future<bool> hideDetails() async {
+    try {
+      return (await SharedPreferences.getInstance()).getBool(hideDetailsKey) ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> setHideDetails(bool value) async {
+    try {
+      await (await SharedPreferences.getInstance()).setBool(
+        hideDetailsKey,
+        value,
+      );
+    } catch (_) {
+      // The choice then lasts only until the app closes.
+    }
+  }
 }

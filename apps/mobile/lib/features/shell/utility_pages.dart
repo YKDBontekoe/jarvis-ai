@@ -5,6 +5,8 @@ import '../activity/activity_screen.dart';
 import '../approvals/approvals_screen.dart';
 import '../watches/condition_watches_screen.dart';
 import '../briefing/daily_briefing_screen.dart';
+import '../captures/captures_screen.dart';
+import '../settings/widget_privacy_screen.dart';
 import '../files/files_screen.dart';
 import '../finance/finance_screen.dart';
 import '../inbox/inbox_screen.dart';
@@ -98,6 +100,9 @@ Widget? utilityPageFor(
   Dio http, {
   Future<void> Function(String conversationId)? onOpenConversation,
   ValueChanged<String>? onAskInChat,
+
+  /// Opens another page from inside this one, such as the result of an action.
+  ValueChanged<String>? onOpenDestination,
 
   /// For `…/new` destinations: called when the editor closes, with a
   /// confirmation when it saved or null when it was cancelled.
@@ -256,6 +261,13 @@ Widget? utilityPageFor(
     initialTab: RemindersTab.notifications,
   ),
   'files' => FilesScreen(http: http, onOpenConversation: onOpenConversation),
+  'widget-privacy' => const WidgetPrivacyScreen(),
+  'captures' => CapturesScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+    onAskInChat: onAskInChat,
+    onOpenDestination: onOpenDestination,
+  ),
   'audit' => ActivityScreen(
     http: http,
     onOpenConversation: onOpenConversation,

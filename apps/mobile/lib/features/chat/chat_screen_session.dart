@@ -22,6 +22,8 @@ mixin _ChatScreenSession on _ChatScreenController {
       // Push setup can wait on a permission dialog or the network; the chat
       // must not.
       unawaited(_enablePush());
+      // Things shared into Jarvis wait for this account; others' are discarded.
+      unawaited(_bindCaptures());
       if (stale()) return;
       final list = await _http.get<dynamic>('/api/v1/conversations');
       if (stale()) return;
