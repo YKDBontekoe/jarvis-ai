@@ -16,6 +16,9 @@ class FixtureHttp implements HttpClientAdapter {
   final Map<String, int> statuses = {};
   final List<RecordedRequest> requests = [];
 
+  /// Awaited after a request is recorded and before it is answered; lets a test hold a response back.
+  Future<void> Function(RequestOptions options)? beforeRespond;
+
   Dio client() =>
       Dio(BaseOptions(baseUrl: 'https://fixture.invalid'))
         ..httpClientAdapter = this;
@@ -42,6 +45,7 @@ class FixtureHttp implements HttpClientAdapter {
       body: body,
       query: Map.of(options.queryParameters),
     ));
+    await beforeRespond?.call(options);
     final baseKey = '${options.method} ${options.path}';
     final queryKey = '$baseKey?${options.uri.query}';
     final key = responses.containsKey(queryKey) ? queryKey : baseKey;

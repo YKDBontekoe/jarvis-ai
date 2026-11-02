@@ -69,7 +69,14 @@ List<ContextCommand> contextCommandsFor(String? context) {
         ContextCommand(
           label: 'Draft a project update',
           icon: PhosphorIconsRegular.notePencil,
-          keywords: const ['update', 'draft', 'report', 'status', 'rapport', 'voortgang'],
+          keywords: const [
+            'update',
+            'draft',
+            'report',
+            'status',
+            'rapport',
+            'voortgang',
+          ],
           run: (http) async {
             final response = await http.post<dynamic>(
               '/api/v1/documents',
@@ -87,7 +94,13 @@ List<ContextCommand> contextCommandsFor(String? context) {
         ContextCommand(
           label: 'Prepare this meeting',
           icon: PhosphorIconsRegular.calendarCheck,
-          keywords: const ['prepare', 'prep', 'agenda', 'voorbereiden', 'vergadering'],
+          keywords: const [
+            'prepare',
+            'prep',
+            'agenda',
+            'voorbereiden',
+            'vergadering',
+          ],
           run: (http) async {
             await http.post<dynamic>('/api/v1/meetings/$id/prep');
             return 'meeting:$id';
@@ -99,7 +112,14 @@ List<ContextCommand> contextCommandsFor(String? context) {
         ContextCommand(
           label: "Plan this week's steps",
           icon: PhosphorIconsRegular.target,
-          keywords: const ['plan', 'week', 'steps', 'next', 'plannen', 'stappen'],
+          keywords: const [
+            'plan',
+            'week',
+            'steps',
+            'next',
+            'plannen',
+            'stappen',
+          ],
           run: (http) async {
             await http.post<dynamic>('/api/v1/goals/$id/plan');
             return 'goal:$id';
@@ -123,7 +143,13 @@ List<ContextCommand> contextCommandsFor(String? context) {
         ContextCommand(
           label: 'Prepare a price pack',
           icon: PhosphorIconsRegular.sliders,
-          keywords: const ['pack', 'price', 'negotiate', 'prijs', 'onderhandelen'],
+          keywords: const [
+            'pack',
+            'price',
+            'negotiate',
+            'prijs',
+            'onderhandelen',
+          ],
           run: (http) async {
             await http.post<dynamic>(
               '/api/v1/finance/subscriptions/$id/review/pack',

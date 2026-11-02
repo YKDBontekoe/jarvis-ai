@@ -65,7 +65,9 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
   var _loading = false;
   String? _error;
   List<FederatedSearchHit> _results = const [];
+  List<SearchProviderStatus> _providers = const [];
   Set<String> _kindFilter = {};
+  var _revision = 0;
   // What the owner was looking at when the palette opened.
   final String? _context = currentPaletteContext;
   bool _running = false;
@@ -85,15 +87,21 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
   }
 
   void _scheduleSearch() {
+    _revision++;
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 180), () => unawaited(_runSearch()));
+    _debounce = Timer(
+      const Duration(milliseconds: 180),
+      () => unawaited(_runSearch()),
+    );
   }
 
   Future<void> _runSearch() async {
+    final revision = ++_revision;
     final text = _query.text.trim();
     if (text.isEmpty) {
       setState(() {
         _results = const [];
+        _providers = const [];
         _error = null;
         _loading = false;
       });
@@ -109,13 +117,14 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
         text,
         kinds: _kindFilter.isEmpty ? null : _kindFilter,
       );
-      if (!mounted) return;
+      if (!mounted || revision != _revision) return;
       setState(() {
         _results = response.results;
+        _providers = response.providers;
         _loading = false;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _revision) return;
       setState(() {
         _loading = false;
         _error = describeApiError(error);
@@ -143,7 +152,8 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
       setState(() {
         _running = false;
         // Nothing is claimed as done: say what stopped it.
-        _error = '${command.label} did not work: ${firstProblemMessage(error.response?.data) ?? describeApiError(error)}';
+        _error =
+            '${command.label} did not work: ${firstProblemMessage(error.response?.data) ?? describeApiError(error)}';
       });
     }
   }
@@ -188,15 +198,15 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
     final width = MediaQuery.sizeOf(context).width;
     final dialogWidth = width >= 720 ? 640.0 : width * 0.92;
     return Shortcuts(
-      shortcuts: {
-        LogicalKeySet(LogicalKeyboardKey.escape): DismissIntent(),
-      },
+      shortcuts: {LogicalKeySet(LogicalKeyboardKey.escape): DismissIntent()},
       child: Actions(
         actions: {
-          DismissIntent: CallbackAction<DismissIntent>(onInvoke: (_) {
-            Navigator.of(context).pop();
-            return null;
-          }),
+          DismissIntent: CallbackAction<DismissIntent>(
+            onInvoke: (_) {
+              Navigator.of(context).pop();
+              return null;
+            },
+          ),
         },
         child: Center(
           child: Material(
@@ -217,7 +227,10 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                       autofocus: true,
                       decoration: InputDecoration(
                         hintText: 'Search or jump to…',
-                        prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass, size: 18),
+                        prefixIcon: Icon(
+                          PhosphorIconsRegular.magnifyingGlass,
+                          size: 18,
+                        ),
                         suffixText: width >= 720 ? 'Esc' : null,
                       ),
                       onChanged: (_) {
@@ -243,7 +256,8 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                                   if (selected) {
                                     _kindFilter = {..._kindFilter, kind};
                                   } else {
-                                    _kindFilter = {..._kindFilter}..remove(kind);
+                                    _kindFilter = {..._kindFilter}
+                                      ..remove(kind);
                                   }
                                 });
                                 _scheduleSearch();
@@ -258,7 +272,9 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
                         _error!,
-                        style: TextStyle(color: JarvisColors.of(context).danger),
+                        style: TextStyle(
+                          color: JarvisColors.of(context).danger,
+                        ),
                       ),
                     ),
                   Expanded(
@@ -277,7 +293,10 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                                 const QuickCommandHeader('Recent'),
                               for (final query in widget.recentStore.read())
                                 ListTile(
-                                  leading: const Icon(PhosphorIconsRegular.clockCounterClockwise, size: 18),
+                                  leading: const Icon(
+                                    PhosphorIconsRegular.clockCounterClockwise,
+                                    size: 18,
+                                  ),
                                   title: Text(query),
                                   onTap: () {
                                     _query.text = query;
@@ -285,7 +304,10 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                                   },
                                 ),
                               ListTile(
-                                leading: const Icon(PhosphorIconsRegular.arrowSquareOut, size: 18),
+                                leading: const Icon(
+                                  PhosphorIconsRegular.arrowSquareOut,
+                                  size: 18,
+                                ),
                                 title: const Text('Open full search'),
                                 onTap: () {
                                   Navigator.of(context).pop();
@@ -306,7 +328,9 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               ..._contextTiles(_query.text),
-                              for (final command in matchQuickCommands(_query.text))
+                              for (final command in matchQuickCommands(
+                                _query.text,
+                              ))
                                 QuickCommandTile(
                                   command: command,
                                   onTap: () => _runCommand(command),
@@ -315,6 +339,8 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                                 child: SearchResultsBody(
                                   loading: _loading,
                                   results: _results,
+                                  providers: _providers,
+                                  onRetry: () => unawaited(_runSearch()),
                                   onOpen: (hit) => unawaited(_openHit(hit)),
                                 ),
                               ),

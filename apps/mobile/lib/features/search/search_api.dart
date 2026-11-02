@@ -69,3 +69,27 @@ class SearchProviderStatus {
   final bool succeeded;
   final String? error;
 }
+
+/// Plain-language line for sources that did not answer; results from the rest stay visible.
+String incompleteSearchMessage(List<SearchProviderStatus> failed) {
+  final names = failed
+      .map((p) => searchProviderLabel(p.providerId))
+      .toSet()
+      .toList();
+  final which = names.length <= 2
+      ? names.join(' and ')
+      : '${names.take(2).join(', ')} and ${names.length - 2} more';
+  return 'Search is incomplete: $which did not respond. '
+      'Results below may be missing items.';
+}
+
+/// Friendly label for a provider id such as `memory` or `graph_entity`.
+String searchProviderLabel(String id) {
+  if (id.isEmpty) return 'One source';
+  final label = searchKindLabels[id];
+  if (label != null) return label;
+  final spaced = id.replaceAll(RegExp(r'[_\-.]+'), ' ').trim();
+  return spaced.isEmpty
+      ? 'One source'
+      : spaced[0].toUpperCase() + spaced.substring(1);
+}

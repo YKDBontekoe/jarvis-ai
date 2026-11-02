@@ -144,7 +144,9 @@ class _MessageContextScreenState extends State<MessageContextScreen> {
       if (!mounted) return;
       final page = jsonObject(response.data);
       final more = _readable(page?['items']);
-      final before = _scroll.hasClients ? _scroll.position.maxScrollExtent : 0.0;
+      final before = _scroll.hasClients
+          ? _scroll.position.maxScrollExtent
+          : 0.0;
       final have = {for (final item in _messages) item['id']};
       setState(() {
         final fresh = [
