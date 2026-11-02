@@ -14,7 +14,8 @@ public sealed class RemoteQueryExecutor(
     public async Task<ConversationTurnResult> SendAsync(Guid ownerId, Guid conversationId, string content,
         Func<string, CancellationToken, Task>? onTextDelta = null,
         Func<CancellationToken, Task>? beforeRun = null,
-        IReadOnlyList<Jarvis.Application.Conversations.MessageAttachment>? attachments = null)
+        IReadOnlyList<Jarvis.Application.Conversations.MessageAttachment>? attachments = null,
+        string? clientMessageId = null)
     {
         using var query = queries.Begin(ownerId, conversationId, lifetime.ApplicationStopping);
         await using var scope = scopes.CreateOwnerScope(ownerId);
@@ -22,7 +23,7 @@ public sealed class RemoteQueryExecutor(
         try
         {
             return await turns.SendAsync(ownerId, conversationId, content, query.Token, onTextDelta, beforeRun,
-                attachments);
+                attachments, clientMessageId);
         }
         catch (OperationCanceledException) when (query.StoppedByOwner)
         {

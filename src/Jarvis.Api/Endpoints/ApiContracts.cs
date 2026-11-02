@@ -18,7 +18,7 @@ public sealed record VoiceToolDto(string Name, string Description, JsonElement I
 public sealed record VoiceSessionBootstrapDto(string Instructions, IReadOnlyList<VoiceToolDto> Tools);
 public sealed record VoiceToolCallResultDto(string Result, bool IsError, bool ApprovalRequired);
 public sealed record SendMessageRequest([StringLength(32_000)] string? Content,
-    IReadOnlyList<Guid>? ImageFileIds = null);
+    IReadOnlyList<Guid>? ImageFileIds = null, [StringLength(64)] string? ClientMessageId = null);
 public sealed record MessageAttachmentDto(Guid FileId, string FileName, string ContentType);
 public sealed record ConversationDto(Guid Id, string Title, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
     Guid? ProfileId = null, string? ProfileName = null, int? ProfileVersion = null, bool ProfileDeleted = false,

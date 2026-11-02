@@ -41,6 +41,10 @@ public interface IConversationStore
         CancellationToken cancellationToken);
 
     Task AddMessageAsync(Message message, CancellationToken cancellationToken);
+
+    /// <summary>The user message a client stored under <paramref name="clientMessageId"/>, if any.</summary>
+    Task<Message?> FindByClientMessageIdAsync(Guid conversationId, string clientMessageId,
+        CancellationToken cancellationToken);
     /// <summary>Removes one message of a conversation, with its feedback; true when it existed.</summary>
     Task<bool> DeleteMessageAsync(Guid conversationId, Guid messageId, CancellationToken cancellationToken);
     Task<string?> GetAgentSessionAsync(Guid conversationId, CancellationToken cancellationToken);

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -205,4 +207,16 @@ class OutboxStore {
       // The queue still lives in memory for this session.
     }
   }
+}
+
+final _ids = math.Random.secure();
+
+/// A fresh id for one send: letters and digits only, unique across devices.
+/// The server keeps it with the message so a retry of the same send is recognised.
+String newClientMessageId() {
+  final random = List.generate(
+    8,
+    (_) => _ids.nextInt(36).toRadixString(36),
+  ).join();
+  return 'm-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-$random';
 }

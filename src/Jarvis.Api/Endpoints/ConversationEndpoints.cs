@@ -161,6 +161,11 @@ internal static class ConversationEndpoints
                     $"Send at most {MessageAttachments.MaxPerMessage} photos with one message.");
             if (content is { Length: > 32_000 } || string.IsNullOrWhiteSpace(content) && imageIds.Length == 0)
                 return EndpointHelpers.Invalid("content", "Message content must contain 1 to 32,000 characters.");
+            var clientMessageId = request.ClientMessageId?.Trim();
+            if (string.IsNullOrEmpty(clientMessageId)) clientMessageId = null;
+            if (clientMessageId is not null && !ClientMessageIds.IsValid(clientMessageId))
+                return EndpointHelpers.Invalid("clientMessageId",
+                    "The message id must be 1 to 64 letters, digits, dots, dashes, colons or underscores.");
             var attachments = new List<MessageAttachment>(imageIds.Length);
             foreach (var imageId in imageIds)
             {
@@ -179,7 +184,8 @@ internal static class ConversationEndpoints
             // The request abort token is intentionally unused. Closing the phone drops this connection,
             // and the query still runs until it is stored.
             return await RemoteQueryResults.ExecuteAsync(() =>
-                remote.SendAsync(currentUser.OwnerId, conversationId, text, attachments: attachments));
+                remote.SendAsync(currentUser.OwnerId, conversationId, text, attachments: attachments,
+                    clientMessageId: clientMessageId));
         }).WithName("SendMessage");
 
         api.MapPost("/conversations/{conversationId:guid}/regenerate", async (Guid conversationId,

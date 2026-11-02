@@ -286,6 +286,11 @@ public sealed class ConversationStore(JarvisDbContext db) : IConversationStore, 
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public Task<Message?> FindByClientMessageIdAsync(Guid conversationId, string clientMessageId,
+        CancellationToken cancellationToken) =>
+        db.Messages.AsNoTracking().FirstOrDefaultAsync(
+            x => x.ConversationId == conversationId && x.ClientMessageId == clientMessageId, cancellationToken);
+
     public async Task<bool> DeleteMessageAsync(Guid conversationId, Guid messageId,
         CancellationToken cancellationToken) =>
         await db.Messages.Where(x => x.ConversationId == conversationId && x.Id == messageId)

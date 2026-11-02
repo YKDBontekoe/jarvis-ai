@@ -301,7 +301,11 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _openSearch(BuildContext context);
   Future<void> _openSearchRouteFromNotification(Map<String, dynamic> data);
 
-  Future<bool> _send([String? text, List<MessagePhoto>? photos]);
+  Future<bool> _send([
+    String? text,
+    List<MessagePhoto>? photos,
+    String? clientId,
+  ]);
   void _upsertSurface(UiSurfaceEntry surface);
   void _upsertBrowserSession(BrowserSessionEntry session);
   void _appendBrowserStep(String sessionId, BrowserStepItem step);

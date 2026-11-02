@@ -398,6 +398,16 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("citations_json");
 
+                    b.Property<string>("ClientMessageId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("client_message_id");
+
+                    b.Property<string>("ClientPayloadHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("client_payload_hash");
+
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("text");
@@ -419,6 +429,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Content"), "gin");
                     NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Content"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("ConversationId", "ClientMessageId")
+                        .IsUnique()
+                        .HasFilter("client_message_id IS NOT NULL");
 
                     b.HasIndex("ConversationId", "CreatedAt", "Id");
 
