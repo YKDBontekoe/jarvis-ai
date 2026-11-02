@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api/mutation_queue.dart';
 import '../api/offline_cache.dart';
+import '../api/waiting_changes.dart';
 import '../l10n/l10n.dart';
 import '../theme.dart';
 import 'motion.dart';
@@ -66,11 +67,14 @@ class _OfflineBarState extends State<_OfflineBar> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      ValueListenableBuilder<List<QueuedMutation>>(
-        valueListenable: MutationQueue.instance.items,
-        builder: (context, _, _) => _bar(context),
-      );
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: Listenable.merge([
+      MutationQueue.instance.items,
+      WaitingChanges.instance.messages,
+      WaitingChanges.instance.openOverview,
+    ]),
+    builder: (context, _) => _bar(context),
+  );
 
   Widget _bar(BuildContext context) {
     final colors = JarvisColors.of(context);
@@ -79,10 +83,13 @@ class _OfflineBarState extends State<_OfflineBar> {
     final base = savedAt == null
         ? l10n.offline
         : l10n.offlineShowingSaved(offlineAge(savedAt, DateTime.now(), l10n));
-    final queued = MutationQueue.instance.waiting;
+    final queued =
+        MutationQueue.instance.waiting +
+        WaitingChanges.instance.messages.value.length;
     final label = queued == 0
         ? base
         : '$base · $queued change${queued == 1 ? '' : 's'} waiting to send';
+    final openOverview = WaitingChanges.instance.openOverview.value;
     return Material(
       color: colors.warningSoft,
       child: SafeArea(
@@ -101,14 +108,24 @@ class _OfflineBarState extends State<_OfflineBar> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: ExcludeSemantics(
-                    child: Text(
-                      label,
-                      key: const ValueKey('offline-banner'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelMedium
-                          ?.copyWith(color: colors.ink),
+                  child: InkWell(
+                    key: const ValueKey('offline-banner-open'),
+                    // The overview is only offered when something is waiting.
+                    onTap: queued == 0 ? null : openOverview,
+                    child: ExcludeSemantics(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Text(
+                          queued > 0 && openOverview != null
+                              ? '$label · View'
+                              : label,
+                          key: const ValueKey('offline-banner'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: colors.ink),
+                        ),
+                      ),
                     ),
                   ),
                 ),

@@ -301,6 +301,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       await DraftStore.clearAll();
       _outboxTimer?.cancel();
       await _outbox.clear();
+      WaitingChanges.instance.reset();
       await OfflineCache.instance.clear();
       await MutationQueue.instance.clear();
       await OutboxStore.clearAll();

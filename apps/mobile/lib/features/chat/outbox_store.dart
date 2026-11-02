@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../json_maps.dart';
@@ -100,7 +101,9 @@ class OutboxMessage {
 /// Messages waiting for a connection, kept on this device in send order.
 /// Cleared on sign-out.
 class OutboxStore {
-  OutboxStore._(this._prefs, this._items);
+  OutboxStore._(this._prefs, this._items) {
+    _publish();
+  }
 
   OutboxStore.memory() : this._(null, []);
 
@@ -113,6 +116,11 @@ class OutboxStore {
 
   final SharedPreferences? _prefs;
   final List<OutboxMessage> _items;
+
+  /// The messages waiting, for screens that show them. Updated on every change.
+  final ValueNotifier<List<OutboxMessage>> changes = ValueNotifier(const []);
+
+  void _publish() => changes.value = List.unmodifiable(_items);
 
   static Future<OutboxStore> open() async {
     try {
@@ -158,17 +166,22 @@ class OutboxStore {
     while (_items.length > maxItems) {
       _items.removeAt(0);
     }
+    _publish();
     await _save();
   }
 
   Future<void> remove(String id) async {
     final before = _items.length;
     _items.removeWhere((item) => item.id == id);
-    if (_items.length != before) await _save();
+    if (_items.length != before) {
+      _publish();
+      await _save();
+    }
   }
 
   Future<void> clear() async {
     _items.clear();
+    _publish();
     await _prefs?.remove(storageKey);
   }
 

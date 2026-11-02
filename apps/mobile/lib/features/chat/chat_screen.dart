@@ -65,6 +65,7 @@ import '../voice/voice_errors.dart';
 import '../voice/voice_stage.dart';
 import 'chat_entries.dart';
 import 'chat_widgets.dart';
+import '../../api/waiting_changes.dart';
 import 'composer_drafts.dart';
 import 'conversation_summary.dart';
 import 'image_paste_stub.dart'
@@ -133,6 +134,7 @@ class _ChatScreenState extends _ChatScreenController
     _scroll.addListener(_handleTranscriptScroll);
     _input.addListener(_rememberDraft);
     unawaited(_openDrafts());
+    _registerWaitingChanges();
     unawaited(_openOutbox());
     unawaited(_tiles.open());
     _chatsTimer = Timer.periodic(const Duration(seconds: 60), (_) {
@@ -346,6 +348,7 @@ class _ChatScreenState extends _ChatScreenController
 
   @override
   void dispose() {
+    WaitingChanges.instance.reset();
     OfflineCache.instance.state.removeListener(_syncQueuedChanges);
     WidgetsBinding.instance.removeObserver(this);
     unawaited(PlaceReminderTracker.instance.detach());

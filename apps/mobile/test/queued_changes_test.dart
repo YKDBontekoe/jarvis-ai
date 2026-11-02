@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/api/mutation_queue.dart';
+import 'package:jarvis_mobile/api/waiting_changes.dart';
+import 'package:jarvis_mobile/features/chat/outbox_store.dart';
 import 'package:jarvis_mobile/features/reminders/reminders_screen.dart';
 import 'package:jarvis_mobile/features/settings/queued_changes_screen.dart';
 
@@ -173,6 +175,112 @@ void main() {
       await MutationQueue.instance.clear();
     },
   );
+
+  group('overview of everything waiting', () {
+    late WaitingChanges waiting;
+
+    setUp(() => waiting = WaitingChanges());
+
+    Future<void> showOverview(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 2600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: QueuedChangesScreen(
+            http: http.client(),
+            queue: queue,
+            waiting: waiting,
+            clock: () => now,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    OutboxMessage message(String id, {Duration age = Duration.zero}) =>
+        OutboxMessage(
+          id: id,
+          conversationId: 'c-$id',
+          content: 'Text for $id',
+          queuedAt: now.subtract(age),
+        );
+
+    testWidgets('changes and chat messages are grouped with counts', (
+      tester,
+    ) async {
+      await queue.enqueue(
+        kind: MutationKinds.reminderComplete,
+        targetId: 'r1',
+        label: 'Mark “Call the plumber” as done',
+        group: 'reminder:r1',
+      );
+      final outbox = OutboxStore.memory();
+      await outbox.add(message('m1'));
+      await outbox.add(message('m2'));
+      waiting.attach(outbox);
+      await showOverview(tester);
+
+      expect(find.text('3 waiting'), findsOneWidget);
+      expect(find.text('CHATS · 2'), findsOneWidget);
+      expect(find.text('REMINDERS · 1'), findsOneWidget);
+      expect(find.text('Text for m1'), findsOneWidget);
+    });
+
+    testWidgets('a chat message links to its chat and can be discarded', (
+      tester,
+    ) async {
+      final outbox = OutboxStore.memory();
+      await outbox.add(message('m1'));
+      waiting.attach(outbox);
+      final opened = <String>[];
+      waiting.openConversation = opened.add;
+      waiting.discardMessage = outbox.remove;
+      await showOverview(tester);
+
+      await tester.tap(find.byKey(const Key('queue-open-m1')));
+      expect(opened, ['c-m1']);
+
+      await tester.tap(find.byKey(const Key('queue-discard-m1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Nothing is waiting'), findsOneWidget);
+    });
+
+    testWidgets('a message past the auto-send window is flagged as old', (
+      tester,
+    ) async {
+      final outbox = OutboxStore.memory();
+      await outbox.add(message('old', age: const Duration(days: 3)));
+      waiting.attach(outbox);
+      await showOverview(tester);
+
+      expect(find.textContaining('TOO OLD TO SEND BY ITSELF'), findsOneWidget);
+      expect(find.text('0 waiting · 1 need you'), findsOneWidget);
+    });
+
+    testWidgets('a conflicted change shows the server reason and opens the '
+        'current item', (tester) async {
+      await queue.enqueue(
+        kind: MutationKinds.reminderComplete,
+        targetId: 'r1',
+        label: 'Mark “Call the plumber” as done',
+        group: 'reminder:r1',
+      );
+      http.on('POST', '/api/v1/reminders/r1/complete', {
+        'title': 'That reminder no longer exists.',
+      }, status: 404);
+      final opened = <String>[];
+      waiting.openDestination = opened.add;
+      await tester.runAsync(() => queue.drain(http.client()));
+      await showOverview(tester);
+
+      expect(find.text('COULD NOT APPLY'), findsOneWidget);
+      expect(find.text('Mark “Call the plumber” as done'), findsOneWidget);
+      await tester.tap(find.text('Open current item'));
+      expect(opened, ['reminders']);
+    });
+  });
 }
 
 class _Down implements HttpClientAdapter {
