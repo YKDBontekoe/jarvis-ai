@@ -1090,6 +1090,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     canStart: !_busy && !_hasPendingApproval && _conversationId != null,
     onPrimary: () => unawaited(_toggleVoice()),
     onToggleMute: _voiceActive ? () => unawaited(_toggleVoiceMute()) : null,
+    onToggleCaptions: () => setState(() => _voiceCaptions = !_voiceCaptions),
     level: _voiceActive ? _voiceLevel : null,
     cards: _voiceCards,
     onCardOpen: (destination) => _fromShell(() => _openUtility(destination)),
