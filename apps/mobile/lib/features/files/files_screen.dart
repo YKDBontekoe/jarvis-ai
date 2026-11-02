@@ -14,6 +14,7 @@ import 'file_download_stub.dart'
 import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
+import 'files_filter.dart';
 
 const uploadableFileExtensions = [
   'pdf',
@@ -102,6 +103,19 @@ class _FilesScreenState extends State<FilesScreen> {
   /// `new-collection`. Only that item is blocked; the rest of the list stays usable.
   final Set<String> _busy = {};
   final List<UploadJob> _uploads = [];
+  final _search = TextEditingController();
+  final Set<FileKind> _kinds = {};
+  FileStage? _stage;
+
+  bool get _filtering =>
+      _search.text.trim().isNotEmpty || _kinds.isNotEmpty || _stage != null;
+
+  void _clearFilters() => setState(() {
+    _search.clear();
+    _kinds.clear();
+    _stage = null;
+  });
+
   final Map<String, _DownloadJob> _downloads = {};
   int _uploadSerial = 0;
   String? _error;
@@ -115,6 +129,7 @@ class _FilesScreenState extends State<FilesScreen> {
 
   @override
   void dispose() {
+    _search.dispose();
     for (final job in _uploads) {
       job.cancel.cancel();
     }
@@ -436,7 +451,27 @@ class _FilesScreenState extends State<FilesScreen> {
   String _formatSize(dynamic value) => formatFileSize(asJsonInt(value));
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final shown = filterFiles(
+      _files,
+      query: _search.text,
+      kinds: _kinds,
+      stage: _stage,
+    );
+    final membership = collectionNamesByFile(_collections);
+    // Collections are hidden while searching so the matches stand alone.
+    final visibleCollections = _filtering
+        ? const <Map<String, dynamic>>[]
+        : _collections;
+    return _scaffold(context, shown, membership, visibleCollections);
+  }
+
+  Widget _scaffold(
+    BuildContext context,
+    List<Map<String, dynamic>> shown,
+    Map<String, List<String>> membership,
+    List<Map<String, dynamic>> visibleCollections,
+  ) => Scaffold(
     appBar: AppBar(
       title: const PageTitle('Files'),
       actions: [
@@ -472,14 +507,22 @@ class _FilesScreenState extends State<FilesScreen> {
       ),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-        itemCount: _uploads.length + _collections.length + _files.length,
+        itemCount:
+            (_files.isEmpty ? 0 : 1) +
+            _uploads.length +
+            visibleCollections.length +
+            (_filtering && shown.isEmpty ? 1 : shown.length),
         itemBuilder: (context, index) {
+          if (_files.isNotEmpty) {
+            if (index == 0) return ContentWidth(child: _filterBar(context));
+            index -= 1;
+          }
           if (index < _uploads.length) {
             return ContentWidth(child: _uploadCard(_uploads[index]));
           }
           index -= _uploads.length;
-          if (index < _collections.length) {
-            final collection = _collections[index];
+          if (index < visibleCollections.length) {
+            final collection = visibleCollections[index];
             final name = asJsonString(collection['name']) ?? 'Collection';
             final fileIds = collection['fileIds'];
             final count = fileIds is List ? fileIds.length : 0;
@@ -525,8 +568,13 @@ class _FilesScreenState extends State<FilesScreen> {
               ),
             );
           }
-          final file = _files[index - _collections.length];
+          index -= visibleCollections.length;
+          if (shown.isEmpty) {
+            return ContentWidth(child: _noMatches(context));
+          }
+          final file = shown[index];
           final name = asJsonString(file['fileName']) ?? 'File';
+          final inCollections = membership[jsonString(file, 'id')] ?? const [];
           final icon = _fileIcon(name);
           final status = asJsonString(file['processingStatus']) ?? 'uploaded';
           final fileId = jsonString(file, 'id') ?? '';
@@ -573,6 +621,20 @@ class _FilesScreenState extends State<FilesScreen> {
                               ),
                           ],
                         ),
+                        if (inCollections.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              key: Key('file-collections-$fileId'),
+                              'In ${inCollections.join(', ')}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: JarvisColors.of(context).inkSoft,
+                                  ),
+                            ),
+                          ),
                         if (download != null)
                           _downloadProgress(download, fileId),
                       ],
@@ -659,6 +721,96 @@ class _FilesScreenState extends State<FilesScreen> {
             ),
           );
         },
+      ),
+    ),
+  );
+
+  /// Filename search plus type and status chips, shown above the list.
+  Widget _filterBar(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            key: const Key('files-search'),
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Search by file name',
+              prefixIcon: Icon(
+                PhosphorIconsRegular.magnifyingGlass,
+                size: 18,
+                color: colors.muted,
+              ),
+              suffixIcon: _search.text.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const Key('files-search-clear'),
+                      tooltip: 'Clear search',
+                      onPressed: () => setState(_search.clear),
+                      icon: const Icon(PhosphorIconsRegular.x, size: 16),
+                    ),
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                for (final kind in FileKind.values)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilterChip(
+                      key: Key('files-kind-${kind.name}'),
+                      label: Text(kind.label),
+                      selected: _kinds.contains(kind),
+                      onSelected: (on) => setState(
+                        () => on ? _kinds.add(kind) : _kinds.remove(kind),
+                      ),
+                    ),
+                  ),
+                for (final stage in FileStage.values)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      key: Key('files-stage-${stage.name}'),
+                      label: Text(stage.label),
+                      selected: _stage == stage,
+                      onSelected: (on) =>
+                          setState(() => _stage = on ? stage : null),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (_filtering)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const Key('files-clear-filters'),
+                onPressed: _clearFilters,
+                icon: const Icon(PhosphorIconsRegular.x, size: 14),
+                label: const Text('Clear filters'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Files exist, but none fit the search: say so instead of showing "No files yet".
+  Widget _noMatches(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 32),
+    child: Center(
+      child: Text(
+        'No files match. You have ${_files.length} '
+        '${_files.length == 1 ? 'file' : 'files'} in all.',
+        key: const Key('files-no-match'),
+        textAlign: TextAlign.center,
+        style: TextStyle(color: JarvisColors.of(context).muted),
       ),
     ),
   );
