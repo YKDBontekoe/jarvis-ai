@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../ui/phosphor_icons.dart';
 import '../../ui/submit_state.dart';
+import 'reminder_shortcuts.dart';
 
 import '../approvals/approvals_screen.dart';
 import '../chat/tool_catalog.dart';
@@ -358,6 +359,14 @@ abstract class _RemindersController extends State<RemindersScreen>
     return null;
   }
 
+  /// Snoozes after the owner picks how long in the shared snooze sheet.
+  Future<void> _snoozeWithSheet(String? id) async {
+    if (id == null) return;
+    final choice = await showSnoozeSheet(context, zoneId: _zoneOfReminder(id));
+    if (choice == null || !mounted) return;
+    await _snooze(id, choice.by ?? Duration.zero, until: choice.until);
+  }
+
   Future<void> _snooze(String? id, Duration by, {DateTime? until}) async {
     if (id == null) return;
     try {
@@ -566,12 +575,18 @@ abstract class _RemindersController extends State<RemindersScreen>
             PhosphorIconsRegular.clockCounterClockwise,
             size: 16,
           ),
-          label: const Text('Snooze 10 min'),
+          label: const Text('+10 min'),
         ),
         OutlinedButton(
           onPressed: () => _snooze(reminderId, const Duration(hours: 1)),
           style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
-          child: const Text('1 hour'),
+          child: const Text('+1 hour'),
+        ),
+        OutlinedButton(
+          key: const Key('snooze-more'),
+          onPressed: () => _snoozeWithSheet(reminderId),
+          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
+          child: const Text('Later…'),
         ),
       ],
     ),
@@ -742,12 +757,6 @@ abstract class _RemindersController extends State<RemindersScreen>
     _tabs.dispose();
     super.dispose();
   }
-}
-
-/// Tomorrow at 09:00 local time, the "later" choice in snooze menus.
-DateTime _tomorrowMorning() {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day + 1, 9);
 }
 
 /// How many finished reminders show before "Show more".

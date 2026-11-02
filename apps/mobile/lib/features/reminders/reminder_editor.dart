@@ -135,6 +135,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
   String _recurrence = 'once';
   int _weekdays = 0;
   bool _atPlace = false;
+  ReminderShortcut? _shortcut;
   final _placeName = TextEditingController();
   ({double latitude, double longitude, double? accuracy})? _spot;
   String? _savedPlace;
@@ -143,6 +144,19 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
   bool _everyVisit = false;
   bool _locating = false;
   String? _placeError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Starts on "Tomorrow morning" on the reminder's own clock.
+    widget.timeZone
+        .then((_) {
+          if (mounted && _shortcut == null) {
+            unawaited(_useShortcut(ReminderShortcut.tomorrowMorning));
+          }
+        })
+        .catchError((_) {});
+  }
 
   static const _radii = [(150.0, '150 m'), (300.0, '300 m'), (750.0, '750 m')];
 
@@ -180,6 +194,26 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
             .firstWhere((value) => value >= accuracy * 2, orElse: () => 750);
       }
     });
+  }
+
+  /// Fills the date and time from a shortcut, on the clock of the reminder's own zone.
+  Future<void> _useShortcut(ReminderShortcut shortcut) async {
+    final zone = await widget.timeZone;
+    if (!mounted) return;
+    final when = resolveReminderShortcut(shortcut, nowOnClock(zone));
+    if (when == null) return;
+    setState(() {
+      _shortcut = shortcut;
+      _date = DateTime(when.year, when.month, when.day);
+      _time = TimeOfDay(hour: when.hour, minute: when.minute);
+    });
+  }
+
+  /// Leaves the shortcuts and opens the time picker.
+  Future<void> _pickATime() async {
+    setState(() => _shortcut = null);
+    final value = await showTimePicker(context: context, initialTime: _time);
+    if (value != null && mounted) setState(() => _time = value);
   }
 
   void _pickSaved(ReminderPlace place) => setState(() {
@@ -517,6 +551,38 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
           ],
         ),
       ],
+      if (_recurrence == 'once') ...[
+        const SizedBox(height: 10),
+        FutureBuilder<String>(
+          future: widget.timeZone,
+          builder: (context, snapshot) {
+            final now = nowOnClock(snapshot.data);
+            return Wrap(
+              key: const Key('reminder-shortcuts'),
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final shortcut in ReminderShortcut.values)
+                  if (resolveReminderShortcut(shortcut, now) != null)
+                    ChoiceChip(
+                      key: Key('shortcut-${shortcut.name}'),
+                      label: Text(shortcut.label),
+                      selected: _shortcut == shortcut,
+                      onSelected: snapshot.hasData
+                          ? (_) => _useShortcut(shortcut)
+                          : null,
+                    ),
+                ChoiceChip(
+                  key: const Key('shortcut-pick'),
+                  label: const Text('Pick a time'),
+                  selected: _shortcut == null,
+                  onSelected: (_) => _pickATime(),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
       const SizedBox(height: 10),
       ListTile(
         tileColor: JarvisColors.of(context).surfaceMuted,
@@ -533,7 +599,12 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
             firstDate: DateTime.now(),
             lastDate: DateTime.now().add(const Duration(days: 730)),
           );
-          if (value != null && mounted) setState(() => _date = value);
+          if (value != null && mounted) {
+            setState(() {
+              _date = value;
+              _shortcut = null;
+            });
+          }
         },
       ),
       const SizedBox(height: 8),
@@ -550,7 +621,12 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
             context: context,
             initialTime: _time,
           );
-          if (value != null && mounted) setState(() => _time = value);
+          if (value != null && mounted) {
+            setState(() {
+              _time = value;
+              _shortcut = null;
+            });
+          }
         },
       ),
       FutureBuilder<String>(

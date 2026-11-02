@@ -482,28 +482,18 @@ class _RemindersScreenState extends _RemindersController {
       tooltip: 'Reminder actions',
       icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
       onSelected: (value) => switch (value) {
-        'snooze10' => _snooze(id, const Duration(minutes: 10)),
-        'snooze60' => _snooze(id, const Duration(hours: 1)),
-        'tomorrow' => _snooze(id, Duration.zero, until: _tomorrowMorning()),
+        'snooze' => _snoozeWithSheet(id),
         'done' => _markDone(reminder),
         'chat' => _openChat(reminder),
         'cancel' => _cancelReminder(reminder),
         _ => Future<void>.value(),
       },
       itemBuilder: (_) => [
-        if (canSnooze) ...[
+        if (canSnooze)
           PopupMenuItem(
-            value: 'snooze10',
-            child: Text(
-              pending ? 'Remind me in 10 min' : 'Remind me again in 10 min',
-            ),
+            value: 'snooze',
+            child: Text(pending ? 'Snooze…' : 'Remind me again…'),
           ),
-          const PopupMenuItem(value: 'snooze60', child: Text('In 1 hour')),
-          const PopupMenuItem(
-            value: 'tomorrow',
-            child: Text('Tomorrow at 9:00'),
-          ),
-        ],
         if (pending && !repeating)
           const PopupMenuItem(value: 'done', child: Text('Mark as done')),
         if (widget.onOpenConversation != null)

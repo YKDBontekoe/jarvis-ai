@@ -406,7 +406,9 @@ void main() {
     expect(find.textContaining('Reminded you Today'), findsOneWidget);
     await tester.tap(find.byTooltip('Reminder actions'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Remind me again in 10 min'));
+    await tester.tap(find.text('Remind me again…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('snooze-10')));
     await tester.pumpAndSettle();
 
     final body =
@@ -481,7 +483,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('1 hour'));
+    await tester.tap(find.text('+1 hour'));
     await tester.pumpAndSettle();
     final body =
         http.sent('POST', '/api/v1/reminders/r1/snooze').single.body as Map;
