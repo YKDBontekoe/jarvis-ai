@@ -5,7 +5,8 @@ Two WidgetKit widgets, written in SwiftUI:
 - **Jarvis** (`JarvisWidget`, small and medium): the Right now card (a plan starting soon with a live countdown, the morning brief, a low battery or tomorrow). The medium size adds the first three things in Needs you. Tapping it opens Home.
 - **Ask Jarvis** (`JarvisAskWidget`, small and medium): opens a new chat. The medium size has separate Type and Talk buttons.
 
-The widgets never call the API. After each Home refresh the app writes what Home shows into the App Group `group.com.example.jarvis_mobile` and asks WidgetKit to reload (`lib/features/home/home_widget_sync.dart`, through the `home_widget` package). Keys: `hero_kind`, `hero_title`, `hero_detail`, `hero_starts_at` (ms since epoch, UTC), `day_line`, `needs_count`, `needs_items` (JSON list of `{title, detail, kind}`), `updated_at`.
+The widgets never call the API. After each Home refresh the app writes what Home shows into the App Group `group.com.example.jarvis_mobile` and asks WidgetKit to reload (`lib/features/home/home_widget_sync.dart`, through the `home_widget` package). Keys: `hero_kind`, `hero_title`, `hero_detail`, `hero_starts_at` (ms since epoch, UTC), `day_line`, `needs_count`, `needs_items` (JSON list of `{title, detail, kind}`), `updated_at`, `hide_details`. With `hide_details` on (More → Widget privacy) the app writes only a count and the widget shows "N need you"; both widgets show "Updated …" and turn amber when the data is older than 12 hours.
+See also `../ShareExtension/README.md` for Share → Jarvis and Shortcuts.
 
 Taps open `jarvis://home`, `jarvis://ask` or `jarvis://voice` (with `?homeWidget`); the `jarvis` URL scheme is registered in `Runner/Info.plist` and the app routes these in `chat_screen.dart`.
 
