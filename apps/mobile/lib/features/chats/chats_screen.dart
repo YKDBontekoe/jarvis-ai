@@ -277,6 +277,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 FilterPills(
                   selected: _filter,
                   unread: widget.chats.unreadChats,
+                  drafts: widget.chats.draftCount,
                   onSelected: _select,
                 ),
                 Expanded(
@@ -748,11 +749,15 @@ class FilterPills extends StatefulWidget {
     required this.selected,
     required this.unread,
     required this.onSelected,
+    this.drafts = 0,
     super.key,
   });
 
   final ChatFilter selected;
   final int unread;
+
+  /// Conversations with an unsent draft; the Drafts pill only shows while there are some.
+  final int drafts;
   final ValueChanged<ChatFilter> onSelected;
 
   @override
@@ -842,17 +847,24 @@ class _FilterPillsState extends State<FilterPills> {
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Row(
                 children: [
-                  for (final filter in ChatFilter.values) ...[
-                    if (filter != ChatFilter.values.first)
-                      const SizedBox(width: 8),
-                    _Pill(
-                      key: _keys[filter],
-                      filter: filter,
-                      selected: filter == widget.selected,
-                      count: filter == ChatFilter.unread ? widget.unread : 0,
-                      onTap: () => widget.onSelected(filter),
-                    ),
-                  ],
+                  for (final filter in ChatFilter.values)
+                    if (filter != ChatFilter.drafts ||
+                        widget.drafts > 0 ||
+                        widget.selected == ChatFilter.drafts) ...[
+                      if (filter != ChatFilter.values.first)
+                        const SizedBox(width: 8),
+                      _Pill(
+                        key: _keys[filter],
+                        filter: filter,
+                        selected: filter == widget.selected,
+                        count: switch (filter) {
+                          ChatFilter.unread => widget.unread,
+                          ChatFilter.drafts => widget.drafts,
+                          _ => 0,
+                        },
+                        onTap: () => widget.onSelected(filter),
+                      ),
+                    ],
                 ],
               ),
             ),
@@ -1239,6 +1251,11 @@ class _Empty extends StatelessWidget {
         PhosphorIconsRegular.checkCircle,
         'You are all caught up',
         'Unread WhatsApp chats show up here.',
+      ),
+      (_, ChatFilter.drafts) => (
+        PhosphorIconsRegular.pencilSimple,
+        'No drafts',
+        'Messages you start but do not send show up here.',
       ),
       (_, ChatFilter.whatsapp) when !linked => (
         PhosphorIconsRegular.whatsappLogo,

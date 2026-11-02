@@ -150,6 +150,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
     if (id != null && _pendingPhotos.isEmpty) {
       unawaited(_restoreStoredPhotos(id));
     }
+    _chatList.setDrafts(_drafts.previews());
   }
 
   /// Saves which photos of the open conversation are uploaded, next to its text.
@@ -161,6 +162,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
         if (photo.fileId != null)
           (fileId: photo.fileId!, fileName: photo.fileName),
     ]);
+    _chatList.setDrafts(_drafts.previews());
   }
 
   Future<void> _restoreStoredPhotos(String conversationId);
@@ -169,6 +171,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
     if (_applyingDraft) return;
     final id = _conversationId;
     if (id != null) _drafts.write(id, _input.text);
+    _chatList.setDrafts(_drafts.previews());
   }
 
   /// Sets the composer without saving it as a draft of the open conversation.

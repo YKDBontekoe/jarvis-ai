@@ -88,6 +88,18 @@ class ComposerDrafts {
     }
   }
 
+  /// What each conversation's unsent draft looks like in the Chats list: its
+  /// text, or "Photo" / "2 photos" when only photos are waiting.
+  Map<String, String> previews() => {
+    for (final entry in _drafts.entries)
+      if (entry.value.text.trim().isNotEmpty)
+        entry.key: entry.value.text.trim()
+      else if (entry.value.photos.isNotEmpty)
+        entry.key: entry.value.photos.length == 1
+            ? 'Photo'
+            : '${entry.value.photos.length} photos',
+  };
+
   String read(String conversationId) => _drafts[conversationId]?.text ?? '';
 
   List<DraftPhoto> readPhotos(String conversationId) =>

@@ -70,6 +70,25 @@ void main() {
       expect(drafts.readPhotos('a'), isEmpty);
     });
 
+    test(
+      'previews summarise text and photo-only drafts for the Chats list',
+      () async {
+        final drafts = await ComposerDrafts.open();
+        drafts.write('a', '  Book the hotel  ');
+        drafts.writePhotos('b', [(fileId: 'f1', fileName: 'a.png')]);
+        drafts.writePhotos('c', [
+          (fileId: 'f1', fileName: 'a.png'),
+          (fileId: 'f2', fileName: 'b.png'),
+        ]);
+        drafts.write('d', '   ');
+        expect(drafts.previews(), {
+          'a': 'Book the hotel',
+          'b': 'Photo',
+          'c': '2 photos',
+        });
+      },
+    );
+
     test('drops the oldest drafts past the limit', () async {
       final drafts = await ComposerDrafts.open();
       for (var i = 0; i < ComposerDrafts.maxDrafts + 3; i++) {

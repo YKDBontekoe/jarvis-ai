@@ -292,7 +292,10 @@ mixin _ChatScreenSession on _ChatScreenController {
     _hub = null;
     await previous?.stop();
     if (!mounted || _signedOut || _signingOut) return;
-    if (_conversationId case final deleted?) _drafts.remove(deleted);
+    if (_conversationId case final deleted?) {
+      _drafts.remove(deleted);
+      _chatList.setDrafts(_drafts.previews());
+    }
     _replaceComposerText('');
     setState(() {
       _conversationId = null;

@@ -260,6 +260,16 @@ class ChatRow extends StatelessWidget {
     );
     return Row(
       children: [
+        if (item.draft != null) ...[
+          Text(
+            key: const Key('chat-draft-label'),
+            'Draft: ',
+            style: style.copyWith(
+              color: colors.danger,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
         if (item.group && item.asksYou) ...[
           Text(
             '@you ',
@@ -286,7 +296,8 @@ class ChatRow extends StatelessWidget {
   }
 
   String? _preview() {
-    final text = item.preview?.trim();
+    // An unsent draft takes the place of the last message in the list.
+    final text = (item.draft ?? item.preview)?.trim();
     return text == null || text.isEmpty ? null : text;
   }
 
