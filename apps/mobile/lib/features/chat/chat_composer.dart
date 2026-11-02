@@ -55,6 +55,10 @@ class ChatComposer extends StatefulWidget {
 }
 
 class _ChatComposerState extends State<ChatComposer> {
+  /// Bumped when the parent rebuilds the composer, so an expanded editor
+  /// above it shows the photos as they finish uploading.
+  final _parentTick = ValueNotifier<int>(0);
+
   late final FocusNode _focus = FocusNode(onKeyEvent: _onKey)
     ..addListener(_changed);
   late final _paste = ImagePasteListener(
@@ -74,6 +78,7 @@ class _ChatComposerState extends State<ChatComposer> {
   @override
   void didUpdateWidget(ChatComposer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _parentTick.value++;
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_changed);
       widget.controller.addListener(_changed);
@@ -142,6 +147,7 @@ class _ChatComposerState extends State<ChatComposer> {
     widget.focusRequests?.removeListener(_requestFocus);
     _paste.detach();
     _focus.dispose();
+    _parentTick.dispose();
     super.dispose();
   }
 
@@ -222,6 +228,31 @@ class _ChatComposerState extends State<ChatComposer> {
   void _send() {
     unawaited(HapticFeedback.lightImpact());
     widget.onSend();
+  }
+
+  /// Opens the message in a full-height editor. It edits the same text field
+  /// controller, so the text, the cursor and the attached photos are exactly
+  /// what the small composer has, and collapsing keeps all of it.
+  Future<void> _expand() async {
+    final sendRequested = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        fullscreenDialog: true,
+        builder: (_) => _ExpandedComposer(
+          controller: widget.controller,
+          changes: Listenable.merge([widget.controller, _parentTick]),
+          photos: () => widget.photos,
+          onRemovePhoto: widget.onRemovePhoto,
+          canSend: () => _canSend,
+          hint: widget.hint,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (sendRequested == true && _canSend) {
+      _send();
+    } else if (_inputEnabled) {
+      _focus.requestFocus();
+    }
   }
 
   @override
@@ -354,6 +385,15 @@ class _ChatComposerState extends State<ChatComposer> {
                 ),
               ],
               const Spacer(),
+              if (widget.controller.text.trim().isNotEmpty && _inputEnabled)
+                _ComposerIconButton(
+                  key: const Key('composer-expand'),
+                  icon: PhosphorIconsRegular.arrowsOutSimple,
+                  tooltip: 'Expand message',
+                  onPressed: _expand,
+                ),
+              if (widget.controller.text.trim().isNotEmpty && _inputEnabled)
+                const SizedBox(width: 6),
               AnimatedSwitcher(
                 duration: JarvisMotion.of(
                   context,
@@ -482,4 +522,96 @@ class _SuggestionRow extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// The full-height editor behind the composer's expand button.
+class _ExpandedComposer extends StatelessWidget {
+  const _ExpandedComposer({
+    required this.controller,
+    required this.changes,
+    required this.photos,
+    required this.onRemovePhoto,
+    required this.canSend,
+    required this.hint,
+  });
+
+  final TextEditingController controller;
+  final Listenable changes;
+  final List<PendingPhoto> Function() photos;
+  final ValueChanged<PendingPhoto>? onRemovePhoto;
+  final bool Function() canSend;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return ListenableBuilder(
+      listenable: changes,
+      builder: (context, _) => Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            key: const Key('composer-collapse'),
+            tooltip: 'Collapse',
+            icon: const Icon(PhosphorIconsRegular.arrowsInSimple),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          title: const Text('Message'),
+          actions: [
+            IconButton.filled(
+              key: const Key('composer-expanded-send'),
+              tooltip: 'Send',
+              onPressed: canSend()
+                  ? () => Navigator.of(context).pop(true)
+                  : null,
+              icon: const Icon(PhosphorIconsBold.arrowUp, size: 18),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (photos().isNotEmpty)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: ComposerPhotoStrip(
+                      photos: photos(),
+                      onRemove: onRemovePhoto ?? (_) {},
+                    ),
+                  ),
+                Expanded(
+                  child: TextField(
+                    key: const Key('composer-expanded-field'),
+                    controller: controller,
+                    autofocus: true,
+                    expands: true,
+                    maxLines: null,
+                    minLines: null,
+                    textAlignVertical: TextAlignVertical.top,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    style: TextStyle(
+                      fontSize: 17,
+                      height: 1.45,
+                      color: colors.ink,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: hint,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

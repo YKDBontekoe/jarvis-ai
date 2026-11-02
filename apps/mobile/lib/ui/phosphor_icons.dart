@@ -14,6 +14,11 @@ abstract final class PhosphorIconsRegular {
     fontFamily: 'PhosphorRegular',
   );
   static const arrowLeft = IconData(0xe058, fontFamily: 'PhosphorRegular');
+  static const arrowsInSimple = IconData(0xe09e, fontFamily: 'PhosphorRegular');
+  static const arrowsOutSimple = IconData(
+    0xe0a6,
+    fontFamily: 'PhosphorRegular',
+  );
   static const arrowsClockwise = IconData(
     0xe094,
     fontFamily: 'PhosphorRegular',
