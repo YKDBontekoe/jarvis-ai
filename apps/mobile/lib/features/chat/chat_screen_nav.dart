@@ -5,6 +5,7 @@ part of 'chat_screen.dart';
 mixin _ChatScreenNav on _ChatScreenController {
   void _openUtility(String destination) {
     if (_signedOut || _signingOut) return;
+    unawaited(RecentFeatures.instance.recordDestination(destination));
     _dismissKeyboard();
     final page = utilityPageFor(
       destination,
@@ -299,6 +300,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       await _drafts.clear();
       await ComposerDrafts.clearAll();
       await DraftStore.clearAll();
+      await RecentFeatures.clearAll();
       _outboxTimer?.cancel();
       await _outbox.clear();
       WaitingChanges.instance.reset();

@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'feature_search.dart';
+import 'recent_features.dart';
 import '../tiles/tile_card.dart';
 import '../tiles/tile_controller.dart';
 import '../tiles/tile_grid.dart';
@@ -19,8 +21,12 @@ class EverythingScreen extends StatefulWidget {
     required this.source,
     required this.layout,
     required this.onOpen,
+    this.recent,
     super.key,
   });
+
+  /// The features opened lately; the app-wide list unless a test passes its own.
+  final RecentFeatures? recent;
 
   final TileDataSource source;
   final TileLayoutController layout;
@@ -34,6 +40,13 @@ class EverythingScreen extends StatefulWidget {
 
 class _EverythingScreenState extends State<EverythingScreen> {
   final _query = TextEditingController();
+  RecentFeatures get _recent => widget.recent ?? RecentFeatures.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_recent.load());
+  }
 
   @override
   void dispose() {
@@ -41,18 +54,12 @@ class _EverythingScreenState extends State<EverythingScreen> {
     super.dispose();
   }
 
-  List<TileSpec> _matches(TileCategory category) {
-    final needle = _query.text.trim().toLowerCase();
-    return [
-      for (final spec in tileSpecs)
-        if (spec.category == category &&
-            (needle.isEmpty ||
-                spec.name.toLowerCase().contains(needle) ||
-                spec.description.toLowerCase().contains(needle) ||
-                spec.category.label.toLowerCase().contains(needle)))
-          spec,
-    ];
-  }
+  /// Matching features in the order they should be listed: best match first,
+  /// exact names before aliases, registry order after that.
+  List<TileSpec> _matches(TileCategory category) => [
+    for (final spec in searchFeatures(_query.text))
+      if (spec.category == category) spec,
+  ];
 
   void _preview(TileSpec spec) {
     FocusManager.instance.primaryFocus?.unfocus();
@@ -82,6 +89,55 @@ class _EverythingScreenState extends State<EverythingScreen> {
           },
         ),
       ),
+    );
+  }
+
+  Widget _recentStrip(BuildContext context) {
+    final specs = _recent.specs;
+    if (specs.isEmpty) return const SizedBox.shrink();
+    final colors = JarvisColors.of(context);
+    return Column(
+      key: const Key('everything-recent'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 24, 2, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text('Recent', style: JarvisType.sectionOf(context)),
+              ),
+              TextButton(
+                key: const Key('everything-clear-recent'),
+                onPressed: () => unawaited(_recent.clear()),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: colors.inkSoft,
+                ),
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+        ),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final spec in specs)
+                  _FavoriteLauncher(
+                    keyPrefix: 'recent',
+                    note: 'recent',
+                    spec: spec,
+                    // A feature used before opens straight away.
+                    onTap: () => widget.onOpen(spec.destination),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -170,6 +226,22 @@ class _EverythingScreenState extends State<EverythingScreen> {
                             when specs.isNotEmpty)
                           (category, specs),
                     ];
+                    // While searching, the section holding the best answer comes first.
+                    if (_query.text.trim().isNotEmpty) {
+                      int best(List<TileSpec> specs) => specs
+                          .map((spec) => featureScore(spec, _query.text))
+                          .reduce((a, b) => a > b ? a : b);
+                      final order = {
+                        for (final (i, section) in sections.indexed)
+                          section.$1: i,
+                      };
+                      sections.sort((a, b) {
+                        final byBest = best(b.$2).compareTo(best(a.$2));
+                        return byBest != 0
+                            ? byBest
+                            : order[a.$1]!.compareTo(order[b.$1]!);
+                      });
+                    }
                     if (sections.isEmpty && favorites.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 48),
@@ -184,6 +256,11 @@ class _EverythingScreenState extends State<EverythingScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (_query.text.trim().isEmpty)
+                          ListenableBuilder(
+                            listenable: _recent,
+                            builder: (context, _) => _recentStrip(context),
+                          ),
                         if (favorites.isNotEmpty &&
                             _query.text.trim().isEmpty) ...[
                           Padding(
@@ -247,10 +324,19 @@ class _EverythingScreenState extends State<EverythingScreen> {
 
 /// A familiar shortcut strip; the feature directory below explains each tool.
 class _FavoriteLauncher extends StatelessWidget {
-  const _FavoriteLauncher({required this.spec, required this.onTap});
+  const _FavoriteLauncher({
+    required this.spec,
+    required this.onTap,
+    this.keyPrefix = 'favorite',
+    this.note = 'on Home',
+  });
 
   final TileSpec spec;
   final VoidCallback onTap;
+  final String keyPrefix;
+
+  /// What the screen reader adds after the name: "on Home" or "recent".
+  final String note;
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +344,7 @@ class _FavoriteLauncher extends StatelessWidget {
     final width = MediaQuery.textScalerOf(context).scale(90).clamp(90.0, 180.0);
     return Semantics(
       button: true,
-      label: '${spec.name}, on Home. ${spec.description}',
+      label: '${spec.name}, $note. ${spec.description}',
       onTap: onTap,
       excludeSemantics: true,
       child: SizedBox(
@@ -268,7 +354,7 @@ class _FavoriteLauncher extends StatelessWidget {
           child: PressFeedback(
             scale: .96,
             builder: (context, highlight) => InkWell(
-              key: Key('favorite-${spec.id}'),
+              key: Key('$keyPrefix-${spec.id}'),
               borderRadius: BorderRadius.circular(JarvisRadii.md),
               onTap: onTap,
               onHighlightChanged: highlight,
