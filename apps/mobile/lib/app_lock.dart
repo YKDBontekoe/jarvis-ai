@@ -98,6 +98,7 @@ class SecureAppLockStore implements AppLockStore {
       for (final key in const [
         AppLockController.enabledKey,
         AppLockController.delayKey,
+        AppLockController.coverKey,
       ]) {
         final value = await _storage.read(key: key);
         if (value != null) values[key] = value;
@@ -128,6 +129,7 @@ class AppLockController extends ChangeNotifier {
 
   static const enabledKey = 'jarvis.appLock.enabled';
   static const delayKey = 'jarvis.appLock.delay';
+  static const coverKey = 'jarvis.appLock.cover';
   static const unlockReason = 'Unlock Jarvis';
 
   final AppLockStore _store;
@@ -135,6 +137,7 @@ class AppLockController extends ChangeNotifier {
   final DateTime Function() _clock;
 
   var _enabled = false;
+  var _cover = true;
   var _delay = AppLockDelay.oneMinute;
   var _locked = false;
   var _obscured = false;
@@ -142,6 +145,10 @@ class AppLockController extends ChangeNotifier {
   DateTime? _backgroundedAt;
 
   bool get enabled => _enabled;
+
+  /// Blur Jarvis in the app switcher even when the lock is off. On by default;
+  /// it only hides the snapshot and never asks for Face ID.
+  bool get coverInSwitcher => _cover;
   AppLockDelay get delay => _delay;
   bool get locked => _locked;
 
@@ -153,6 +160,7 @@ class AppLockController extends ChangeNotifier {
     final values = await _store.read();
     _enabled = values[enabledKey] == 'true';
     _delay = AppLockDelay.parse(values[delayKey]);
+    _cover = values[coverKey] != 'false';
     _locked = _enabled;
     notifyListeners();
   }
@@ -173,6 +181,14 @@ class AppLockController extends ChangeNotifier {
     await _store.write(enabledKey, value.toString());
     notifyListeners();
     return true;
+  }
+
+  Future<void> setCoverInSwitcher(bool value) async {
+    if (value == _cover) return;
+    _cover = value;
+    if (!value && !_enabled && _obscured) _obscured = false;
+    await _store.write(coverKey, value.toString());
+    notifyListeners();
   }
 
   Future<void> setDelay(AppLockDelay value) async {
@@ -203,7 +219,8 @@ class AppLockController extends ChangeNotifier {
   }
 
   void handleLifecycle(AppLifecycleState state) {
-    if (!_enabled) {
+    // With the lock on the cover is always on; otherwise it follows the setting.
+    if (!_enabled && !_cover) {
       if (_obscured) {
         _obscured = false;
         notifyListeners();
@@ -226,7 +243,9 @@ class AppLockController extends ChangeNotifier {
       case AppLifecycleState.resumed:
         final since = _backgroundedAt;
         _backgroundedAt = null;
-        if (since != null && _clock().difference(since) >= _delay.duration) {
+        if (_enabled &&
+            since != null &&
+            _clock().difference(since) >= _delay.duration) {
           _locked = true;
         }
         _obscured = false;

@@ -190,4 +190,29 @@ void main() {
       findsOneWidget,
     );
   });
+
+  test(
+    'the switcher cover works without the lock and can be turned off',
+    () async {
+      final lock = controller();
+      await lock.load();
+      expect(lock.coverInSwitcher, isTrue);
+
+      lock.handleLifecycle(AppLifecycleState.paused);
+      expect(lock.obscured, isTrue);
+      now = now.add(const Duration(hours: 1));
+      lock.handleLifecycle(AppLifecycleState.resumed);
+      expect(lock.obscured, isFalse);
+      expect(lock.locked, isFalse, reason: 'the cover never locks');
+
+      await lock.setCoverInSwitcher(false);
+      expect(store.values[AppLockController.coverKey], 'false');
+      lock.handleLifecycle(AppLifecycleState.inactive);
+      expect(lock.obscured, isFalse);
+
+      final reopened = controller();
+      await reopened.load();
+      expect(reopened.coverInSwitcher, isFalse);
+    },
+  );
 }
