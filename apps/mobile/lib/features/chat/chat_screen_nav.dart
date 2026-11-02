@@ -357,6 +357,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       await MutationQueue.instance.clear();
       await OutboxStore.clearAll();
       _chatList.clear();
+      _tabMemory.clear();
       _tileSource.reset();
       _tiles.reset();
       await hub?.stop();

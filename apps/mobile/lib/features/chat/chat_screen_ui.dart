@@ -74,6 +74,11 @@ mixin _ChatScreenUi on _ChatScreenController {
   }
 
   void _selectTab(JarvisTab tab) => _fromShell(() {
+    // The tab you are already on: tapping it again goes back to the top.
+    if (tab == _tab && !_inChat && _selectedDestination == 0) {
+      unawaited(_tabMemory.scrollToTop(tab));
+      return;
+    }
     if (_selectedDestination != 0) _selectDestination(0);
     setState(() {
       _tab = tab;
@@ -227,6 +232,7 @@ mixin _ChatScreenUi on _ChatScreenController {
       chats: _chatList,
       ready: _conversationId != null,
       refreshRevision: _homeRevision,
+      scrollSlot: _tabMemory.slotFor(JarvisTab.home),
       jarvisBusy: _busy,
       onOpen: _openTile,
       onOpenChat: _openChatByKey,
@@ -242,6 +248,11 @@ mixin _ChatScreenUi on _ChatScreenController {
     JarvisTab.chats => ChatsScreen(
       chats: _chatList,
       http: _http,
+      scrollSlot: _tabMemory.slotFor(JarvisTab.chats),
+      initialFilter: _tabMemory.chatsFilter,
+      initialQuery: _tabMemory.chatsQuery,
+      onFilterChanged: (filter) => _tabMemory.chatsFilter = filter,
+      onQueryChanged: (text) => _tabMemory.chatsQuery = text,
       onOpen: _openChatItem,
       onReplyWith: (item, draft) => _openChatItem(item, draft: draft),
       onNewChat: _busy ? null : _startNewChat,
@@ -260,6 +271,9 @@ mixin _ChatScreenUi on _ChatScreenController {
       source: _tileSource,
       layout: _tiles,
       onOpen: _openTile,
+      scrollSlot: _tabMemory.slotFor(JarvisTab.everything),
+      initialQuery: _tabMemory.everythingQuery,
+      onQueryChanged: (text) => _tabMemory.everythingQuery = text,
     ),
     JarvisTab.you => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -913,6 +927,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     connected: _connected,
     onOpen: (destination) => _fromShell(() => _openUtility(destination)),
     onSignOut: _auth.enabled ? () => unawaited(_signOut()) : null,
+    scrollSlot: _tabMemory.slotFor(JarvisTab.you),
   );
 
   Widget _welcome() => _NewChatWelcome(

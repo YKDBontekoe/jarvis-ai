@@ -8,6 +8,7 @@ import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'feature_search.dart';
 import 'recent_features.dart';
+import '../shell/tab_memory.dart';
 import '../tiles/tile_card.dart';
 import '../tiles/tile_controller.dart';
 import '../tiles/tile_grid.dart';
@@ -22,8 +23,16 @@ class EverythingScreen extends StatefulWidget {
     required this.layout,
     required this.onOpen,
     this.recent,
+    this.scrollSlot,
+    this.initialQuery = '',
+    this.onQueryChanged,
     super.key,
   });
+
+  /// Keeps the list position and search text between visits.
+  final TabScrollSlot? scrollSlot;
+  final String initialQuery;
+  final ValueChanged<String>? onQueryChanged;
 
   /// The features opened lately; the app-wide list unless a test passes its own.
   final RecentFeatures? recent;
@@ -39,18 +48,23 @@ class EverythingScreen extends StatefulWidget {
 }
 
 class _EverythingScreenState extends State<EverythingScreen> {
-  final _query = TextEditingController();
+  late final _query = TextEditingController(text: widget.initialQuery);
+  late final ScrollController _list =
+      widget.scrollSlot?.create() ?? ScrollController();
   RecentFeatures get _recent => widget.recent ?? RecentFeatures.instance;
 
   @override
   void initState() {
     super.initState();
     unawaited(_recent.load());
+    _query.addListener(() => widget.onQueryChanged?.call(_query.text));
   }
 
   @override
   void dispose() {
     _query.dispose();
+    final slot = widget.scrollSlot;
+    slot == null ? _list.dispose() : slot.release(_list);
     super.dispose();
   }
 
@@ -146,6 +160,7 @@ class _EverythingScreenState extends State<EverythingScreen> {
     final colors = JarvisColors.of(context);
     return ListView(
       key: const Key('everything-list'),
+      controller: _list,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [

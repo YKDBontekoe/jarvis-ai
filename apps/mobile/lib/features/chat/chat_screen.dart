@@ -61,6 +61,7 @@ import '../search/find_in_chat_screen.dart';
 import '../search/search_screen.dart';
 import '../projects/project_style.dart';
 import '../shell/jarvis_tab_bar.dart';
+import '../shell/tab_memory.dart';
 import '../shell/utility_pages.dart';
 import '../whatsapp/whatsapp_chat_screen.dart';
 import '../voice/chat_gpt_voices.dart';

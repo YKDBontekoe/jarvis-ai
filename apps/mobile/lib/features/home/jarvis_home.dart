@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../shell/tab_memory.dart';
 import '../../ui/phosphor_icons.dart';
 import '../../json_maps.dart';
 import '../chat/mcp_setup.dart';
@@ -57,6 +58,7 @@ class JarvisHome extends StatefulWidget {
     this.onSuggestion,
     this.onReplyWith,
     this.jarvisBusy = false,
+    this.scrollSlot,
     this.clock,
     super.key,
   });
@@ -82,6 +84,9 @@ class JarvisHome extends StatefulWidget {
 
   /// Jarvis is writing a reply, possibly in a conversation that is not open.
   final bool jarvisBusy;
+
+  /// Remembers the scroll position between visits to Home.
+  final TabScrollSlot? scrollSlot;
 
   /// Replaces the wall clock in tests.
   final DateTime Function()? clock;
@@ -120,7 +125,8 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   final Set<String> _learningPending = {};
 
   /// Drives the parallax glow, the receding greeting and the compact header.
-  final _scroll = ScrollController();
+  late final ScrollController _scroll =
+      widget.scrollSlot?.create() ?? ScrollController();
 
   /// The Ask bar's text, so a follow-up on the brief can start it.
   final _ask = TextEditingController();
@@ -194,7 +200,8 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     widget.chats.removeListener(_rebuild);
     _tick?.cancel();
     _generation++;
-    _scroll.dispose();
+    final slot = widget.scrollSlot;
+    slot == null ? _scroll.dispose() : slot.release(_scroll);
     _ask.dispose();
     super.dispose();
   }

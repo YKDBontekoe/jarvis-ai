@@ -11,6 +11,7 @@ import '../../ui/phosphor_icons.dart';
 import '../whatsapp/catch_up_card.dart';
 import '../whatsapp/read_along_screen.dart';
 import '../whatsapp/whatsapp_models.dart';
+import '../shell/tab_memory.dart';
 import 'chat_list.dart';
 import 'chat_row.dart';
 import 'quick_replies.dart';
@@ -32,6 +33,11 @@ class ChatsScreen extends StatefulWidget {
     this.selectedKey,
     this.http,
     this.clock,
+    this.scrollSlot,
+    this.initialFilter = ChatFilter.forYou,
+    this.initialQuery = '',
+    this.onFilterChanged,
+    this.onQueryChanged,
     super.key,
   });
 
@@ -63,14 +69,23 @@ class ChatsScreen extends StatefulWidget {
   /// Replaces the wall clock in tests.
   final DateTime Function()? clock;
 
+  /// Keeps the list position, filter and search between visits to Chats.
+  final TabScrollSlot? scrollSlot;
+  final ChatFilter initialFilter;
+  final String initialQuery;
+  final ValueChanged<ChatFilter>? onFilterChanged;
+  final ValueChanged<String>? onQueryChanged;
+
   @override
   State<ChatsScreen> createState() => _ChatsScreenState();
 }
 
 class _ChatsScreenState extends State<ChatsScreen> {
-  final _query = TextEditingController();
+  late final _query = TextEditingController(text: widget.initialQuery);
   final _searchFocus = FocusNode();
-  var _filter = ChatFilter.forYou;
+  late final ScrollController _list =
+      widget.scrollSlot?.create() ?? ScrollController();
+  late var _filter = widget.initialFilter;
   var _remindersOpen = false;
 
   /// When each chat last moved, so a newer message can light its row up.
@@ -80,6 +95,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_key);
+    _query.addListener(() => widget.onQueryChanged?.call(_query.text));
   }
 
   @override
@@ -87,6 +103,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
     HardwareKeyboard.instance.removeHandler(_key);
     _query.dispose();
     _searchFocus.dispose();
+    final slot = widget.scrollSlot;
+    slot == null ? _list.dispose() : slot.release(_list);
     super.dispose();
   }
 
@@ -122,6 +140,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     if (_filter == filter) return;
     unawaited(HapticFeedback.selectionClick());
     setState(() => _filter = filter);
+    widget.onFilterChanged?.call(filter);
   }
 
   Future<void> _pin(ChatListItem item) async {
@@ -298,6 +317,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                               )
                             : CustomScrollView(
                                 key: const Key('chats-list'),
+                                controller: _list,
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 slivers: [
                                   if (widget.chats.whatsAppError)

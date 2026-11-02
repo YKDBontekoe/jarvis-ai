@@ -4,6 +4,7 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../everything/feature_search.dart' show foldForSearch;
+import '../shell/tab_memory.dart';
 
 typedef SettingsDestination = ({
   String title,
@@ -352,8 +353,12 @@ class SettingsView extends StatefulWidget {
     required this.connected,
     required this.onOpen,
     this.onSignOut,
+    this.scrollSlot,
     super.key,
   });
+
+  /// Keeps the list position between visits to You.
+  final TabScrollSlot? scrollSlot;
 
   final bool connected;
   final ValueChanged<String> onOpen;
@@ -376,10 +381,14 @@ class SettingsView extends StatefulWidget {
 
 class _SettingsViewState extends State<SettingsView> {
   final _query = TextEditingController();
+  late final ScrollController _list =
+      widget.scrollSlot?.create() ?? ScrollController();
 
   @override
   void dispose() {
     _query.dispose();
+    final slot = widget.scrollSlot;
+    slot == null ? _list.dispose() : slot.release(_list);
     super.dispose();
   }
 
@@ -388,6 +397,7 @@ class _SettingsViewState extends State<SettingsView> {
     final colors = JarvisColors.of(context);
     return SafeArea(
       child: ListView(
+        controller: _list,
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
           ContentWidth(
