@@ -57,6 +57,7 @@ mixin _ChatScreenSend on _ChatScreenController {
     if (text == null) {
       _input.clear();
       _pendingPhotos = [];
+      _rememberDraftPhotos();
     }
     // Typing over a docked card answers it in words, so the card closes
     // before the message goes out and Jarvis sees it as closed.

@@ -7,6 +7,47 @@ part of 'chat_screen.dart';
 mixin _ChatScreenPhotos on _ChatScreenController {
   int _photoSerial = 0;
 
+  /// Brings back the uploaded photos stored with [conversationId]'s draft. A
+  /// photo that is gone from the server is dropped and said so; the text stays.
+  Future<void> _restoreStoredPhotos(String conversationId) async {
+    final stored = _drafts.readPhotos(conversationId);
+    if (stored.isEmpty) return;
+    var missing = 0;
+    final restored = <PendingPhoto>[];
+    for (final photo in stored) {
+      final bytes = await _loadPhoto(photo.fileId);
+      if (bytes == null) {
+        missing++;
+      } else {
+        restored.add(
+          PendingPhoto(
+            localId: 'photo-${++_photoSerial}',
+            bytes: bytes,
+            fileName: photo.fileName,
+            fileId: photo.fileId,
+          ),
+        );
+      }
+    }
+    if (!mounted || _conversationId != conversationId) return;
+    setState(() {
+      final have = {for (final p in _pendingPhotos) p.fileId};
+      _pendingPhotos = [
+        ..._pendingPhotos,
+        for (final photo in restored)
+          if (!have.contains(photo.fileId)) photo,
+      ];
+    });
+    _rememberDraftPhotos();
+    if (missing > 0) {
+      _showPhotoNotice(
+        missing == 1
+            ? 'A photo from your draft is no longer available. Your text is kept.'
+            : '$missing photos from your draft are no longer available. Your text is kept.',
+      );
+    }
+  }
+
   void _showPhotoSources() {
     _dismissKeyboard();
     unawaited(
@@ -130,12 +171,16 @@ mixin _ChatScreenPhotos on _ChatScreenController {
   Future<void> _uploadPhoto(PendingPhoto photo) async {
     void replace(PendingPhoto next) {
       if (!mounted) return;
-      setState(
-        () => _pendingPhotos = [
-          for (final item in _pendingPhotos)
-            item.localId == photo.localId ? next : item,
-        ],
-      );
+      PendingPhoto swap(PendingPhoto item) =>
+          item.localId == photo.localId ? next : item;
+      setState(() {
+        _pendingPhotos = [for (final item in _pendingPhotos) swap(item)];
+        // The owner may have moved to another conversation while it uploaded.
+        for (final entry in _stashedPhotos.entries.toList()) {
+          _stashedPhotos[entry.key] = [for (final i in entry.value) swap(i)];
+        }
+      });
+      _rememberDraftPhotos();
     }
 
     try {
@@ -165,11 +210,14 @@ mixin _ChatScreenPhotos on _ChatScreenController {
     }
   }
 
-  void _removePendingPhoto(PendingPhoto photo) => setState(
-    () => _pendingPhotos = _pendingPhotos
-        .where((item) => item.localId != photo.localId)
-        .toList(),
-  );
+  void _removePendingPhoto(PendingPhoto photo) {
+    setState(
+      () => _pendingPhotos = _pendingPhotos
+          .where((item) => item.localId != photo.localId)
+          .toList(),
+    );
+    _rememberDraftPhotos();
+  }
 
   /// Bytes of a sent photo, fetched once per session from the owner's files.
   Future<Uint8List?> _loadPhoto(String fileId) =>

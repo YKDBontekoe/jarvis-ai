@@ -117,6 +117,10 @@ abstract class _ChatScreenController extends State<ChatScreen>
 
   /// Photos picked for the next message, and bytes of photos already shown.
   List<PendingPhoto> _pendingPhotos = [];
+
+  /// Photos picked in a conversation the owner left before sending, kept for
+  /// when they come back (uploads that were still running keep running).
+  final Map<String, List<PendingPhoto>> _stashedPhotos = {};
   final Map<String, Future<Uint8List?>> _photoBytes = {};
 
   /// Messages waiting for a connection, and whether the last send joined them.
@@ -143,7 +147,23 @@ abstract class _ChatScreenController extends State<ChatScreen>
     if (id != null && _input.text.isEmpty) {
       _replaceComposerText(_drafts.read(id));
     }
+    if (id != null && _pendingPhotos.isEmpty) {
+      unawaited(_restoreStoredPhotos(id));
+    }
   }
+
+  /// Saves which photos of the open conversation are uploaded, next to its text.
+  void _rememberDraftPhotos() {
+    final id = _conversationId;
+    if (id == null) return;
+    _drafts.writePhotos(id, [
+      for (final photo in _pendingPhotos)
+        if (photo.fileId != null)
+          (fileId: photo.fileId!, fileName: photo.fileName),
+    ]);
+  }
+
+  Future<void> _restoreStoredPhotos(String conversationId);
 
   void _rememberDraft() {
     if (_applyingDraft) return;
@@ -168,7 +188,21 @@ abstract class _ChatScreenController extends State<ChatScreen>
   /// before any conversation was open moves along into the new one.
   void _restoreDraft(String? previousId, String conversationId) {
     if (previousId == conversationId) return;
-    if (previousId != null) _pendingPhotos = [];
+    if (previousId != null) {
+      final keep = [
+        for (final photo in _pendingPhotos)
+          if (!photo.failed) photo,
+      ];
+      if (keep.isEmpty) {
+        _stashedPhotos.remove(previousId);
+      } else {
+        _stashedPhotos[previousId] = keep;
+      }
+      _pendingPhotos = _stashedPhotos.remove(conversationId) ?? [];
+      if (_pendingPhotos.isEmpty) {
+        unawaited(_restoreStoredPhotos(conversationId));
+      }
+    }
     final draft = _drafts.read(conversationId);
     if (previousId == null && draft.isEmpty && _input.text.trim().isNotEmpty) {
       _drafts.write(conversationId, _input.text);

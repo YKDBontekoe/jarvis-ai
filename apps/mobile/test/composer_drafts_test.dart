@@ -36,6 +36,40 @@ void main() {
       expect(prefs.getString(ComposerDrafts.storageKey), isNull);
     });
 
+    test('photos are kept next to the text and survive reopening', () async {
+      final drafts = await ComposerDrafts.open();
+      drafts.write('a', 'What is this?');
+      drafts.writePhotos('a', [(fileId: 'f1', fileName: 'leaf.png')]);
+      // Typing again keeps the photos.
+      drafts.write('a', 'What is this plant?');
+      await drafts.flush();
+
+      final reopened = await ComposerDrafts.open();
+      expect(reopened.read('a'), 'What is this plant?');
+      expect(reopened.readPhotos('a'), [(fileId: 'f1', fileName: 'leaf.png')]);
+    });
+
+    test('a photo alone is a draft, and clearing both forgets it', () async {
+      final drafts = await ComposerDrafts.open();
+      drafts.writePhotos('a', [(fileId: 'f1', fileName: 'leaf.png')]);
+      await drafts.flush();
+      expect((await ComposerDrafts.open()).readPhotos('a'), hasLength(1));
+
+      drafts.writePhotos('a', const []);
+      await drafts.flush();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString(ComposerDrafts.storageKey), isNull);
+    });
+
+    test('drafts saved by older versions as plain text still load', () async {
+      SharedPreferences.setMockInitialValues({
+        ComposerDrafts.storageKey: jsonEncode({'a': 'Old draft'}),
+      });
+      final drafts = await ComposerDrafts.open();
+      expect(drafts.read('a'), 'Old draft');
+      expect(drafts.readPhotos('a'), isEmpty);
+    });
+
     test('drops the oldest drafts past the limit', () async {
       final drafts = await ComposerDrafts.open();
       for (var i = 0; i < ComposerDrafts.maxDrafts + 3; i++) {
