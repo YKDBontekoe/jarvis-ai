@@ -180,6 +180,11 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 - Give buttons with a long visible text and subtitle a short label too. The web recorder (`tool/record_web.mjs`) taps by accessible name, so use unique names.
 - Check contrast in both themes. Never put information in colour alone; pair it with text or an icon.
 - 44pt targets, and the text-scale rules in §4.
+- **Announce what changed.** `InlineNotice` with the `danger` or `success` tone is a live region, so VoiceOver reads a save failure or confirmation as it appears. Use those tones for results of an action, `info`/`warning` for standing state (they stay quiet).
+- **Privacy cover.** Jarvis is blurred in the app switcher by default, with or without the Face ID lock (More → Face ID lock → Hide in app switcher). The cover never asks for Face ID; only the lock does.
+- **Pinned primary controls.** On full-screen sessions (voice) the End and Mute buttons sit outside the scroll area, so growing captions, cards or 3× text never push them off screen. Captions can be hidden mid-call.
+- **System share.** Messages offer Share (long-press on yours, the ⋯ menu on replies) through the phone's own share sheet via `features/chat/share_text.dart`; tests replace `textSharer`. Files already open through the system "Open in" sheet.
+- **Both languages.** New user-visible strings go in `lib/l10n/app_en.arb` and `app_nl.arb` and are read with `context.l10n`; Captures and the switcher cover are done, older screens still use literal English.
 
 ## 10. Workflow
 
