@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -9,41 +11,100 @@ import '../entities/entity_screen.dart';
 import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
+import 'task_refresh_bus.dart';
 
 class TaskDetailsScreen extends StatefulWidget {
   const TaskDetailsScreen({
     required this.http,
     required this.taskId,
+    this.pollEvery = const Duration(seconds: 5),
+    this.bus,
     super.key,
   });
 
   final Dio http;
   final String taskId;
 
+  /// How often an unfinished task is checked while the page is in front.
+  final Duration pollEvery;
+
+  /// Where realtime hints arrive; defaults to the app-wide bus.
+  final TaskRefreshBus? bus;
+
   @override
   State<TaskDetailsScreen> createState() => _TaskDetailsScreenState();
 }
 
-class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
+class _TaskDetailsScreenState extends State<TaskDetailsScreen>
+    with WidgetsBindingObserver {
   Map<String, dynamic>? _task;
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
   String? _error;
   int _requestRevision = 0;
 
+  Timer? _poll;
+  bool _loadingSilently = false;
+  bool _foreground = true;
+  TaskRefreshBus get _bus => widget.bus ?? TaskRefreshBus.instance;
+
+  bool get _finished => isTerminalTaskStatus(asJsonString(_task?['status']));
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _bus.addListener(_onBusEvent);
     _load();
+    _poll = Timer.periodic(widget.pollEvery, (_) => _pollOnce());
   }
 
-  Future<void> _load() async {
-    if (!mounted) return;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _bus.removeListener(_onBusEvent);
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    // Catch up straight away when the app comes back to the front.
+    if (_foreground) _pollOnce();
+  }
+
+  /// Refreshes quietly while the page is in front and the task can still change.
+  void _pollOnce() {
+    if (!mounted || !_foreground || _loading || _task == null) return;
+    if (_finished) {
+      _poll?.cancel();
+      return;
+    }
+    // A page covered by another one is not being looked at.
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+    unawaited(_load(silent: true));
+  }
+
+  void _onBusEvent() {
+    final conversationId = asJsonString(_task?['conversationId']);
+    if (conversationId != null && _bus.lastConversationId == conversationId) {
+      _pollOnce();
+    }
+  }
+
+  /// [silent] refreshes in place: no spinner, no error banner on failure, and
+  /// the list keeps its scroll position.
+  Future<void> _load({bool silent = false}) async {
+    if (!mounted || (silent && _loadingSilently)) return;
     final revision = ++_requestRevision;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    _loadingSilently = silent;
     try {
       Map<String, dynamic>? task;
       try {
@@ -53,6 +114,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         task = jsonObject(taskResponse.data);
       } on DioException catch (error) {
         if (!mounted || revision != _requestRevision) return;
+        if (silent) return;
         setState(() {
           _error = error.response?.statusCode == 404
               ? 'This task is no longer available.'
@@ -75,17 +137,18 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         if (!mounted || revision != _requestRevision) return;
         setState(() => _messages = jsonMaps(messagesResponse.data));
       } on DioException {
-        if (!mounted || revision != _requestRevision) return;
+        if (!mounted || revision != _requestRevision || silent) return;
         setState(() => _error = 'Jarvis could not load the task activity.');
       } catch (_) {
-        if (!mounted || revision != _requestRevision) return;
+        if (!mounted || revision != _requestRevision || silent) return;
         setState(() => _error = 'Jarvis could not load the task activity.');
       }
     } catch (_) {
-      if (!mounted || revision != _requestRevision) return;
+      if (!mounted || revision != _requestRevision || silent) return;
       setState(() => _error = 'Jarvis could not load the task details.');
     } finally {
-      if (mounted && revision == _requestRevision) {
+      if (silent) _loadingSilently = false;
+      if (mounted && revision == _requestRevision && !silent) {
         setState(() => _loading = false);
       }
     }
