@@ -189,6 +189,8 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.layout.removeListener(_layoutChanged);
+    // Leaving Home mid-edit keeps what was done rather than losing it.
+    if (widget.layout.editing) widget.layout.commitEdit();
     widget.chats.removeListener(_rebuild);
     _tick?.cancel();
     _generation++;
@@ -813,13 +815,28 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     );
     if (!mounted || choice == null) return;
     if (choice == 'edit') {
-      setState(() => _editing = true);
+      _beginEdit();
     } else if (choice == 'remove') {
       widget.layout.unpin(spec.id);
     } else if (choice.startsWith('size:')) {
       final size = TileSize.parse(choice.substring(5));
       if (size != null) widget.layout.pin(spec.id, size);
     }
+  }
+
+  void _beginEdit() {
+    widget.layout.beginEdit();
+    setState(() => _editing = true);
+  }
+
+  /// Done saves the layout; Cancel puts back what Home looked like before.
+  void _endEdit({required bool save}) {
+    if (save) {
+      widget.layout.commitEdit();
+    } else {
+      widget.layout.cancelEdit();
+    }
+    if (mounted) setState(() => _editing = false);
   }
 
   @override
@@ -1041,10 +1058,25 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
+                          ListenableBuilder(
+                            listenable: widget.layout,
+                            builder: (context, _) => TextButton(
+                              key: const Key('home-edit-undo'),
+                              onPressed: widget.layout.canUndo
+                                  ? widget.layout.undo
+                                  : null,
+                              child: const Text('Undo'),
+                            ),
+                          ),
+                          TextButton(
+                            key: const Key('home-edit-cancel'),
+                            onPressed: () => _endEdit(save: false),
+                            child: const Text('Cancel'),
+                          ),
                           TextButton(
                             key: const Key('home-edit-done'),
-                            onPressed: () => setState(() => _editing = false),
+                            onPressed: () => _endEdit(save: true),
                             child: const Text('Done'),
                           ),
                         ],
@@ -1074,7 +1106,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                                 widget.onOpen(spec.destination);
                               }
                             },
-                            onEdit: () => setState(() => _editing = true),
+                            onEdit: _beginEdit,
                             now: now,
                             isLoading: _isLoading,
                             pending: _pending,
@@ -1092,7 +1124,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                       child: Center(
                         child: TextButton.icon(
                           key: const Key('home-edit'),
-                          onPressed: () => setState(() => _editing = true),
+                          onPressed: _beginEdit,
                           style: TextButton.styleFrom(
                             foregroundColor: JarvisColors.of(context).inkSoft,
                             minimumSize: const Size(44, 44),

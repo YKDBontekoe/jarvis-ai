@@ -339,7 +339,8 @@ void main() {
             'id': 'p1',
             'kind': 'capability',
             'title': 'Switch on “Trains”',
-            'detail': 'An app Jarvis built and tested for live train departures',
+            'detail':
+                'An app Jarvis built and tested for live train departures',
             'acceptLabel': 'Switch on',
           },
         ],
@@ -400,10 +401,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('home-learning-action-c1')));
     await tester.pumpAndSettle();
-    expect(
-      http.sent('POST', '/api/v1/skills/s1/status').single.body,
-      {'status': 'disabled'},
-    );
+    expect(http.sent('POST', '/api/v1/skills/s1/status').single.body, {
+      'status': 'disabled',
+    });
 
     await reveal(tester, find.byKey(const Key('home-learning-action-c2')));
     await tester.tap(find.byKey(const Key('home-learning-action-c2')));
@@ -589,6 +589,44 @@ void main() {
     expect(layout.contains('memory'), isFalse);
     expect(find.byKey(const Key('tile-remove-memory')), findsNothing);
     expect(opened, isEmpty, reason: 'editing never opens a page');
+  });
+
+  testWidgets('Cancel throws away edits and Undo takes back the last one', (
+    tester,
+  ) async {
+    await show(
+      tester,
+      tiles: const [
+        TilePlacement('tasks', TileSize.square),
+        TilePlacement('memory', TileSize.icon),
+      ],
+    );
+    await enterEdit(tester);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('tile-remove-memory')));
+    await tester.pumpAndSettle();
+    expect(layout.contains('memory'), isFalse);
+
+    await tester.tap(find.byKey(const Key('home-edit-undo')));
+    await tester.pumpAndSettle();
+    expect(layout.contains('memory'), isTrue);
+    expect(
+      tester
+          .widget<TextButton>(find.byKey(const Key('home-edit-undo')))
+          .onPressed,
+      isNull,
+      reason: 'nothing left to undo',
+    );
+
+    await tester.tap(find.byKey(const Key('tile-remove-memory')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('home-edit-cancel')));
+    await tester.pumpAndSettle();
+
+    expect(layout.contains('memory'), isTrue);
+    expect(layout.editing, isFalse);
+    expect(find.byKey(const Key('home-edit-done')), findsNothing);
   });
 
   testWidgets('dragging one tile onto another reorders them', (tester) async {
