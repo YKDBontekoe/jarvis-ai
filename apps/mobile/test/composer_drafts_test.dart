@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chat/chat_entries.dart';
 import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
 import 'package:jarvis_mobile/features/chat/composer_drafts.dart';
+import 'package:jarvis_mobile/features/chat/share_text.dart';
 import 'package:jarvis_mobile/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -149,6 +150,50 @@ void main() {
       await tester.tap(find.text('Edit as new message'));
       await tester.pumpAndSettle();
       expect(edited, 'Book a table');
+    });
+
+    testWidgets('long-press can share the message through the phone', (
+      tester,
+    ) async {
+      final shared = <String>[];
+      final original = textSharer;
+      textSharer = (text, _) async => shared.add(text);
+      addTearDown(() => textSharer = original);
+      await tester.pumpWidget(
+        host(
+          const MessageBubble(
+            message: MessageEntry(role: 'user', content: 'Dinner at 7'),
+          ),
+        ),
+      );
+
+      await tester.longPress(find.text('Dinner at 7'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('message-share')));
+      await tester.pumpAndSettle();
+
+      expect(shared, ['Dinner at 7']);
+    });
+
+    testWidgets('a reply can be shared from its menu', (tester) async {
+      final shared = <String>[];
+      final original = textSharer;
+      textSharer = (text, _) async => shared.add(text);
+      addTearDown(() => textSharer = original);
+      await tester.pumpWidget(
+        host(
+          const MessageBubble(
+            message: MessageEntry(role: 'assistant', content: 'It is 7 pm.'),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('message-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Share'));
+      await tester.pumpAndSettle();
+
+      expect(shared, ['It is 7 pm.']);
     });
 
     testWidgets('edit is hidden when the chat cannot take it', (tester) async {

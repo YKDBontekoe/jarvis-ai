@@ -83,6 +83,12 @@ class _MessageBubbleState extends State<MessageBubble> {
               title: const Text('Copy'),
               onTap: () => Navigator.pop(sheetContext, 'copy'),
             ),
+            ListTile(
+              key: const Key('message-share'),
+              leading: const Icon(PhosphorIconsRegular.shareNetwork),
+              title: const Text('Share'),
+              onTap: () => Navigator.pop(sheetContext, 'share'),
+            ),
             if (widget.onEdit != null)
               ListTile(
                 leading: const Icon(PhosphorIconsRegular.pencilSimple),
@@ -125,6 +131,8 @@ class _MessageBubbleState extends State<MessageBubble> {
         ScaffoldMessenger.maybeOf(context)
           ?..hideCurrentSnackBar()
           ..showSnackBar(const SnackBar(content: Text('Message copied')));
+      case 'share':
+        await shareText(context, message.content);
       case 'edit':
         widget.onEdit?.call(message.content);
       case 'library':
@@ -227,8 +235,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                             onPressed: () => widget.onRate!('down'),
                           ),
                         ],
-                        if (widget.onSaveToLibrary != null ||
-                            widget.onRemindMe != null)
+                        if (message.content.trim().isNotEmpty)
                           PopupMenuButton<String>(
                             key: const Key('message-more'),
                             tooltip: 'More actions',
@@ -239,9 +246,16 @@ class _MessageBubbleState extends State<MessageBubble> {
                             ),
                             onSelected: (value) => switch (value) {
                               'library' => widget.onSaveToLibrary?.call(),
+                              'share' => unawaited(
+                                shareText(context, message.content),
+                              ),
                               _ => widget.onRemindMe?.call(),
                             },
                             itemBuilder: (_) => [
+                              const PopupMenuItem(
+                                value: 'share',
+                                child: Text('Share'),
+                              ),
                               if (widget.onSaveToLibrary != null)
                                 const PopupMenuItem(
                                   value: 'library',
