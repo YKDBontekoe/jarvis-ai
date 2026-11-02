@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -28,13 +30,64 @@ const uploadableFileExtensions = [
 ];
 const maxUploadBytes = 20 * 1024 * 1024;
 
+/// A file the owner picked to upload: its name and contents.
+typedef PickedUpload = ({String name, Uint8List bytes});
+
+enum UploadState { uploading, failed, cancelled }
+
+/// One upload in progress (or stopped), shown at the top of the list with
+/// its own progress, Cancel and Retry. Stays until it succeeds or is dismissed.
+class UploadJob {
+  UploadJob({required this.id, required this.fileName, required this.bytes});
+
+  final int id;
+  final String fileName;
+  final Uint8List bytes;
+  int sent = 0;
+  UploadState state = UploadState.uploading;
+  String? message;
+  CancelToken cancel = CancelToken();
+
+  int get total => bytes.length;
+  bool get sentEverything => sent >= total;
+}
+
+/// A download in progress for one file.
+class _DownloadJob {
+  _DownloadJob();
+
+  int received = 0;
+  int total = -1;
+  final CancelToken cancel = CancelToken();
+}
+
 class FilesScreen extends StatefulWidget {
-  const FilesScreen({required this.http, this.onOpenConversation, super.key});
+  const FilesScreen({
+    required this.http,
+    this.onOpenConversation,
+    this.pickUpload,
+    this.download,
+    super.key,
+  });
 
   final Dio http;
 
   /// Opens a chat. Without it a file cannot be asked about from here.
   final Future<void> Function(String conversationId)? onOpenConversation;
+
+  /// Lets the owner choose a file to upload; defaults to the system picker.
+  final Future<PickedUpload?> Function()? pickUpload;
+
+  /// Fetches and opens a file; defaults to the platform implementation.
+  final Future<bool> Function(
+    Dio http,
+    String id,
+    String fileName, {
+    int? expectedBytes,
+    void Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+  })?
+  download;
 
   @override
   State<FilesScreen> createState() => _FilesScreenState();
@@ -44,7 +97,13 @@ class _FilesScreenState extends State<FilesScreen> {
   List<Map<String, dynamic>> _files = [];
   List<Map<String, dynamic>> _collections = [];
   bool _loading = true;
-  bool _busy = false;
+
+  /// Items with a request running, by file id, `collection:<id>` or
+  /// `new-collection`. Only that item is blocked; the rest of the list stays usable.
+  final Set<String> _busy = {};
+  final List<UploadJob> _uploads = [];
+  final Map<String, _DownloadJob> _downloads = {};
+  int _uploadSerial = 0;
   String? _error;
   int _requestRevision = 0;
 
@@ -52,6 +111,30 @@ class _FilesScreenState extends State<FilesScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    for (final job in _uploads) {
+      job.cancel.cancel();
+    }
+    for (final job in _downloads.values) {
+      job.cancel.cancel();
+    }
+    super.dispose();
+  }
+
+  bool _isBusy(String key) => _busy.contains(key);
+
+  /// Runs [action] for the item [key] unless that item is already busy.
+  Future<void> _run(String key, Future<void> Function() action) async {
+    if (!_busy.add(key)) return;
+    setState(() {});
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _busy.remove(key));
+    }
   }
 
   Future<void> _load() async {
@@ -93,65 +176,126 @@ class _FilesScreenState extends State<FilesScreen> {
     }
   }
 
-  Future<void> _upload() async {
+  Future<PickedUpload?> _pick() async {
+    final custom = widget.pickUpload;
+    if (custom != null) return custom();
     final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: uploadableFileExtensions,
     );
-    if (file == null) return;
-    final bytes = await file.readAsBytes();
-    if (!mounted) return;
+    if (file == null) return null;
+    return (name: file.name, bytes: await file.readAsBytes());
+  }
+
+  Future<void> _upload() async {
+    final picked = await _pick();
+    if (picked == null || !mounted) return;
+    final bytes = picked.bytes;
     if (bytes.isEmpty || bytes.length > maxUploadBytes) {
       _showError('Choose a non-empty file up to 20 MB.');
       return;
     }
+    final job = UploadJob(
+      id: ++_uploadSerial,
+      fileName: picked.name,
+      bytes: bytes,
+    );
+    setState(() => _uploads.add(job));
+    await _sendUpload(job);
+  }
 
-    setState(() => _busy = true);
+  Future<void> _sendUpload(UploadJob job) async {
+    setState(() {
+      job.state = UploadState.uploading;
+      job.message = null;
+      job.sent = 0;
+      job.cancel = CancelToken();
+    });
     try {
       final form = FormData.fromMap({
         'file': MultipartFile.fromBytes(
-          bytes,
-          filename: file.name,
-          contentType: DioMediaType.parse(uploadContentTypeFor(file.name)),
+          job.bytes,
+          filename: job.fileName,
+          contentType: DioMediaType.parse(uploadContentTypeFor(job.fileName)),
         ),
       });
       await widget.http.post(
         '/api/v1/files',
         data: form,
+        cancelToken: job.cancel,
+        onSendProgress: (sent, total) {
+          if (!mounted) return;
+          setState(() => job.sent = sent < job.total ? sent : job.total);
+        },
         options: Options(
           sendTimeout: const Duration(minutes: 2),
           receiveTimeout: const Duration(minutes: 2),
         ),
       );
+      if (!mounted) return;
+      // The file is saved; scanning and indexing continue on the server and
+      // show as the file's own status in the list.
+      setState(() => _uploads.remove(job));
       await _load();
     } on DioException catch (error) {
-      final message = error.response?.statusCode == 400
-          ? 'That file type is not supported.'
-          : 'Jarvis could not upload this file.';
-      if (mounted) _showError(message);
+      if (!mounted) return;
+      setState(() {
+        if (CancelToken.isCancel(error)) {
+          job.state = UploadState.cancelled;
+          job.message = 'Upload cancelled. Nothing was added.';
+        } else {
+          job.state = UploadState.failed;
+          job.message = error.response?.statusCode == 400
+              ? 'That file type is not supported.'
+              : 'Jarvis could not upload this file.';
+        }
+      });
     } catch (_) {
-      if (mounted) _showError('Jarvis could not upload this file.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      if (!mounted) return;
+      setState(() {
+        job.state = UploadState.failed;
+        job.message = 'Jarvis could not upload this file.';
+      });
     }
   }
 
+  void _cancelUpload(UploadJob job) => job.cancel.cancel();
+
+  void _dismissUpload(UploadJob job) => setState(() => _uploads.remove(job));
+
   Future<void> _download(Map<String, dynamic> file) async {
     final id = jsonString(file, 'id');
-    if (id == null) return;
-    setState(() => _busy = true);
+    if (id == null || _downloads.containsKey(id) || _isBusy(id)) return;
+    final job = _DownloadJob();
+    setState(() => _downloads[id] = job);
+    final download = widget.download ?? file_download.downloadAndOpen;
     try {
-      await file_download.downloadAndOpen(
+      await download(
         widget.http,
         id,
         asJsonString(file['fileName']) ?? 'jarvis-file',
+        expectedBytes: file['sizeBytes'] is int
+            ? file['sizeBytes'] as int
+            : null,
+        cancelToken: job.cancel,
+        onProgress: (received, total) {
+          if (!mounted) return;
+          setState(() {
+            job.received = received;
+            job.total = total;
+          });
+        },
       );
-    } on DioException {
-      if (mounted) _showError('Jarvis could not download this file.');
+    } on DioException catch (error) {
+      if (mounted && !CancelToken.isCancel(error)) {
+        _showError('Jarvis could not download this file.');
+      } else if (mounted) {
+        _showError('Download cancelled.');
+      }
     } catch (error) {
       if (mounted) _showError('Could not open this file: $error');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _downloads.remove(id));
     }
   }
 
@@ -160,58 +304,60 @@ class _FilesScreenState extends State<FilesScreen> {
     final id = jsonString(file, 'id');
     final open = widget.onOpenConversation;
     if (id == null || open == null) return;
-    setState(() => _busy = true);
     String? conversationId;
-    try {
-      final response = await widget.http.post<dynamic>('/api/v1/files/$id/ask');
-      final body = jsonObject(response.data);
-      conversationId = asJsonString(body?['conversationId']);
-      final status = asJsonString(body?['status']);
-      if (mounted &&
-          status != null &&
-          status != 'ready' &&
-          status != 'indexed') {
-        ScaffoldMessenger.maybeOf(context)
-          ?..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Jarvis is still reading this file. Answers may be partial.',
-              ),
-            ),
-          );
-      }
-    } on DioException catch (error) {
-      if (mounted) {
-        _showError(
-          error.response?.statusCode == 404
-              ? 'That file is gone.'
-              : (firstProblemMessage(error.response?.data) ??
-                    'Jarvis could not start a chat about this file.'),
+    await _run(id, () async {
+      try {
+        final response = await widget.http.post<dynamic>(
+          '/api/v1/files/$id/ask',
         );
+        final body = jsonObject(response.data);
+        conversationId = asJsonString(body?['conversationId']);
+        final status = asJsonString(body?['status']);
+        if (mounted &&
+            status != null &&
+            status != 'ready' &&
+            status != 'indexed') {
+          ScaffoldMessenger.maybeOf(context)
+            ?..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Jarvis is still reading this file. Answers may be partial.',
+                ),
+              ),
+            );
+        }
+      } on DioException catch (error) {
+        if (mounted) {
+          _showError(
+            error.response?.statusCode == 404
+                ? 'That file is gone.'
+                : (firstProblemMessage(error.response?.data) ??
+                      'Jarvis could not start a chat about this file.'),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          _showError('Jarvis could not start a chat about this file.');
+        }
       }
-    } catch (_) {
-      if (mounted) _showError('Jarvis could not start a chat about this file.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-    if (conversationId != null && mounted) await open(conversationId);
+    });
+    if (conversationId != null && mounted) await open(conversationId!);
   }
 
   Future<void> _retryIndexing(Map<String, dynamic> file) async {
     final id = jsonString(file, 'id');
     if (id == null) return;
-    setState(() => _busy = true);
-    try {
-      await widget.http.post('/api/v1/files/$id/reprocess');
-      await _load();
-    } on DioException {
-      if (mounted) _showError('Jarvis could not retry indexing this file.');
-    } catch (_) {
-      if (mounted) _showError('Jarvis could not retry indexing this file.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _run(id, () async {
+      try {
+        await widget.http.post('/api/v1/files/$id/reprocess');
+        await _load();
+      } on DioException {
+        if (mounted) _showError('Jarvis could not retry indexing this file.');
+      } catch (_) {
+        if (mounted) _showError('Jarvis could not retry indexing this file.');
+      }
+    });
   }
 
   Future<void> _delete(Map<String, dynamic> file) async {
@@ -226,19 +372,17 @@ class _FilesScreenState extends State<FilesScreen> {
       destructive: true,
       icon: PhosphorIconsRegular.trash,
     );
-    if (!confirmed) return;
-    if (!mounted) return;
-    setState(() => _busy = true);
-    try {
-      await widget.http.delete('/api/v1/files/$id');
-      await _load();
-    } on DioException {
-      if (mounted) _showError('Jarvis could not delete this file.');
-    } catch (_) {
-      if (mounted) _showError('Jarvis could not delete this file.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    if (!confirmed || !mounted) return;
+    await _run(id, () async {
+      try {
+        await widget.http.delete('/api/v1/files/$id');
+        await _load();
+      } on DioException {
+        if (mounted) _showError('Jarvis could not delete this file.');
+      } catch (_) {
+        if (mounted) _showError('Jarvis could not delete this file.');
+      }
+    });
   }
 
   Future<void> _createCollection() async {
@@ -247,17 +391,16 @@ class _FilesScreenState extends State<FilesScreen> {
       builder: (_) => const _NewCollectionDialog(),
     );
     if (name == null || name.isEmpty || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      await widget.http.post('/api/v1/collections', data: {'name': name});
-      await _load();
-    } on DioException {
-      if (mounted) _showError('Could not create that collection.');
-    } catch (_) {
-      if (mounted) _showError('Could not create that collection.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _run('new-collection', () async {
+      try {
+        await widget.http.post('/api/v1/collections', data: {'name': name});
+        await _load();
+      } on DioException {
+        if (mounted) _showError('Could not create that collection.');
+      } catch (_) {
+        if (mounted) _showError('Could not create that collection.');
+      }
+    });
   }
 
   Future<void> _deleteCollection(Map<String, dynamic> collection) async {
@@ -273,17 +416,16 @@ class _FilesScreenState extends State<FilesScreen> {
       icon: PhosphorIconsRegular.trash,
     );
     if (!confirmed || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      await widget.http.delete('/api/v1/collections/$id');
-      await _load();
-    } on DioException {
-      if (mounted) _showError('Could not delete this collection.');
-    } catch (_) {
-      if (mounted) _showError('Could not delete this collection.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _run('collection:$id', () async {
+      try {
+        await widget.http.delete('/api/v1/collections/$id');
+        await _load();
+      } on DioException {
+        if (mounted) _showError('Could not delete this collection.');
+      } catch (_) {
+        if (mounted) _showError('Could not delete this collection.');
+      }
+    });
   }
 
   void _showError(String message) {
@@ -291,12 +433,7 @@ class _FilesScreenState extends State<FilesScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  String _formatSize(dynamic value) {
-    final bytes = asJsonInt(value);
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
+  String _formatSize(dynamic value) => formatFileSize(asJsonInt(value));
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -312,21 +449,20 @@ class _FilesScreenState extends State<FilesScreen> {
           label: 'Collection',
           icon: PhosphorIconsRegular.folders,
           onPressed: _createCollection,
-          busy: _busy,
+          busy: _isBusy('new-collection'),
           collapsesWhenNarrow: true,
         ),
         HeaderAction(
           label: 'Upload',
           icon: PhosphorIconsRegular.uploadSimple,
           onPressed: _upload,
-          busy: _busy,
         ),
       ],
     ),
     body: ListScreenBody(
       loading: _loading,
       error: _error,
-      isEmpty: _files.isEmpty && _collections.isEmpty,
+      isEmpty: _files.isEmpty && _collections.isEmpty && _uploads.isEmpty,
       onRetry: _load,
       onRefresh: _load,
       empty: const EmptyState(
@@ -336,8 +472,12 @@ class _FilesScreenState extends State<FilesScreen> {
       ),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-        itemCount: _collections.length + _files.length,
+        itemCount: _uploads.length + _collections.length + _files.length,
         itemBuilder: (context, index) {
+          if (index < _uploads.length) {
+            return ContentWidth(child: _uploadCard(_uploads[index]));
+          }
+          index -= _uploads.length;
           if (index < _collections.length) {
             final collection = _collections[index];
             final name = asJsonString(collection['name']) ?? 'Collection';
@@ -374,7 +514,8 @@ class _FilesScreenState extends State<FilesScreen> {
                     ),
                     IconButton(
                       tooltip: 'Delete collection',
-                      onPressed: _busy
+                      onPressed:
+                          _isBusy('collection:${jsonString(collection, 'id')}')
                           ? null
                           : () => _deleteCollection(collection),
                       icon: const Icon(PhosphorIconsRegular.trash),
@@ -388,11 +529,14 @@ class _FilesScreenState extends State<FilesScreen> {
           final name = asJsonString(file['fileName']) ?? 'File';
           final icon = _fileIcon(name);
           final status = asJsonString(file['processingStatus']) ?? 'uploaded';
+          final fileId = jsonString(file, 'id') ?? '';
+          final busy = _isBusy(fileId);
+          final download = _downloads[fileId];
           return ContentWidth(
             child: SurfaceCard(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
-              onTap: _busy ? null : () => _download(file),
+              onTap: busy || download != null ? null : () => _download(file),
               child: Row(
                 children: [
                   IconBadge(icon: icon, size: 44),
@@ -429,74 +573,87 @@ class _FilesScreenState extends State<FilesScreen> {
                               ),
                           ],
                         ),
+                        if (download != null)
+                          _downloadProgress(download, fileId),
                       ],
                     ),
                   ),
-                  PopupMenuButton<String>(
-                    enabled: !_busy,
-                    icon: const Icon(PhosphorIconsRegular.dotsThree),
-                    onSelected: (action) {
-                      if (action == 'open') {
-                        _download(file);
-                      } else if (action == 'ask') {
-                        _ask(file);
-                      } else if (action == 'retry') {
-                        _retryIndexing(file);
-                      } else if (action == 'delete') {
-                        _delete(file);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'open',
-                        child: ListTile(
-                          leading: const Icon(
-                            PhosphorIconsRegular.arrowSquareOut,
-                          ),
-                          title: Text(
-                            kIsWeb ? 'Download' : 'Download and open',
-                          ),
-                          contentPadding: EdgeInsets.zero,
-                        ),
+                  if (busy)
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
-                      if (widget.onOpenConversation != null &&
-                          status != 'failed' &&
-                          status != 'deleting')
-                        const PopupMenuItem(
-                          value: 'ask',
+                    )
+                  else
+                    PopupMenuButton<String>(
+                      enabled: download == null,
+                      icon: const Icon(PhosphorIconsRegular.dotsThree),
+                      onSelected: (action) {
+                        if (action == 'open') {
+                          _download(file);
+                        } else if (action == 'ask') {
+                          _ask(file);
+                        } else if (action == 'retry') {
+                          _retryIndexing(file);
+                        } else if (action == 'delete') {
+                          _delete(file);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'open',
                           child: ListTile(
-                            leading: Icon(PhosphorIconsRegular.chatCircle),
-                            title: Text('Ask Jarvis about this'),
+                            leading: const Icon(
+                              PhosphorIconsRegular.arrowSquareOut,
+                            ),
+                            title: Text(
+                              kIsWeb ? 'Download' : 'Download and open',
+                            ),
                             contentPadding: EdgeInsets.zero,
                           ),
                         ),
-                      if (status == 'failed')
-                        const PopupMenuItem(
-                          value: 'retry',
-                          child: ListTile(
-                            leading: Icon(PhosphorIconsRegular.arrowsClockwise),
-                            title: Text('Retry indexing'),
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: ListTile(
-                          leading: Icon(
-                            PhosphorIconsRegular.trash,
-                            color: JarvisColors.of(context).danger,
-                          ),
-                          title: Text(
-                            'Delete',
-                            style: TextStyle(
-                              color: JarvisColors.of(context).danger,
+                        if (widget.onOpenConversation != null &&
+                            status != 'failed' &&
+                            status != 'deleting')
+                          const PopupMenuItem(
+                            value: 'ask',
+                            child: ListTile(
+                              leading: Icon(PhosphorIconsRegular.chatCircle),
+                              title: Text('Ask Jarvis about this'),
+                              contentPadding: EdgeInsets.zero,
                             ),
                           ),
-                          contentPadding: EdgeInsets.zero,
+                        if (status == 'failed')
+                          const PopupMenuItem(
+                            value: 'retry',
+                            child: ListTile(
+                              leading: Icon(
+                                PhosphorIconsRegular.arrowsClockwise,
+                              ),
+                              title: Text('Retry indexing'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(
+                              PhosphorIconsRegular.trash,
+                              color: JarvisColors.of(context).danger,
+                            ),
+                            title: Text(
+                              'Delete',
+                              style: TextStyle(
+                                color: JarvisColors.of(context).danger,
+                              ),
+                            ),
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -506,6 +663,110 @@ class _FilesScreenState extends State<FilesScreen> {
     ),
   );
 
+  Widget _uploadCard(UploadJob job) {
+    final colors = JarvisColors.of(context);
+    final uploading = job.state == UploadState.uploading;
+    final progress = job.total == 0 ? 0.0 : job.sent / job.total;
+    final status = switch (job.state) {
+      UploadState.uploading when job.sentEverything =>
+        'Sent. Jarvis is saving it…',
+      UploadState.uploading =>
+        '${formatFileSize(job.sent)} of ${formatFileSize(job.total)}',
+      _ => job.message ?? '',
+    };
+    return SurfaceCard(
+      key: Key('upload-${job.id}'),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      child: Row(
+        children: [
+          IconBadge(icon: _fileIcon(job.fileName), size: 44),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  job.fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(fontSize: 15),
+                ),
+                const SizedBox(height: 6),
+                if (uploading)
+                  LinearProgressIndicator(
+                    key: Key('upload-progress-${job.id}'),
+                    value: job.sentEverything ? null : progress,
+                    minHeight: 4,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                const SizedBox(height: 6),
+                Text(
+                  status,
+                  key: Key('upload-status-${job.id}'),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: job.state == UploadState.failed
+                        ? colors.danger
+                        : colors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (uploading && !job.sentEverything)
+            TextButton(
+              key: Key('upload-cancel-${job.id}'),
+              onPressed: () => _cancelUpload(job),
+              child: const Text('Cancel'),
+            )
+          else if (!uploading) ...[
+            TextButton(
+              key: Key('upload-retry-${job.id}'),
+              onPressed: () => unawaited(_sendUpload(job)),
+              child: const Text('Retry'),
+            ),
+            IconButton(
+              key: Key('upload-dismiss-${job.id}'),
+              tooltip: 'Dismiss',
+              onPressed: () => _dismissUpload(job),
+              icon: const Icon(PhosphorIconsRegular.x, size: 18),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _downloadProgress(_DownloadJob job, String fileId) {
+    final known = job.total > 0;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, right: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: LinearProgressIndicator(
+              key: Key('download-progress-$fileId'),
+              value: known ? job.received / job.total : null,
+              minHeight: 4,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          TextButton(
+            key: Key('download-cancel-$fileId'),
+            onPressed: job.cancel.cancel,
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              minimumSize: const Size(0, 32),
+            ),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
   IconData _fileIcon(String name) =>
       switch (name.split('.').last.toLowerCase()) {
         'pdf' => PhosphorIconsRegular.filePdf,
@@ -514,6 +775,13 @@ class _FilesScreenState extends State<FilesScreen> {
         'json' => PhosphorIconsRegular.bracketsCurly,
         _ => PhosphorIconsRegular.fileText,
       };
+}
+
+/// "512 B", "3.4 KB", "1.2 MB".
+String formatFileSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
 String uploadContentTypeFor(String fileName) {

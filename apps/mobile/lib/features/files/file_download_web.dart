@@ -4,9 +4,18 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:web/web.dart' as web;
 
-Future<void> downloadAndOpen(Dio http, String id, String fileName) async {
+Future<bool> downloadAndOpen(
+  Dio http,
+  String id,
+  String fileName, {
+  int? expectedBytes,
+  void Function(int received, int total)? onProgress,
+  CancelToken? cancelToken,
+}) async {
   final response = await http.get<dynamic>(
     '/api/v1/files/$id/content',
+    onReceiveProgress: onProgress,
+    cancelToken: cancelToken,
     options: Options(
       responseType: ResponseType.bytes,
       receiveTimeout: const Duration(minutes: 2),
@@ -26,4 +35,5 @@ Future<void> downloadAndOpen(Dio http, String id, String fileName) async {
   anchor.click();
   anchor.remove();
   web.URL.revokeObjectURL(url);
+  return false;
 }

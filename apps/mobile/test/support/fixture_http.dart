@@ -45,7 +45,21 @@ class FixtureHttp implements HttpClientAdapter {
       body: body,
       query: Map.of(options.queryParameters),
     ));
-    await beforeRespond?.call(options);
+    final hold = beforeRespond?.call(options);
+    if (hold != null) {
+      // A held request ends early with a cancel error when its token is cancelled.
+      var cancelled = false;
+      await Future.any([
+        hold,
+        if (cancelFuture != null) cancelFuture.then((_) => cancelled = true),
+      ]);
+      if (cancelled) {
+        throw DioException.requestCancelled(
+          requestOptions: options,
+          reason: 'cancelled',
+        );
+      }
+    }
     final baseKey = '${options.method} ${options.path}';
     final queryKey = '$baseKey?${options.uri.query}';
     final key = responses.containsKey(queryKey) ? queryKey : baseKey;
