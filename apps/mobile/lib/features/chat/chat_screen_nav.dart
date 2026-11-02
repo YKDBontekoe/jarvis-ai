@@ -41,6 +41,55 @@ mixin _ChatScreenNav on _ChatScreenController {
     }
   }
 
+  /// Completed messages with some text can be saved or turned into a reminder.
+  bool _canActOnMessage(MessageEntry entry) =>
+      !entry.pending &&
+      !entry.failed &&
+      !entry.queued &&
+      _conversationId != null &&
+      entry.content.trim().isNotEmpty;
+
+  /// Saves a message to the Library after the owner reviews it, then offers to open it.
+  Future<void> _saveToLibrary(MessageEntry entry) async {
+    final saved = await showSaveToLibrarySheet(
+      context,
+      http: _http,
+      content: entry.content,
+      conversationId: _conversationId,
+    );
+    if (saved == null || !mounted) return;
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('Saved to Library'),
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 128),
+          action: SnackBarAction(
+            label: 'Open',
+            onPressed: () => _openUtility('library'),
+          ),
+        ),
+      );
+  }
+
+  /// Opens the new-reminder editor with this message's text, to review before saving.
+  Future<void> _remindFromMessage(MessageEntry entry) async {
+    final text = suggestedNoteTitle(entry.content, max: 200);
+    final page = RemindersScreen(
+      http: _http,
+      onOpenConversation: (id) async => _presentConversation(id),
+      startCreating: true,
+      initialTitle: text,
+      sourceConversationId: _conversationId,
+      onCreateDone: (message) => _quickCreateDone('reminders', message),
+    );
+    if (_isWide) {
+      _showInPane('reminders', page);
+    } else {
+      unawaited(_openUtilityPage('reminders', page));
+    }
+  }
+
   /// A quick-create editor (`reminders/new` and friends) closed: go back to
   /// where the person was, and confirm with a way to see the new item.
   void _quickCreateDone(String destination, String? message) {

@@ -802,6 +802,12 @@ mixin _ChatScreenUi on _ChatScreenController {
           ? null
           : (rating) => unawaited(_rate(entry, rating)),
       onCitationTap: (citation) => unawaited(_openCitation(citation)),
+      onSaveToLibrary: _canActOnMessage(entry)
+          ? () => unawaited(_saveToLibrary(entry))
+          : null,
+      onRemindMe: _canActOnMessage(entry)
+          ? () => unawaited(_remindFromMessage(entry))
+          : null,
       photoLoader: _loadPhoto,
       onCancelQueued: entry.queued
           ? () => unawaited(_cancelQueued(entry))

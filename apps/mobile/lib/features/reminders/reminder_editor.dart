@@ -103,6 +103,8 @@ List<ReminderPlace> savedPlaces(Iterable<Map<String, dynamic>> reminders) {
 class _NewReminderDialog extends StatefulWidget {
   const _NewReminderDialog({
     required this.timeZone,
+    this.initialTitle,
+    this.fromChat = false,
     this.places = const [],
     this.locate = readDeviceLocationSnapshot,
     required this.onSubmit,
@@ -110,6 +112,12 @@ class _NewReminderDialog extends StatefulWidget {
 
   /// Saves the reminder; null on success, otherwise the message to show here.
   final Future<String?> Function(_NewReminder reminder) onSubmit;
+
+  /// Text the title starts with, for a reminder made from a chat message.
+  final String? initialTitle;
+
+  /// The reminder is being made from a chat message, which the editor says.
+  final bool fromChat;
 
   /// Resolves to the zone the reminder will be saved in, shown under the time.
   final Future<String> timeZone;
@@ -129,7 +137,7 @@ class _NewReminderDialog extends StatefulWidget {
 class _NewReminderDialogState extends State<_NewReminderDialog>
     with SubmitState {
   final _formKey = GlobalKey<FormState>();
-  final _title = TextEditingController();
+  late final _title = TextEditingController(text: widget.initialTitle);
   DateTime _date = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _time = const TimeOfDay(hour: 9, minute: 0);
   String _recurrence = 'once';
@@ -294,6 +302,21 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.fromChat)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      const Icon(PhosphorIconsRegular.chatCircle, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        'From a message in this chat',
+                        key: const Key('reminder-from-chat'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
               TextFormField(
                 controller: _title,
                 autofocus: true,

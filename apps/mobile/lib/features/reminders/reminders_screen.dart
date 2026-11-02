@@ -45,6 +45,8 @@ class RemindersScreen extends StatefulWidget {
     this.initialTab = RemindersTab.reminders,
     this.startCreating = false,
     this.onCreateDone,
+    this.initialTitle,
+    this.sourceConversationId,
     this.locate = readDeviceLocationSnapshot,
     this.locationAccess = _checkLocationAccess,
     this.openLocationSettings = Geolocator.openAppSettings,
@@ -79,6 +81,13 @@ class RemindersScreen extends StatefulWidget {
   /// Called after a [startCreating] editor closes: with a confirmation when
   /// it saved, or null when it was cancelled.
   final ValueChanged<String?>? onCreateDone;
+
+  /// Text the new-reminder editor starts with, such as part of a chat message.
+  final String? initialTitle;
+
+  /// The chat the reminder is made from: the editor says so, and the saved
+  /// reminder is linked back to it.
+  final String? sourceConversationId;
   final Future<void> Function(String conversationId)? onOpenConversation;
 
   @override
@@ -248,6 +257,8 @@ abstract class _RemindersController extends State<RemindersScreen>
       context: context,
       builder: (_) => _NewReminderDialog(
         timeZone: zoneLookup,
+        initialTitle: widget.initialTitle,
+        fromChat: widget.sourceConversationId != null,
         places: savedPlaces(_reminders),
         locate: () => widget.locate(requestPermission: true),
         onSubmit: (reminder) async => _saveReminder(reminder, await zoneLookup),
@@ -277,7 +288,7 @@ abstract class _RemindersController extends State<RemindersScreen>
     final localTime =
         '${created.time.hour.toString().padLeft(2, '0')}:${created.time.minute.toString().padLeft(2, '0')}:00';
     try {
-      await widget.http.post(
+      final response = await widget.http.post(
         '/api/v1/reminders',
         data: {
           'title': created.title,
@@ -289,6 +300,7 @@ abstract class _RemindersController extends State<RemindersScreen>
         },
       );
       await _seedOwnerZone(timeZoneId);
+      await _linkToSourceChat(response.data);
       if (mounted) {
         unawaited(_load());
         _showMessage('Reminder set.');
@@ -301,6 +313,26 @@ abstract class _RemindersController extends State<RemindersScreen>
                 'Jarvis could not create that reminder.';
     } catch (_) {
       return 'Jarvis could not create that reminder.';
+    }
+  }
+
+  /// Links a reminder made from a chat message back to that chat. The reminder
+  /// is saved either way.
+  Future<void> _linkToSourceChat(Object? created) async {
+    final chat = widget.sourceConversationId;
+    final id = created is Map ? created['id']?.toString() : null;
+    if (chat == null || id == null) return;
+    try {
+      await widget.http.post<dynamic>(
+        '/api/v1/entities/links',
+        data: {
+          'from': 'conversation:$chat',
+          'to': 'reminder:$id',
+          'relation': 'source',
+        },
+      );
+    } on DioException {
+      // Nothing to undo: the reminder exists.
     }
   }
 
