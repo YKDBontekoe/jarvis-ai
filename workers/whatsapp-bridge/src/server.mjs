@@ -236,7 +236,11 @@ class Session {
     const dropped = this.observed.items.filter((item) => !keep(item)).map((item) => item.id);
     this.observed.items = this.observed.items.filter(keep);
     this.media.drop(dropped);
-    await writeJsonFile(path.join(this.dir, WATCH_FILE), { chats: [...this.watched] });
+    // A logged-out session had its directory removed; there is nothing to persist and recreating it would leave junk.
+    if (this.state !== 'logged_out') {
+      await mkdir(this.dir, { recursive: true });
+      await writeJsonFile(path.join(this.dir, WATCH_FILE), { chats: [...this.watched] });
+    }
     return this.watched.size;
   }
 
