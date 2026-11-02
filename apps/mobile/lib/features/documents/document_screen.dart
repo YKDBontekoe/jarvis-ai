@@ -10,6 +10,7 @@ import '../search/context_commands.dart';
 import '../../theme.dart';
 import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
+import '../entities/sources_panel.dart';
 import '../../ui/phosphor_icons.dart';
 
 /// One draft: sections you edit in your own words, shorten or rebuild from
@@ -236,16 +237,13 @@ class _DocumentScreenState extends State<DocumentScreen>
         data: {'action': action},
       ),
     );
-    return FeatureRow(
+    final row = FeatureRow(
       key: Key('document-section-$id'),
       index: index,
       icon: PhosphorIconsRegular.fileText,
       caption: section['edited'] == true ? 'Edited' : null,
       title: asJsonString(section['heading']) ?? '',
-      subtitle: [
-        asJsonString(section['body']) ?? '',
-        if (refs.isNotEmpty) 'Sources: ${refs.join(', ')}',
-      ].join('\n'),
+      subtitle: asJsonString(section['body']) ?? '',
       actions: [
         PillAction(
           compact: true,
@@ -282,6 +280,21 @@ class _DocumentScreenState extends State<DocumentScreen>
                     ),
                   ),
           ),
+      ],
+    );
+    if (refs.isEmpty) return row;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        row,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: SourcesPanel.refs(
+            key: Key('document-sources-$id'),
+            http: widget.http,
+            refs: refs,
+          ),
+        ),
       ],
     );
   }

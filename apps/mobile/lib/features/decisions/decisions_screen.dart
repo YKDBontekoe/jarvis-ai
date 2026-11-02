@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../entities/entity_ref.dart';
+import '../entities/sources_panel.dart';
 import '../../ui/phosphor_icons.dart';
 import 'calibration_card.dart';
 import 'decision_editor_screen.dart';
@@ -91,7 +93,7 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _DecisionSheet(decision: decision),
+      builder: (_) => _DecisionSheet(decision: decision, http: widget.http),
     );
     if (result == null || !mounted) return;
     final id = jsonId(decision);
@@ -318,9 +320,10 @@ class _Delete extends _SheetResult {
 
 /// One decision in full, with the buttons to answer, change or remove it.
 class _DecisionSheet extends StatefulWidget {
-  const _DecisionSheet({required this.decision});
+  const _DecisionSheet({required this.decision, required this.http});
 
   final Map<String, dynamic> decision;
+  final Dio http;
 
   @override
   State<_DecisionSheet> createState() => _DecisionSheetState();
@@ -382,6 +385,15 @@ class _DecisionSheetState extends State<_DecisionSheet> {
                     context_,
                     style: TextStyle(fontSize: 14, color: colors.inkSoft),
                   ),
+                ),
+              // Where the decision was logged, when it came from a chat.
+              if (EntityRef.tryParse('decision:${jsonId(d)}') case final ref?)
+                SourcesPanel.of(
+                  key: const Key('decision-sources'),
+                  http: widget.http,
+                  entity: ref,
+                  expectsSource: false,
+                  relations: const {'created', 'source'},
                 ),
               const SizedBox(height: 16),
               Text(

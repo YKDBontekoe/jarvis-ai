@@ -10,6 +10,7 @@ import 'memory_review_screen.dart';
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../entities/sources_panel.dart';
 import '../../ui/unsaved_changes_guard.dart';
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
@@ -512,37 +513,15 @@ class _MemoryScreenState extends State<MemoryScreen> {
               ),
             ),
           ),
-          if (memory['sourceType'] == 'conversation')
-            InkWell(
+          if (EntityRef.tryParse('memory:${jsonId(memory)}') case final ref?
+              when memory['sourceType'] == 'conversation')
+            KeyedSubtree(
               key: Key('memory-source-${jsonId(memory)}'),
-              onTap: () => _openRelated(memory),
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding: EdgeInsets.only(top: 10, bottom: 2),
-                child: Row(
-                  children: [
-                    Icon(
-                      PhosphorIconsRegular.sparkle,
-                      size: 14,
-                      color: JarvisColors.of(context).muted,
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      'Learned from a conversation',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: JarvisColors.of(context).inkSoft,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(
-                      PhosphorIconsRegular.caretRight,
-                      size: 12,
-                      color: JarvisColors.of(context).muted,
-                    ),
-                  ],
-                ),
+              child: SourcesPanel.of(
+                http: widget.http,
+                entity: ref,
+                collapsedLabel: 'Learned from a conversation',
+                onOpenConversation: widget.onOpenConversation,
               ),
             ),
         ],
