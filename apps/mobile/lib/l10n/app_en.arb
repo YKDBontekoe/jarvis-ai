@@ -7,7 +7,11 @@
   "tabUnread": "{label}, unread",
   "@tabUnread": {
     "description": "Screen reader label of a tab with unread items.",
-    "placeholders": { "label": { "type": "String" } }
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
   },
   "greetingMorning": "Good morning",
   "greetingAfternoon": "Good afternoon",
@@ -15,18 +19,41 @@
   "offline": "Offline",
   "offlineShowingSaved": "Offline · showing data from {age}",
   "@offlineShowingSaved": {
-    "placeholders": { "age": { "type": "String", "example": "5 min ago" } }
+    "placeholders": {
+      "age": {
+        "type": "String",
+        "example": "5 min ago"
+      }
+    }
   },
   "offlineRetry": "Retry",
   "offlineChecking": "Checking…",
   "ageJustNow": "just now",
   "ageMinutes": "{count} min ago",
-  "@ageMinutes": { "placeholders": { "count": { "type": "int" } } },
+  "@ageMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "ageHours": "{count} h ago",
-  "@ageHours": { "placeholders": { "count": { "type": "int" } } },
+  "@ageHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "ageYesterday": "yesterday",
   "ageDays": "{count} days ago",
-  "@ageDays": { "placeholders": { "count": { "type": "int" } } },
+  "@ageDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "appearanceTitle": "Appearance",
   "languageSection": "Language",
   "languageSystem": "Use device language",
@@ -45,26 +72,82 @@
   "turnQualitySlowestTools": "Slowest tools",
   "turnQualityToolAverage": "{tool}: {duration} on average",
   "@turnQualityToolAverage": {
-    "placeholders": { "tool": { "type": "String" }, "duration": { "type": "String" } }
+    "placeholders": {
+      "tool": {
+        "type": "String"
+      },
+      "duration": {
+        "type": "String"
+      }
+    }
   },
   "turnQualityModelFailures": "{percent}% of {calls} model calls failed",
   "@turnQualityModelFailures": {
-    "placeholders": { "percent": { "type": "String" }, "calls": { "type": "int" } }
+    "placeholders": {
+      "percent": {
+        "type": "String"
+      },
+      "calls": {
+        "type": "int"
+      }
+    }
   },
   "turnQualityTurns": "{failed, plural, =1{1 turn failed} other{{failed} turns failed}}, {cancelled} stopped (of {turns} traced)",
   "@turnQualityTurns": {
-    "placeholders": { "failed": { "type": "int" }, "cancelled": { "type": "int" }, "turns": { "type": "int" } }
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      },
+      "cancelled": {
+        "type": "int"
+      },
+      "turns": {
+        "type": "int"
+      }
+    }
   },
   "turnQualityTools": "{calls, plural, =1{1 tool call} other{{calls} tool calls}}, {percent}% failed",
   "@turnQualityTools": {
-    "placeholders": { "calls": { "type": "int" }, "percent": { "type": "int" } }
+    "placeholders": {
+      "calls": {
+        "type": "int"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
   },
   "turnQualityApprovals": "{asked, plural, =1{1 approval} other{{asked} approvals}} asked, {denied} declined, {auto} handled automatically",
   "@turnQualityApprovals": {
-    "placeholders": { "asked": { "type": "int" }, "denied": { "type": "int" }, "auto": { "type": "int" } }
+    "placeholders": {
+      "asked": {
+        "type": "int"
+      },
+      "denied": {
+        "type": "int"
+      },
+      "auto": {
+        "type": "int"
+      }
+    }
   },
   "turnQualityFlagSlowReplies": "Replies are slow: one in ten takes over 30 s. A faster chat model in Settings → Models helps most.",
   "turnQualityFlagFailingTurns": "More than one in ten turns failed. The Codex sign-in or the server log usually says why.",
   "turnQualityFlagApprovalFriction": "You approve a lot by hand. Always allow a category on its next approval card, or raise the autonomy level in Learning.",
-  "turnQualityFlagLowCache": "Few prompts are reused from cache, so each reply costs more time."
+  "turnQualityFlagLowCache": "Few prompts are reused from cache, so each reply costs more time.",
+  "capturesTitle": "Captures",
+  "capturesEmptyTitle": "Nothing shared yet",
+  "capturesEmptyMessage": "Use Share in another app and choose Jarvis. What you share waits here until you decide what to do with it.",
+  "capturesDiscardTitle": "Discard this capture?",
+  "capturesDiscardMessage": "It will be removed from this phone. Nothing is sent anywhere.",
+  "capturesKeep": "Keep",
+  "capturesDiscard": "Discard",
+  "capturesLinkNote": "Add a note about this link (optional)",
+  "capturesEditFirst": "Edit before you decide",
+  "capturesSaveToFiles": "Save to Files",
+  "capturesSaveToLibrary": "Save to Library",
+  "capturesAsk": "Ask Jarvis",
+  "capturesRemind": "Create reminder",
+  "hideInSwitcherTitle": "Hide in app switcher",
+  "hideInSwitcherSubtitle": "Blur Jarvis when you swipe up or switch apps"
 }

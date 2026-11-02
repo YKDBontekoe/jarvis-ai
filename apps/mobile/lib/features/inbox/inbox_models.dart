@@ -95,9 +95,8 @@ class CommitmentData {
       dueOn != null &&
       dueOn!.isBefore(DateTime(today.year, today.month, today.day));
 
-  String get headline => iOwe
-      ? 'You owe $counterparty'
-      : '$counterparty owes you';
+  String get headline =>
+      iOwe ? 'You owe $counterparty' : '$counterparty owes you';
 
   static CommitmentData? fromJson(dynamic json) {
     final map = jsonObject(json);

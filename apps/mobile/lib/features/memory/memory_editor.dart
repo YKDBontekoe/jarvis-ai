@@ -56,57 +56,61 @@ class _MemoryEditorDialogState extends State<_MemoryEditorDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.title),
-    content: Form(
-      key: _formKey,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: _kind,
-            decoration: const InputDecoration(labelText: 'Type'),
-            items: [
-              for (final value in _memoryKinds)
-                DropdownMenuItem(
-                  value: value,
-                  child: Text(value[0].toUpperCase() + value.substring(1)),
-                ),
-            ],
-            onChanged: (value) =>
-                setState(() => _kind = value ?? widget.kindFallback),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _content,
-            autofocus: true,
-            minLines: 2,
-            maxLines: 5,
-            maxLength: 8000,
-            decoration: const InputDecoration(
-              labelText: 'What should Jarvis remember?',
-              alignLabelWithHint: true,
+  Widget build(BuildContext context) => UnsavedChangesGuard(
+    changes: _content,
+    snapshot: () => [_content.text, _kind, _pinned].join('\u0001'),
+    child: AlertDialog(
+      title: Text(widget.title),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: _kind,
+              decoration: const InputDecoration(labelText: 'Type'),
+              items: [
+                for (final value in _memoryKinds)
+                  DropdownMenuItem(
+                    value: value,
+                    child: Text(value[0].toUpperCase() + value.substring(1)),
+                  ),
+              ],
+              onChanged: (value) =>
+                  setState(() => _kind = value ?? widget.kindFallback),
             ),
-            validator: (value) => value == null || value.trim().isEmpty
-                ? 'Enter something to remember.'
-                : null,
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Pin this memory'),
-            value: _pinned,
-            onChanged: (value) => setState(() => _pinned = value),
-          ),
-        ],
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _content,
+              autofocus: true,
+              minLines: 2,
+              maxLines: 5,
+              maxLength: 8000,
+              decoration: const InputDecoration(
+                labelText: 'What should Jarvis remember?',
+                alignLabelWithHint: true,
+              ),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Enter something to remember.'
+                  : null,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Pin this memory'),
+              value: _pinned,
+              onChanged: (value) => setState(() => _pinned = value),
+            ),
+          ],
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.maybePop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _save, child: Text(widget.saveLabel)),
+      ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
-      ),
-      FilledButton(onPressed: _save, child: Text(widget.saveLabel)),
-    ],
   );
 }

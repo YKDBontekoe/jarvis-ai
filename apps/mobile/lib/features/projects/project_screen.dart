@@ -41,7 +41,8 @@ class ProjectScreen extends StatefulWidget {
   State<ProjectScreen> createState() => _ProjectScreenState();
 }
 
-class _ProjectScreenState extends State<ProjectScreen> with PaletteContextMixin<ProjectScreen> {
+class _ProjectScreenState extends State<ProjectScreen>
+    with PaletteContextMixin<ProjectScreen> {
   @override
   String get paletteContextValue => 'project:${widget.projectId}';
 
@@ -194,8 +195,7 @@ class _ProjectScreenState extends State<ProjectScreen> with PaletteContextMixin<
     );
     if (choice == null || !mounted) return;
     await _run(() async {
-      final hasNext =
-          choice.linkType != null || choice.note.isNotEmpty;
+      final hasNext = choice.linkType != null || choice.note.isNotEmpty;
       final response = await widget.http.put<dynamic>(
         '$_base/focus',
         data: {
@@ -295,9 +295,9 @@ class _ProjectScreenState extends State<ProjectScreen> with PaletteContextMixin<
     final List<Map<String, dynamic>> candidates;
     try {
       final response = await widget.http.get<dynamic>('/api/v1/conversations');
-      candidates = _withIds(
-        response.data,
-      ).where((item) => item['projectId'] != widget.projectId).toList();
+      candidates = _withIds(response.data)
+          .where((item) => item['projectId'] != widget.projectId)
+          .toList();
     } catch (_) {
       if (mounted) setState(() => _error = 'Jarvis could not load your chats.');
       return;
@@ -326,9 +326,9 @@ class _ProjectScreenState extends State<ProjectScreen> with PaletteContextMixin<
     try {
       final response = await widget.http.get<dynamic>('/api/v1/files');
       final inProject = _files.map((file) => file['id']).toSet();
-      candidates = _withIds(
-        response.data,
-      ).where((file) => !inProject.contains(file['id'])).toList();
+      candidates = _withIds(response.data)
+          .where((file) => !inProject.contains(file['id']))
+          .toList();
     } catch (_) {
       if (mounted) setState(() => _error = 'Jarvis could not load your files.');
       return;

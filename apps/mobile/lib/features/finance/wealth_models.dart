@@ -21,8 +21,13 @@ DateTime? _day(dynamic value) {
 }
 
 /// "-€12.50" or "€12.50": [formatMoney] drops the sign, balances need it.
-String formatSigned(double amount, String currency, {bool plus = false}) {
-  final text = formatMoney(amount, currency);
+String formatSigned(
+  double amount,
+  String currency, {
+  bool plus = false,
+  bool code = false,
+}) {
+  final text = formatMoney(amount, currency, code: code);
   if (amount < 0) return '-$text';
   return plus && amount > 0 ? '+$text' : text;
 }

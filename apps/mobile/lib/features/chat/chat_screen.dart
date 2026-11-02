@@ -17,6 +17,7 @@ import '../../api/api_errors.dart';
 import '../../api/jarvis_http.dart';
 import '../../api/mutation_queue.dart';
 import '../../api/offline_cache.dart';
+import '../../app_lock.dart';
 import '../../auth/auth_session.dart';
 import '../../auth/auth_validation.dart';
 import '../conversations/conversations_screen.dart';
@@ -31,7 +32,10 @@ import '../files/file_download_stub.dart'
     if (dart.library.io) '../files/file_download_io.dart'
     if (dart.library.js_interop) '../files/file_download_web.dart'
     as file_download;
+import '../reminders/reminders_screen.dart';
 import '../tasks/task_details_screen.dart';
+import '../tasks/task_refresh_bus.dart';
+import '../../storage/draft_store.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/orb_flight.dart';
@@ -43,6 +47,7 @@ import '../home/home_widget_sync.dart';
 import '../chats/chat_list.dart';
 import '../chats/chats_screen.dart';
 import '../everything/everything_screen.dart';
+import '../everything/recent_features.dart';
 import '../home/jarvis_home.dart';
 import '../home/learning_card.dart' show LearningSeenStore;
 import '../tiles/app_tiles.dart';
@@ -53,9 +58,15 @@ import '../settings/settings_view.dart';
 import '../search/command_palette.dart';
 import '../search/recent_searches_store.dart';
 import '../search/search_navigation.dart';
+import '../search/find_in_chat_screen.dart';
 import '../search/search_screen.dart';
 import '../projects/project_style.dart';
+import '../shell/dock_strip.dart';
+import '../captures/capture_store.dart';
+import '../shell/app_shortcuts.dart';
+import '../shell/incoming_routes.dart';
 import '../shell/jarvis_tab_bar.dart';
+import '../shell/tab_memory.dart';
 import '../shell/utility_pages.dart';
 import '../whatsapp/whatsapp_chat_screen.dart';
 import '../voice/chat_gpt_voices.dart';
@@ -64,7 +75,10 @@ import '../voice/voice_errors.dart';
 import '../voice/voice_stage.dart';
 import 'chat_entries.dart';
 import 'chat_widgets.dart';
+import '../../api/waiting_changes.dart';
 import 'composer_drafts.dart';
+import 'reading_position.dart';
+import 'message_actions.dart';
 import 'conversation_summary.dart';
 import 'image_paste_stub.dart'
     if (dart.library.js_interop) 'image_paste_web.dart';
@@ -132,6 +146,10 @@ class _ChatScreenState extends _ChatScreenController
     _scroll.addListener(_handleTranscriptScroll);
     _input.addListener(_rememberDraft);
     unawaited(_openDrafts());
+    unawaited(_openReadingPositions());
+    // The dock strip follows who is waiting and who is replying.
+    _chatList.addListener(_onChatListChanged);
+    _registerWaitingChanges();
     unawaited(_openOutbox());
     unawaited(_tiles.open());
     _chatsTimer = Timer.periodic(const Duration(seconds: 60), (_) {
@@ -143,15 +161,18 @@ class _ChatScreenState extends _ChatScreenController
     _attachPushListeners();
     // Taps on the iOS home screen widget.
     _widgetClicks = HomeWidgetSync.instance.clicks().listen(
-      (destination) => switch (destination) {
-        'ask' => _presentChat(),
-        'voice' => _openTile('voice'),
-        'chats' => _selectTab(JarvisTab.chats),
-        _ => _selectTab(JarvisTab.home),
-      },
+      (destination) => IncomingRoutes.instance.offer('widget', destination),
     );
+    IncomingRoutes.instance.addListener(_drainIncomingRoutes);
     // Widget tests serve canned responses; a cache shared across them would leak data between tests.
     if (!usesDebugJarvisHttpAdapter) {
+      // The iPhone app-icon menu: New chat, Talk, New reminder, Captures.
+      unawaited(
+        AppShortcuts.install(
+          languageCode:
+              WidgetsBinding.instance.platformDispatcher.locale.languageCode,
+        ),
+      );
       OfflineCache.instance.attach(_http);
       // Changes made offline are kept for this server only, and sent once Jarvis answers again.
       OfflineCache.instance.state.addListener(_syncQueuedChanges);
@@ -172,6 +193,8 @@ class _ChatScreenState extends _ChatScreenController
 
   @override
   Widget build(BuildContext context) {
+    // Session restored, signed in or unlocked: a waiting outside request can run now.
+    _drainSoon();
     if (_restoringSession) {
       return const Scaffold(
         body: Stack(
@@ -218,10 +241,14 @@ class _ChatScreenState extends _ChatScreenController
                           Expanded(
                             child: PageSwitcher(
                               index: _tab.index,
-                              child: KeyedSubtree(
-                                key: ValueKey('page-${_tab.name}'),
-                                child: _tabPage(),
-                              ),
+                              child:
+                                  NotificationListener<UserScrollNotification>(
+                                    onNotification: _foldDockOnScroll,
+                                    child: KeyedSubtree(
+                                      key: ValueKey('page-${_tab.name}'),
+                                      child: _tabPage(),
+                                    ),
+                                  ),
                             ),
                           ),
                         ],
@@ -241,6 +268,12 @@ class _ChatScreenState extends _ChatScreenController
                   chatsAttention: chatsAttention,
                   jarvisBusy: _busy,
                   orbKey: _tabOrbKey,
+                  compact: _dockCompact,
+                  onUnfold: () => setState(() => _dockCompact = false),
+                  strip: switch (_dockStrip()) {
+                    final data? => DockStrip(data: data),
+                    null => null,
+                  },
                 )
               : null,
           body: wide
@@ -308,6 +341,23 @@ class _ChatScreenState extends _ChatScreenController
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The app lock opening is one of the moments a waiting request can run.
+    _drainSoon();
+  }
+
+  /// Opens a waiting outside request after this frame, when the app can show it.
+  void _drainSoon() {
+    if (!IncomingRoutes.instance.hasPending) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _drainIncomingRoutes());
+  }
+
+  void _onChatListChanged() {
+    if (mounted && !_inChat) setState(() {});
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final backgrounded =
         state == AppLifecycleState.inactive ||
@@ -316,6 +366,7 @@ class _ChatScreenState extends _ChatScreenController
         state == AppLifecycleState.detached;
     if (backgrounded) {
       unawaited(_drafts.flush());
+      _saveReadingPosition();
       if (_sending || _busy) _remoteQuery = true;
       return;
     }
@@ -324,6 +375,8 @@ class _ChatScreenState extends _ChatScreenController
         !_signingOut &&
         !_restoringSession) {
       unawaited(PlaceReminderTracker.instance.refresh(_http));
+      // Things shared while the app was away wait on the Captures page.
+      unawaited(_presentNewCaptures());
     }
     if (state != AppLifecycleState.resumed || _conversationId == null) return;
     unawaited(_flushOutbox());
@@ -345,6 +398,9 @@ class _ChatScreenState extends _ChatScreenController
 
   @override
   void dispose() {
+    WaitingChanges.instance.reset();
+    IncomingRoutes.instance.removeListener(_drainIncomingRoutes);
+    _chatList.removeListener(_onChatListChanged);
     OfflineCache.instance.state.removeListener(_syncQueuedChanges);
     WidgetsBinding.instance.removeObserver(this);
     unawaited(PlaceReminderTracker.instance.detach());

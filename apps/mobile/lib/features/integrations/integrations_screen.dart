@@ -301,9 +301,8 @@ class _IntegrationsScreenState extends _IntegrationsController
       'secrets' => 'Added ${outcome.name}. Add its key to finish.',
       _ => 'Added ${outcome.name}.',
     };
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
     if (outcome.nextStep == 'sign_in') {
       await _connectOAuth(server: outcome.serverId, endpoint: outcome.endpoint);
     }

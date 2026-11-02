@@ -121,6 +121,8 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 | `NoticedCard`, `EveningCard`, `DayOneCard`, `BriefCard`, `AskBar` | `features/home/` | Home sections |
 | `HeroCard`, `FeatureRow`, `PillAction`, `GroupLabel`, `SoftButton`, `InkButton` | `ui/feature_kit.dart` | The vocabulary for feature screens. One `HeroCard` (ink card, caps label, headline, optional segmented progress, footer) leads the screen; everything under it is `FeatureRow`s (icon badge, caps caption, title, detail, trailing, pill actions; entrance stagger; stacks under the text at large sizes) grouped by a `GroupLabel` (caps, optional count). Actions are `PillAction` (ink when primary, tonal otherwise, `compact` for several per row, `onDark` on a hero). Never bare `TextButton`s in cards. |
 | `PersonPanel` | `features/whatsapp/person_panel.dart` | About a person, beside a chat on wide screens |
+| `SourceRow`, `SourcesPanel` | `ui/source_row.dart`, `features/entities/sources_panel.dart` | One row for supporting evidence: source name, kind, date and Open; a deleted source reads "Source no longer available" with no link. Used by memories, decisions and generated documents |
+| `UnsavedChangesGuard`, `SubmitState` | `ui/unsaved_changes_guard.dart`, `ui/submit_state.dart` | Editors ask Keep editing / Discard only when values changed, and run their save inside the editor so a failure keeps the input and shows beside it |
 | `UiSurfaceCard`, `DockedSurfaceBar` | `features/chat/generative_ui.dart` | Cards Jarvis renders with RenderUi. An open question docks in the composer's place (`pinned`); `DockedSurfaceBar` keeps it in view while the owner types instead |
 | `SurfaceBlocks`, `SurfaceTag`, `SurfaceChoiceChip` | `features/chat/generative_ui_blocks.dart` | Custom cards Jarvis composes from blocks (stats, progress, bars, steps, pairs, chips, callout, heading, text, divider, columns); item tags; chip answers for short choice fields |
 
@@ -156,14 +158,13 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
   - tapping the transcript closes the keyboard.
 - **Cards Jarvis composes (custom blocks).** A card that only shows something (a week summary, a bill list) stays readable in the transcript and never folds. Blocks use the tokens only: stat tiles on `surfaceMuted` (two a row, an odd last one full width, one a row from 1.5× text), progress and bars grow once with `JarvisMotion.slow` (instant with reduced motion), callouts take a tone's soft colour, columns stack below 150pt each or at large text. Up/down deltas pair an arrow icon with colour, never colour alone. Gallery: `test/screenshots/generative_cards.dart`.
 - **People everywhere.** A chat linked to a person shows the relationship in Chats rows, Needs you, the hold preview, the chat header (instead of your own number) and the About panel.
-- **Navigation (approved design, not built yet).** See [mockups/home-header-nav.html](mockups/home-header-nav.html):
-  - two floating glass pieces, a capsule for Home / Chats / Everything / You and a separate orb button;
-  - the open tab is a solid pill with its name;
-  - one contextual strip above the dock, priority: Jarvis writing, then Jarvis replied, then the top Needs you item;
-  - the capsule folds to the current tab while scrolling;
-  - hold the orb to talk;
-  - Chats shows the waiting count, Home an amber dot for approvals or due reminders.
-  Today's bar is `features/shell/jarvis_tab_bar.dart`.
+- **Navigation (built: the two-piece dock).** See [mockups/home-header-nav.html](mockups/home-header-nav.html). `JarvisTabBar` in `features/shell/jarvis_tab_bar.dart`:
+  - two floating glass pieces, a capsule for Home / Chats / Everything / You and a separate orb button (`dock-capsule`, `dock-orb`);
+  - the open tab is a solid pill with its name; the others are icons, every tab at least 44 pt. If the name does not fit beside three icons (320 pt phones, large text) the pill keeps only its icon; labels scale at most 1.4×;
+  - scrolling a list down folds the capsule to the open tab (`dockCompactAfterScroll`); scrolling up, reaching the top or tapping the folded tab unfolds it;
+  - one contextual strip above the dock (`dock_strip.dart`), priority: Jarvis writing, then a reply that finished while away, then the top Needs you item (an approval, or the first chat waiting on you). Home shows Needs you itself, so the strip skips it there. × hides a strip until something newer replaces it; opening its destination or resolving it removes it;
+  - tapping the tab you are on scrolls it to the top; every tab reopens where it was left, with its Chats filter and searches (`TabMemory`);
+  - Chats shows the unread dot. Hold-the-orb-to-talk and the Home amber dot are still to do.
 
 ## 8. Copy
 
@@ -179,6 +180,11 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 - Give buttons with a long visible text and subtitle a short label too. The web recorder (`tool/record_web.mjs`) taps by accessible name, so use unique names.
 - Check contrast in both themes. Never put information in colour alone; pair it with text or an icon.
 - 44pt targets, and the text-scale rules in §4.
+- **Announce what changed.** `InlineNotice` with the `danger` or `success` tone is a live region, so VoiceOver reads a save failure or confirmation as it appears. Use those tones for results of an action, `info`/`warning` for standing state (they stay quiet).
+- **Privacy cover.** Jarvis is blurred in the app switcher by default, with or without the Face ID lock (More → Face ID lock → Hide in app switcher). The cover never asks for Face ID; only the lock does.
+- **Pinned primary controls.** On full-screen sessions (voice) the End and Mute buttons sit outside the scroll area, so growing captions, cards or 3× text never push them off screen. Captions can be hidden mid-call.
+- **System share.** Messages offer Share (long-press on yours, the ⋯ menu on replies) through the phone's own share sheet via `features/chat/share_text.dart`; tests replace `textSharer`. Files already open through the system "Open in" sheet.
+- **Both languages.** New user-visible strings go in `lib/l10n/app_en.arb` and `app_nl.arb` and are read with `context.l10n`; Captures and the switcher cover are done, older screens still use literal English.
 
 ## 10. Workflow
 
@@ -194,6 +200,6 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 
 ## 11. Open items
 
-- The navigation redesign and the compact Home header are approved as mockups and not built yet.
+- The compact Home header is approved as a mockup and not built yet. Hold the orb to talk and the amber Home dot from the navigation mockup are not built.
 - A "Leave now" travel estimate needs locations on calendar events and reminders.
 - The iOS widget's Swift (`apps/mobile/ios/JarvisWidget/`) has not been compiled yet. See its README.

@@ -73,11 +73,34 @@ mixin _ChatScreenUi on _ChatScreenController {
     }
   }
 
+  /// Scrolling a list down folds the dock to the open tab; scrolling back up,
+  /// or reaching the top, unfolds it.
+  bool _foldDockOnScroll(UserScrollNotification notification) {
+    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+    final compact = dockCompactAfterScroll(
+      direction: notification.direction,
+      pixels: notification.metrics.pixels,
+      current: _dockCompact,
+    );
+    if (compact != _dockCompact && mounted) {
+      setState(() => _dockCompact = compact);
+    }
+    return false;
+  }
+
   void _selectTab(JarvisTab tab) => _fromShell(() {
+    // The tab you are already on: tapping it again goes back to the top.
+    if (tab == _tab && !_inChat && _selectedDestination == 0) {
+      unawaited(_tabMemory.scrollToTop(tab));
+      return;
+    }
     if (_selectedDestination != 0) _selectDestination(0);
     setState(() {
       _tab = tab;
       _inChat = false;
+      _dockCompact = false;
     });
     if (tab == JarvisTab.chats) unawaited(_refreshChats());
   });
@@ -88,6 +111,7 @@ mixin _ChatScreenUi on _ChatScreenController {
   }
 
   void _presentChat() {
+    _unreadReply = null;
     if (!_inChat && mounted) setState(() => _inChat = true);
   }
 
@@ -220,6 +244,146 @@ mixin _ChatScreenUi on _ChatScreenController {
     );
   }
 
+  /// Starts capturing for this account and shows what was shared while the app was away.
+  Future<void> _bindCaptures() async {
+    if (usesDebugJarvisHttpAdapter) return;
+    await CaptureStore.instance.bind(_http.options.baseUrl);
+    await _presentNewCaptures();
+  }
+
+  /// Offers the Captures page once for captures the owner has not seen. It does
+  /// not send anything to the assistant: the page asks what to do with each.
+  Future<void> _presentNewCaptures() async {
+    if (usesDebugJarvisHttpAdapter || _signedOut || _signingOut) return;
+    await CaptureStore.instance.refresh();
+    final newest = CaptureStore.instance.newest;
+    if (newest != null && await CaptureStore.instance.hasUnpresented()) {
+      IncomingRoutes.instance.offer(
+        'capture',
+        'captures',
+        id: 'captures:${newest.id}',
+      );
+    }
+  }
+
+  /// True when the app can show something opened from outside: the session is
+  /// restored and signed in, and the app lock (if on) is open.
+  bool get _canOpenIncoming =>
+      mounted &&
+      !_signedOut &&
+      !_signingOut &&
+      !_restoringSession &&
+      !(AppLockScope.maybeOf(context)?.locked ?? false);
+
+  /// Opens whatever is waiting in [IncomingRoutes] once the app is ready for it.
+  /// Called when something arrives, and again when the session is restored, the
+  /// owner signs in, or the app unlocks.
+  void _drainIncomingRoutes() {
+    if (!IncomingRoutes.instance.hasPending || !_canOpenIncoming) return;
+    final route = IncomingRoutes.instance.take();
+    if (route == null) return;
+    if (route.run != null) {
+      route.run!();
+      return;
+    }
+    _openIncoming(route.destination);
+  }
+
+  void _openIncoming(String destination) {
+    switch (destination) {
+      case 'ask':
+        _presentChat();
+      case 'voice':
+        _openTile('voice');
+      case 'chats':
+        _selectTab(JarvisTab.chats);
+      case 'home':
+        _selectTab(JarvisTab.home);
+      case final chat when chat.startsWith('chat:'):
+        unawaited(_presentConversation(chat.substring(5)));
+      default:
+        _openUtility(destination);
+    }
+  }
+
+  /// The one line above the dock, or none: Jarvis writing, a reply that
+  /// finished while away, or the most pressing thing that needs the owner.
+  DockStripData? _dockStrip() {
+    if (_signedOut || _signingOut) return null;
+    DockStripData? writing;
+    final replying = _chatList.all.where((item) => item.responding).firstOrNull;
+    if (_busy || replying != null) {
+      final id = replying?.conversationId ?? _conversationId;
+      writing = DockStripData(
+        kind: DockStripKind.writing,
+        key: 'writing:${id ?? ''}',
+        title: 'Jarvis is writing…',
+        detail: replying?.title,
+        action: 'Open',
+        onTap: () =>
+            id == null ? _openJarvis() : unawaited(_presentConversation(id)),
+      );
+    }
+    DockStripData? replied;
+    if (_unreadReply case final reply?) {
+      replied = DockStripData(
+        kind: DockStripKind.replied,
+        key: 'reply:${reply.conversationId}:${reply.serial}',
+        title: reply.preview,
+        detail: 'Jarvis replied',
+        action: 'Read',
+        onTap: () {
+          _unreadReply = null;
+          unawaited(_presentConversation(reply.conversationId));
+        },
+        onDismiss: () => setState(() {
+          _dismissedStrips.add('reply:${reply.conversationId}:${reply.serial}');
+        }),
+      );
+    }
+    DockStripData? needs;
+    // Home already shows what needs you, so the strip covers the other tabs.
+    if (_tab != JarvisTab.home) {
+      if (_hasPendingApproval && _conversationId != null) {
+        needs = DockStripData(
+          kind: DockStripKind.needsYou,
+          key: 'approval:$_conversationId',
+          title: 'Jarvis needs your OK',
+          detail: 'An action is waiting for approval',
+          action: 'Review',
+          onTap: () => unawaited(_presentConversation(_conversationId!)),
+          onDismiss: () =>
+              setState(() => _dismissedStrips.add('approval:$_conversationId')),
+        );
+      } else {
+        final waiting = _chatList
+            .grouped(ChatFilter.forYou)
+            .where((group) => group.section == ChatSection.waiting)
+            .expand((group) => group.items)
+            .firstOrNull;
+        if (waiting != null) {
+          final key =
+              'waiting:${waiting.key}:${waiting.time?.millisecondsSinceEpoch}';
+          needs = DockStripData(
+            kind: DockStripKind.needsYou,
+            key: key,
+            title: '${waiting.title} is waiting',
+            detail: waiting.preview,
+            action: 'Reply',
+            onTap: () => _openChatItem(waiting),
+            onDismiss: () => setState(() => _dismissedStrips.add(key)),
+          );
+        }
+      }
+    }
+    return chooseDockStrip(
+      writing: writing,
+      replied: replied,
+      needsYou: needs,
+      dismissed: _dismissedStrips,
+    );
+  }
+
   Widget _tabPage() => switch (_tab) {
     JarvisTab.home => JarvisHome(
       source: _tileSource,
@@ -227,6 +391,7 @@ mixin _ChatScreenUi on _ChatScreenController {
       chats: _chatList,
       ready: _conversationId != null,
       refreshRevision: _homeRevision,
+      scrollSlot: _tabMemory.slotFor(JarvisTab.home),
       jarvisBusy: _busy,
       onOpen: _openTile,
       onOpenChat: _openChatByKey,
@@ -242,6 +407,11 @@ mixin _ChatScreenUi on _ChatScreenController {
     JarvisTab.chats => ChatsScreen(
       chats: _chatList,
       http: _http,
+      scrollSlot: _tabMemory.slotFor(JarvisTab.chats),
+      initialFilter: _tabMemory.chatsFilter,
+      initialQuery: _tabMemory.chatsQuery,
+      onFilterChanged: (filter) => _tabMemory.chatsFilter = filter,
+      onQueryChanged: (text) => _tabMemory.chatsQuery = text,
       onOpen: _openChatItem,
       onReplyWith: (item, draft) => _openChatItem(item, draft: draft),
       onNewChat: _busy ? null : _startNewChat,
@@ -260,6 +430,9 @@ mixin _ChatScreenUi on _ChatScreenController {
       source: _tileSource,
       layout: _tiles,
       onOpen: _openTile,
+      scrollSlot: _tabMemory.slotFor(JarvisTab.everything),
+      initialQuery: _tabMemory.everythingQuery,
+      onQueryChanged: (text) => _tabMemory.everythingQuery = text,
     ),
     JarvisTab.you => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -312,6 +485,19 @@ mixin _ChatScreenUi on _ChatScreenController {
                     onTap: () {
                       Navigator.pop(context);
                       _showConversationSummary();
+                    },
+                  ),
+                if (_conversationId != null && _hasMessages)
+                  ListTile(
+                    key: const Key('menu-find-in-chat'),
+                    leading: const IconBadge(
+                      icon: PhosphorIconsRegular.magnifyingGlass,
+                    ),
+                    title: const Text('Find in chat'),
+                    subtitle: const Text('Search the whole conversation'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      unawaited(_findInChat());
                     },
                   ),
                 action(
@@ -617,7 +803,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                                                   alignment: _entryOrigin(
                                                     _entries[index],
                                                   ),
-                                                  child: _entryView(
+                                                  child: _anchored(
                                                     _entries[index],
                                                   ),
                                                 ),
@@ -656,12 +842,19 @@ mixin _ChatScreenUi on _ChatScreenController {
                                     child: ExcludeSemantics(
                                       excluding:
                                           _nearBottom || _showApprovalDock,
-                                      child: CircleIconButton(
-                                        icon: PhosphorIconsRegular.caretDown,
-                                        tooltip: 'Jump to latest',
-                                        size: 44,
+                                      child: FilledButton.tonalIcon(
+                                        key: const Key('jump-to-latest'),
                                         onPressed: () =>
                                             _scrollToBottom(force: true),
+                                        icon: const Icon(
+                                          PhosphorIconsRegular.caretDown,
+                                          size: 16,
+                                        ),
+                                        label: const Text('Latest'),
+                                        style: FilledButton.styleFrom(
+                                          minimumSize: const Size(44, 44),
+                                          shape: const StadiumBorder(),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -793,6 +986,15 @@ mixin _ChatScreenUi on _ChatScreenController {
       ? Alignment.bottomRight
       : Alignment.bottomLeft;
 
+  /// Messages with an id wear a key so the app can tell where the screen is.
+  Widget _anchored(ChatEntry entry) {
+    final view = _entryView(entry);
+    final id = entry is MessageEntry ? entry.id : null;
+    return id == null
+        ? view
+        : KeyedSubtree(key: _anchors.keyFor(id), child: view);
+  }
+
   Widget _entryView(ChatEntry entry) => switch (entry) {
     MessageEntry() => MessageBubble(
       key: ObjectKey(entry),
@@ -802,6 +1004,12 @@ mixin _ChatScreenUi on _ChatScreenController {
           ? null
           : (rating) => unawaited(_rate(entry, rating)),
       onCitationTap: (citation) => unawaited(_openCitation(citation)),
+      onSaveToLibrary: _canActOnMessage(entry)
+          ? () => unawaited(_saveToLibrary(entry))
+          : null,
+      onRemindMe: _canActOnMessage(entry)
+          ? () => unawaited(_remindFromMessage(entry))
+          : null,
       photoLoader: _loadPhoto,
       onCancelQueued: entry.queued
           ? () => unawaited(_cancelQueued(entry))
@@ -882,6 +1090,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     canStart: !_busy && !_hasPendingApproval && _conversationId != null,
     onPrimary: () => unawaited(_toggleVoice()),
     onToggleMute: _voiceActive ? () => unawaited(_toggleVoiceMute()) : null,
+    onToggleCaptions: () => setState(() => _voiceCaptions = !_voiceCaptions),
     level: _voiceActive ? _voiceLevel : null,
     cards: _voiceCards,
     onCardOpen: (destination) => _fromShell(() => _openUtility(destination)),
@@ -894,6 +1103,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     connected: _connected,
     onOpen: (destination) => _fromShell(() => _openUtility(destination)),
     onSignOut: _auth.enabled ? () => unawaited(_signOut()) : null,
+    scrollSlot: _tabMemory.slotFor(JarvisTab.you),
   );
 
   Widget _welcome() => _NewChatWelcome(

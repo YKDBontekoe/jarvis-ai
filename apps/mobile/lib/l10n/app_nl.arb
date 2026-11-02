@@ -41,5 +41,20 @@
   "turnQualityFlagSlowReplies": "Antwoorden zijn traag: één op de tien duurt langer dan 30 s. Een sneller chatmodel in Instellingen → Modellen helpt het meest.",
   "turnQualityFlagFailingTurns": "Meer dan één op de tien beurten mislukte. De Codex-aanmelding of het serverlog zegt meestal waarom.",
   "turnQualityFlagApprovalFriction": "Je keurt veel met de hand goed. Sta een categorie altijd toe op de volgende goedkeuringskaart, of verhoog het autonomieniveau in Leren.",
-  "turnQualityFlagLowCache": "Weinig prompts komen uit de cache, dus elk antwoord kost meer tijd."
+  "turnQualityFlagLowCache": "Weinig prompts komen uit de cache, dus elk antwoord kost meer tijd.",
+  "capturesTitle": "Vastgelegd",
+  "capturesEmptyTitle": "Nog niets gedeeld",
+  "capturesEmptyMessage": "Gebruik Deel in een andere app en kies Jarvis. Wat je deelt wacht hier tot jij beslist wat ermee gebeurt.",
+  "capturesDiscardTitle": "Dit weggooien?",
+  "capturesDiscardMessage": "Het wordt van deze telefoon verwijderd. Er wordt niets verstuurd.",
+  "capturesKeep": "Bewaren",
+  "capturesDiscard": "Weggooien",
+  "capturesLinkNote": "Voeg een notitie bij deze link toe (optioneel)",
+  "capturesEditFirst": "Pas aan voordat je beslist",
+  "capturesSaveToFiles": "Bewaar in Bestanden",
+  "capturesSaveToLibrary": "Bewaar in Bibliotheek",
+  "capturesAsk": "Vraag het Jarvis",
+  "capturesRemind": "Herinnering maken",
+  "hideInSwitcherTitle": "Verberg in appkiezer",
+  "hideInSwitcherSubtitle": "Maak Jarvis onscherp als je omhoog veegt of van app wisselt"
 }

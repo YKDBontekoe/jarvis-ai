@@ -152,7 +152,8 @@ class _Element extends StatelessWidget {
       'image' || 'sticker' => caption,
       _ => null,
     };
-    final tappable = media.kind == 'document' ||
+    final tappable =
+        media.kind == 'document' ||
         media.kind == 'audio' ||
         (media.kind == 'location' &&
             media.latitude != null &&
@@ -163,9 +164,7 @@ class _Element extends StatelessWidget {
       subtitle: subtitle,
       lines: media.kind == 'poll' ? media.pollOptions : const [],
       semantics: tappable ? 'Open $title' : label,
-      onTap: tappable
-          ? () => _open(context, media, message.id, title)
-          : null,
+      onTap: tappable ? () => _open(context, media, message.id, title) : null,
     );
   }
 
@@ -189,7 +188,9 @@ class _Element extends StatelessWidget {
     try {
       final bytes = await WhatsAppMediaCache.load(http, channelId, messageId);
       if (bytes == null) {
-        if (context.mounted) _note(context, 'This file is no longer available.');
+        if (context.mounted) {
+          _note(context, 'This file is no longer available.');
+        }
         return;
       }
       final name = media.fileName ?? _fileName(media, messageId);
@@ -270,7 +271,10 @@ class _StillState extends State<_Still> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(widget.sticker ? 8 : 16),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: width, maxHeight: widget.sticker ? 168 : 360),
+            constraints: BoxConstraints(
+              maxWidth: width,
+              maxHeight: widget.sticker ? 168 : 360,
+            ),
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -290,10 +294,16 @@ class _StillState extends State<_Still> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         child: Text(
                           duration,
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
                         ),
                       ),
                     ),
@@ -343,7 +353,9 @@ class _Card extends StatelessWidget {
                 if (subtitle != null)
                   Text(
                     subtitle!,
-                    style: theme.textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.inkSoft,
+                    ),
                   ),
                 for (final line in lines)
                   Text(line, style: theme.textTheme.bodyMedium),
@@ -541,19 +553,22 @@ class WhatsAppMediaCache {
     final key = '$channelId\n$messageId';
     final cached = _memory[key];
     if (cached != null) return Future.value(cached);
-    return _loading[key] ??= _fetch(http, channelId, messageId).then((bytes) {
-      if (bytes != null) {
-        _memory[key] = bytes;
-        while (_memory.length > 40) {
-          _memory.remove(_memory.keys.first);
+    return _loading[key] ??= _fetch(http, channelId, messageId).then(
+      (bytes) {
+        if (bytes != null) {
+          _memory[key] = bytes;
+          while (_memory.length > 40) {
+            _memory.remove(_memory.keys.first);
+          }
         }
-      }
-      _loading.remove(key);
-      return bytes;
-    }, onError: (_) {
-      _loading.remove(key);
-      return null;
-    });
+        _loading.remove(key);
+        return bytes;
+      },
+      onError: (_) {
+        _loading.remove(key);
+        return null;
+      },
+    );
   }
 
   static Future<Uint8List?> _fetch(
@@ -619,5 +634,6 @@ String _fileName(WhatsAppMedia media, String messageId) {
 }
 
 void _note(BuildContext context, String message) {
-  ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
+  ScaffoldMessenger.maybeOf(context)
+      ?.showSnackBar(SnackBar(content: Text(message)));
 }

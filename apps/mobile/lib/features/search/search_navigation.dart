@@ -28,7 +28,23 @@ SearchRouteTarget? searchRouteFromNotification(Map<String, dynamic> data) {
       if (value != null) params[entry.key.toString()] = value;
     }
   }
-  for (final key in ['conversationId', 'messageId', 'personId', 'commitmentId', 'decisionId', 'memoryId', 'fileId', 'taskId', 'reminderId', 'automationId', 'skillId', 'entityId', 'connectionId', 'peer', 'runId']) {
+  for (final key in [
+    'conversationId',
+    'messageId',
+    'personId',
+    'commitmentId',
+    'decisionId',
+    'memoryId',
+    'fileId',
+    'taskId',
+    'reminderId',
+    'automationId',
+    'skillId',
+    'entityId',
+    'connectionId',
+    'peer',
+    'runId',
+  ]) {
     final value = asJsonString(data[key]);
     if (value != null) params.putIfAbsent(_routeParamForKey(key), () => value);
   }
@@ -88,7 +104,12 @@ Future<void> navigateSearchRoute(
       final id = route.parameters['${route.kind}Id'];
       final ref = id == null ? null : EntityRef.tryParse('${route.kind}:$id');
       if (ref != null) {
-        await openEntity(context, http, ref, onOpenConversation: onConversation);
+        await openEntity(
+          context,
+          http,
+          ref,
+          onOpenConversation: onConversation,
+        );
         return;
       }
     case 'memory':
@@ -103,7 +124,9 @@ Future<void> navigateSearchRoute(
       final id = route.parameters['taskId'];
       if (id != null) {
         await Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(builder: (_) => TaskDetailsScreen(http: http, taskId: id)),
+          MaterialPageRoute<void>(
+            builder: (_) => TaskDetailsScreen(http: http, taskId: id),
+          ),
         );
         return;
       }
@@ -115,10 +138,8 @@ Future<void> navigateSearchRoute(
       }
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) => RemindersScreen(
-            http: http,
-            onOpenConversation: onConversation,
-          ),
+          builder: (_) =>
+              RemindersScreen(http: http, onOpenConversation: onConversation),
         ),
       );
       return;
@@ -130,10 +151,8 @@ Future<void> navigateSearchRoute(
       }
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) => AutomationsScreen(
-            http: http,
-            onOpenConversation: onConversation,
-          ),
+          builder: (_) =>
+              AutomationsScreen(http: http, onOpenConversation: onConversation),
         ),
       );
       return;

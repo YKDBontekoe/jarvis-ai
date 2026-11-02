@@ -81,9 +81,8 @@ class RadarReportData {
     return RadarReportData(
       personId: id,
       name: name,
-      lastMessageAt: DateTime.tryParse(
-        jsonString(json, 'lastMessageAt') ?? '',
-      )?.toLocal(),
+      lastMessageAt: DateTime.tryParse(jsonString(json, 'lastMessageAt') ?? '')
+          ?.toLocal(),
       recentPerWeek: _double(json['recentPerWeek']) ?? 0,
       baselinePerWeek: _double(json['baselinePerWeek']) ?? 0,
       myReplyMinutes: _double(json['myReplyMinutes']),

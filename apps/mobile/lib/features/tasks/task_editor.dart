@@ -9,15 +9,18 @@ class _NewTask {
 }
 
 class _NewTaskDialog extends StatefulWidget {
-  const _NewTaskDialog({required this.http});
+  const _NewTaskDialog({required this.http, required this.onSubmit});
 
   final Dio http;
+
+  /// Starts the task; returns null on success or a message to show in the dialog.
+  final Future<String?> Function(_NewTask task) onSubmit;
 
   @override
   State<_NewTaskDialog> createState() => _NewTaskDialogState();
 }
 
-class _NewTaskDialogState extends State<_NewTaskDialog> {
+class _NewTaskDialogState extends State<_NewTaskDialog> with SubmitState {
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _prompt = TextEditingController();
@@ -27,24 +30,29 @@ class _NewTaskDialogState extends State<_NewTaskDialog> {
   @override
   void initState() {
     super.initState();
-    widget.http.get<dynamic>('/api/v1/profiles').then((response) {
-      if (!mounted) return;
-      final profiles = jsonMaps(response.data)
-          .where((item) => jsonString(item, 'id') != null)
-          .toList();
-      String? selected;
-      for (final profile in profiles) {
-        if (asJsonBool(profile['isDefault'])) {
-          selected = jsonString(profile, 'id');
-          break;
-        }
-      }
-      selected ??= profiles.isEmpty ? null : jsonString(profiles.first, 'id');
-      setState(() {
-        _profiles = profiles;
-        _profileId = selected;
-      });
-    }).catchError((_) {});
+    widget.http
+        .get<dynamic>('/api/v1/profiles')
+        .then((response) {
+          if (!mounted) return;
+          final profiles = jsonMaps(response.data)
+              .where((item) => jsonString(item, 'id') != null)
+              .toList();
+          String? selected;
+          for (final profile in profiles) {
+            if (asJsonBool(profile['isDefault'])) {
+              selected = jsonString(profile, 'id');
+              break;
+            }
+          }
+          selected ??= profiles.isEmpty
+              ? null
+              : jsonString(profiles.first, 'id');
+          setState(() {
+            _profiles = profiles;
+            _profileId = selected;
+          });
+        })
+        .catchError((_) {});
   }
 
   @override
@@ -54,16 +62,16 @@ class _NewTaskDialogState extends State<_NewTaskDialog> {
     super.dispose();
   }
 
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    Navigator.pop(
-      context,
-      _NewTask(
-        title: _title.text.trim(),
-        prompt: _prompt.text.trim(),
-        profileId: _profileId,
-      ),
+  Future<void> _save() async {
+    if (submitting || !(_formKey.currentState?.validate() ?? false)) return;
+    final task = _NewTask(
+      title: _title.text.trim(),
+      prompt: _prompt.text.trim(),
+      profileId: _profileId,
     );
+    if (await submit(() => widget.onSubmit(task)) && mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   @override
@@ -113,15 +121,16 @@ class _NewTaskDialogState extends State<_NewTaskDialog> {
               onChanged: (value) => setState(() => _profileId = value),
             ),
           ],
+          submitErrorNotice(),
         ],
       ),
     ),
     actions: [
       TextButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: submitting ? null : () => Navigator.pop(context),
         child: const Text('Cancel'),
       ),
-      FilledButton(onPressed: _save, child: const Text('Start task')),
+      SubmitButton(label: 'Start task', busy: submitting, onPressed: _save),
     ],
   );
 }

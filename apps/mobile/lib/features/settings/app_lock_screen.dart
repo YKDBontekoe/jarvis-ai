@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app_lock.dart';
+import '../../l10n/l10n.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
@@ -83,11 +84,31 @@ class _AppLockScreenState extends State<AppLockScreen> {
                                       unawaited(_toggle(controller, value)),
                           ),
                         ),
+                        const SizedBox(height: 12),
+                        SurfaceCard(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: SwitchListTile(
+                            key: const Key('app-cover-switch'),
+                            secondary: const IconBadge(
+                              icon: PhosphorIconsRegular.eyeSlash,
+                              size: 34,
+                            ),
+                            title: Text(context.l10n.hideInSwitcherTitle),
+                            subtitle: Text(context.l10n.hideInSwitcherSubtitle),
+                            value:
+                                controller.enabled ||
+                                controller.coverInSwitcher,
+                            onChanged: controller.enabled
+                                ? null
+                                : (value) => unawaited(
+                                    controller.setCoverInSwitcher(value),
+                                  ),
+                          ),
+                        ),
                         if (_available == false) ...[
                           const SizedBox(height: 12),
                           const InlineNotice(
-                            message:
-                                'Set up Face ID, Touch ID, or a passcode on this device to use the lock.',
+                            message: 'Set up Face ID, Touch ID, or a passcode on this device to use the lock.',
                           ),
                         ],
                         if (controller.enabled) ...[
@@ -122,7 +143,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                         ],
                         const SizedBox(height: 16),
                         Text(
-                          'While Jarvis is in the app switcher its screen is blurred, so nobody can read your chats over your shoulder. Reminders and notifications still arrive as usual.',
+                          'With this on, Jarvis is blurred in the app switcher so nobody can read your chats over your shoulder. With the lock on it is always blurred. Reminders and notifications still arrive as usual.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],

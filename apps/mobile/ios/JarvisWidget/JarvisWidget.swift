@@ -24,6 +24,10 @@ struct JarvisEntry: TimelineEntry {
   let dayLine: String
   let needsCount: Int
   let needs: [NeedsYouLine]
+  /// The owner chose to hide details: show only counts, never titles or names.
+  let hideDetails: Bool
+  /// When the app last wrote this data, so the widget can say how fresh it is.
+  let updatedAt: Date?
 
   static let placeholder = JarvisEntry(
     date: Date(),
@@ -37,7 +41,9 @@ struct JarvisEntry: TimelineEntry {
       NeedsYouLine(title: "Rosa", detail: "Je bent de beste · 14 h", kind: "person"),
       NeedsYouLine(title: "Bring the charger", detail: "Overdue · 20 min", kind: "reminder"),
       NeedsYouLine(title: "Create calendar event", detail: "Jarvis is waiting for your OK", kind: "approval"),
-    ]
+    ],
+    hideDetails: false,
+    updatedAt: Date().addingTimeInterval(-120)
   )
 
   /// Reads what the app last wrote. Missing values fall back to a calm state.
@@ -50,6 +56,10 @@ struct JarvisEntry: TimelineEntry {
     if let json = store?.string(forKey: "needs_items"), let data = json.data(using: .utf8) {
       needs = (try? JSONDecoder().decode([NeedsYouLine].self, from: data)) ?? []
     }
+    let updatedAt = (store?.object(forKey: "updated_at") as? NSNumber).map {
+      Date(timeIntervalSince1970: $0.doubleValue / 1000)
+    }
+    let hide = store?.bool(forKey: "hide_details") ?? false
     return JarvisEntry(
       date: now,
       heroKind: store?.string(forKey: "hero_kind") ?? "none",
@@ -58,7 +68,9 @@ struct JarvisEntry: TimelineEntry {
       heroStartsAt: startsAt,
       dayLine: store?.string(forKey: "day_line") ?? "",
       needsCount: store?.integer(forKey: "needs_count") ?? 0,
-      needs: needs
+      needs: hide ? [] : needs,
+      hideDetails: hide,
+      updatedAt: updatedAt
     )
   }
 }
@@ -123,12 +135,47 @@ private struct WidgetBackground: ViewModifier {
   }
 }
 
+// MARK: - Freshness
+
+/// "Updated 5 min ago", and a nudge when the data is old. A widget cannot refresh
+/// itself, so it says how old what it shows is instead of pretending it is live.
+struct FreshnessView: View {
+  let updatedAt: Date?
+  let now: Date
+
+  private var stale: Bool {
+    guard let updatedAt else { return true }
+    return now.timeIntervalSince(updatedAt) > 12 * 3600
+  }
+
+  var body: some View {
+    Group {
+      if let updatedAt {
+        (Text("Updated ") + Text(updatedAt, style: .relative))
+      } else {
+        Text("Open Jarvis to refresh")
+      }
+    }
+    .font(.system(size: 10))
+    .foregroundStyle(stale ? Color.jarvisWarning : Color.white.opacity(0.5))
+    .lineLimit(1)
+  }
+}
+
 // MARK: - Right now
 
 struct RightNowView: View {
   let entry: JarvisEntry
 
   var body: some View {
+    if entry.hideDetails {
+      HiddenView(entry: entry)
+    } else {
+      detailed
+    }
+  }
+
+  private var detailed: some View {
     VStack(alignment: .leading, spacing: 4) {
       Text(label(for: entry.heroKind))
         .font(.system(size: 10, weight: .semibold))
@@ -157,6 +204,33 @@ struct RightNowView: View {
           .foregroundStyle(Color.white.opacity(0.75))
           .lineLimit(2)
       }
+      Spacer(minLength: 0)
+      FreshnessView(updatedAt: entry.updatedAt, now: entry.date)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+  }
+}
+
+/// What the widget shows when details are hidden: how many things need you.
+struct HiddenView: View {
+  let entry: JarvisEntry
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text("JARVIS")
+        .font(.system(size: 10, weight: .semibold))
+        .tracking(1)
+        .foregroundStyle(Color.white.opacity(0.6))
+      Spacer(minLength: 0)
+      Text(entry.needsCount == 0 ? "Nothing needs you" : "\(entry.needsCount) need you")
+        .font(.system(size: 18, weight: .bold))
+        .foregroundStyle(.white)
+        .lineLimit(2)
+        .minimumScaleFactor(0.8)
+      Text("Details hidden")
+        .font(.system(size: 12))
+        .foregroundStyle(Color.white.opacity(0.65))
+      FreshnessView(updatedAt: entry.updatedAt, now: entry.date)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
   }
@@ -185,7 +259,11 @@ struct NeedsYouView: View {
               .background(Capsule().fill(Color.jarvisAccent))
           }
         }
-        if entry.needs.isEmpty {
+        if entry.hideDetails {
+          Text(entry.needsCount == 0 ? "You're all caught up" : "\(entry.needsCount) waiting. Details hidden.")
+            .font(.system(size: 12))
+            .foregroundStyle(Color.white.opacity(0.7))
+        } else if entry.needs.isEmpty {
           Text("You're all caught up")
             .font(.system(size: 12))
             .foregroundStyle(Color.white.opacity(0.7))

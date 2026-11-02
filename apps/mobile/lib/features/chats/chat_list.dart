@@ -14,6 +14,7 @@ enum ChatFilter {
   forYou('For you'),
   all('All'),
   unread('Unread'),
+  drafts('Drafts'),
   jarvis('Jarvis'),
   whatsapp('WhatsApp'),
   groups('Groups');
@@ -79,6 +80,7 @@ class ChatListItem {
     this.responding = false,
     this.origin,
     this.originId,
+    this.draft,
   });
 
   /// Unique across sources.
@@ -113,6 +115,9 @@ class ChatListItem {
   final String? origin;
   final String? originId;
 
+  /// The message started here and not sent, from this device's composer drafts.
+  final String? draft;
+
   bool get isJarvis => source == ChatSource.jarvis;
 
   bool get fromReminder => origin == 'reminder';
@@ -120,26 +125,28 @@ class ChatListItem {
   /// A group chat on WhatsApp that asks something of you, per its catch-up.
   bool get asksYou => (whatsApp?.catchUp?.toReply.isNotEmpty ?? false);
 
-  ChatListItem copyWith({bool? pinned, int? unread}) => ChatListItem(
-    key: key,
-    source: source,
-    title: title,
-    preview: preview,
-    time: time,
-    startedAt: startedAt,
-    unread: unread ?? this.unread,
-    group: group,
-    pinned: pinned ?? this.pinned,
-    conversationId: conversationId,
-    channelId: channelId,
-    whatsApp: whatsApp,
-    account: account,
-    profile: profile,
-    fromMe: fromMe,
-    responding: responding,
-    origin: origin,
-    originId: originId,
-  );
+  ChatListItem copyWith({bool? pinned, int? unread, String? draft}) =>
+      ChatListItem(
+        key: key,
+        source: source,
+        title: title,
+        preview: preview,
+        time: time,
+        startedAt: startedAt,
+        unread: unread ?? this.unread,
+        group: group,
+        pinned: pinned ?? this.pinned,
+        conversationId: conversationId,
+        channelId: channelId,
+        whatsApp: whatsApp,
+        account: account,
+        profile: profile,
+        fromMe: fromMe,
+        responding: responding,
+        origin: origin,
+        originId: originId,
+        draft: draft ?? this.draft,
+      );
 }
 
 /// Jarvis conversations and WhatsApp chats in one list, newest first with
@@ -149,12 +156,27 @@ class ChatList extends ChangeNotifier {
   List<ChatListItem> _whatsApp = const [];
   bool _whatsAppLinked = false;
   bool _loadingWhatsApp = false;
+
+  /// Unsent drafts by conversation id, as short previews.
+  Map<String, String> _drafts = const {};
   int _revision = 0;
 
   /// People linked to WhatsApp chats, from Home's context.
   List<HomePerson> _people = const [];
 
   bool get whatsAppLinked => _whatsAppLinked;
+
+  /// Shows unsent drafts on the conversations they belong to. Called as
+  /// the owner types, so it only notifies when something changed.
+  void setDrafts(Map<String, String> drafts) {
+    if (mapEquals(_drafts, drafts)) return;
+    _drafts = Map.of(drafts);
+    notifyListeners();
+  }
+
+  /// How many conversations have a draft waiting.
+  int get draftCount =>
+      _jarvis.where((i) => _drafts.containsKey(i.conversationId)).length;
 
   /// Lets rows show who someone is to you, and ranks Waiting on you by it.
   void setPeople(List<HomePerson> people) {
@@ -201,6 +223,7 @@ class ChatList extends ChangeNotifier {
     _revision++;
     _jarvis = const [];
     _whatsApp = const [];
+    _drafts = const {};
     _whatsAppLinked = false;
     _whatsAppError = false;
     notifyListeners();
@@ -329,7 +352,14 @@ class ChatList extends ChangeNotifier {
 
   /// Everything, newest first, pinned Jarvis conversations on top.
   List<ChatListItem> get all {
-    final items = [..._jarvis, ..._whatsApp];
+    final items = [
+      for (final item in _jarvis)
+        if (_drafts[item.conversationId] case final draft?)
+          item.copyWith(draft: draft)
+        else
+          item,
+      ..._whatsApp,
+    ];
     items.sort((a, b) {
       if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
       final x = a.time ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -347,6 +377,7 @@ class ChatList extends ChangeNotifier {
         if (switch (filter) {
               ChatFilter.forYou || ChatFilter.all => true,
               ChatFilter.unread => item.unread > 0,
+              ChatFilter.drafts => item.draft != null,
               ChatFilter.jarvis => item.isJarvis,
               ChatFilter.whatsapp => !item.isJarvis,
               ChatFilter.groups => item.group,

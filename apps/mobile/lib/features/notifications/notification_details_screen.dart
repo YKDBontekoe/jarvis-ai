@@ -5,6 +5,7 @@ import '../../ui/phosphor_icons.dart';
 
 import '../chat/chat_widgets.dart';
 import '../../json_maps.dart';
+import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 
@@ -95,10 +96,23 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     final date = jsonDate(raw, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
-    final timeText = MaterialLocalizations.of(
-      context,
-    ).formatTimeOfDay(TimeOfDay.fromDateTime(date));
+    final timeText = MaterialLocalizations.of(context)
+        .formatTimeOfDay(TimeOfDay.fromDateTime(date));
     return '$dateText · $timeText';
+  }
+
+  /// The due time, plus the reminder's own clock when it reads differently
+  /// from the phone, so every screen describes the same moment.
+  String _reminderWhen(Map<String, dynamic> item) {
+    final due = jsonDate(item['dueAt'], local: true);
+    final base = _date(item['dueAt']);
+    if (due == null) return base;
+    final zone = zoneEquivalentLine(
+      context,
+      due,
+      asJsonString(item['timeZoneId']),
+    );
+    return zone == null ? base : '$base\n\nThat is $zone';
   }
 
   @override
@@ -171,7 +185,7 @@ class _NotificationDetailsScreenState extends State<NotificationDetailsScreen> {
     final detail = switch (widget.notificationType) {
       'reminder.due' ||
       'reminder.failed' ||
-      'whatsapp.reminder' => _date(item['dueAt']),
+      'whatsapp.reminder' => _reminderWhen(item),
       'task.completed' || 'task.failed' => asJsonString(item['summary']) ?? '',
       'watch.triggered' || 'watch.failed' => _watchCondition(item),
       _ => '',

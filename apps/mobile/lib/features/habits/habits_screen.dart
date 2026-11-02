@@ -167,7 +167,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         loading: _loading,
         error: _error,
         isEmpty: active.isEmpty && archived.isEmpty,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         empty: _EmptyHabits(
           onCreate: (template) => unawaited(_create(template)),
         ),

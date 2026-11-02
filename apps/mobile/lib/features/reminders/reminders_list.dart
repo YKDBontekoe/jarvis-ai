@@ -269,10 +269,8 @@ class _RemindersScreenState extends _RemindersController {
                   denied
                       ? 'Place reminders need location access. Turn it on in Settings.'
                       : 'Set location to Always in Settings so place reminders also work when the app is closed.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.inkSoft,
-                    height: 1.35,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: colors.inkSoft, height: 1.35),
                 ),
                 const SizedBox(height: 6),
                 TextButton(
@@ -282,9 +280,8 @@ class _RemindersScreenState extends _RemindersController {
                     minimumSize: const Size(0, 32),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     foregroundColor: colors.ink,
-                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    textStyle: Theme.of(context).textTheme.labelLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   child: const Text('Open Settings'),
                 ),
@@ -341,12 +338,10 @@ class _RemindersScreenState extends _RemindersController {
     final outcome = _outcome(reminder);
     final place = ReminderPlace.fromJson(reminder['place']);
     final zone = asJsonString(reminder['timeZoneId']);
-    final otherZone =
-        place == null &&
-        pending &&
-        zone != null &&
-        _deviceZone != null &&
-        zone != _deviceZone;
+    // The reminder's own clock, only when it reads differently from the phone.
+    final zoneLine = place == null && pending && due != null
+        ? zoneEquivalentLine(context, due, zone)
+        : null;
 
     final String primary;
     if (pending && place != null) {
@@ -405,18 +400,17 @@ class _RemindersScreenState extends _RemindersController {
                         ),
                     ],
                   ),
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: colors.inkSoft),
                 ),
-                if (otherZone)
+                if (zoneLine != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      'Runs on ${zone.replaceAll('_', ' ')} time',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+                      key: const Key('reminder-zone-line'),
+                      'That is $zoneLine',
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: colors.inkSoft),
                     ),
                   ),
               ],
@@ -488,28 +482,18 @@ class _RemindersScreenState extends _RemindersController {
       tooltip: 'Reminder actions',
       icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
       onSelected: (value) => switch (value) {
-        'snooze10' => _snooze(id, const Duration(minutes: 10)),
-        'snooze60' => _snooze(id, const Duration(hours: 1)),
-        'tomorrow' => _snooze(id, Duration.zero, until: _tomorrowMorning()),
+        'snooze' => _snoozeWithSheet(id),
         'done' => _markDone(reminder),
         'chat' => _openChat(reminder),
         'cancel' => _cancelReminder(reminder),
         _ => Future<void>.value(),
       },
       itemBuilder: (_) => [
-        if (canSnooze) ...[
+        if (canSnooze)
           PopupMenuItem(
-            value: 'snooze10',
-            child: Text(
-              pending ? 'Remind me in 10 min' : 'Remind me again in 10 min',
-            ),
+            value: 'snooze',
+            child: Text(pending ? 'Snooze…' : 'Remind me again…'),
           ),
-          const PopupMenuItem(value: 'snooze60', child: Text('In 1 hour')),
-          const PopupMenuItem(
-            value: 'tomorrow',
-            child: Text('Tomorrow at 9:00'),
-          ),
-        ],
         if (pending && !repeating)
           const PopupMenuItem(value: 'done', child: Text('Mark as done')),
         if (widget.onOpenConversation != null)

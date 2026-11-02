@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme.dart';
 import '../../ui/phosphor_icons.dart';
+import '../../ui/submit_state.dart';
 import 'people_models.dart';
 
 /// Round initials avatar tinted per name. A small cake badge marks a birthday
@@ -92,6 +93,10 @@ Future<PersonDraft?> showPersonEditor(
   PersonData? person,
   String title = 'Add someone',
   String confirmLabel = 'Add',
+
+  /// Saves the draft while the sheet stays open; null on success, otherwise the
+  /// message to show beside the typed values. Without it the sheet just returns the draft.
+  Future<String?> Function(PersonDraft draft)? onSubmit,
 }) => showModalBottomSheet<PersonDraft>(
   context: context,
   isScrollControlled: true,
@@ -100,6 +105,7 @@ Future<PersonDraft?> showPersonEditor(
     person: person,
     title: title,
     confirmLabel: confirmLabel,
+    onSubmit: onSubmit,
   ),
 );
 
@@ -108,8 +114,10 @@ class _PersonEditorSheet extends StatefulWidget {
     required this.person,
     required this.title,
     required this.confirmLabel,
+    this.onSubmit,
   });
 
+  final Future<String?> Function(PersonDraft draft)? onSubmit;
   final PersonData? person;
   final String title;
   final String confirmLabel;
@@ -118,7 +126,8 @@ class _PersonEditorSheet extends StatefulWidget {
   State<_PersonEditorSheet> createState() => _PersonEditorSheetState();
 }
 
-class _PersonEditorSheetState extends State<_PersonEditorSheet> {
+class _PersonEditorSheetState extends State<_PersonEditorSheet>
+    with SubmitState {
   late final _name = TextEditingController(text: widget.person?.name);
   late final _relationship = TextEditingController(
     text: widget.person?.relationship,
@@ -164,10 +173,10 @@ class _PersonEditorSheetState extends State<_PersonEditorSheet> {
       (_month == null) == (_day == null) &&
       _yearError == null;
 
-  void _submit() {
-    if (!_valid) return;
+  Future<void> _submit() async {
+    if (!_valid || submitting) return;
     String? clean(String text) => text.trim().isEmpty ? null : text.trim();
-    Navigator.of(context).pop((
+    final draft = (
       name: _name.text.trim(),
       relationship: clean(_relationship.text),
       birthdayMonth: _month,
@@ -175,7 +184,15 @@ class _PersonEditorSheetState extends State<_PersonEditorSheet> {
       birthYear: _month == null ? null : int.tryParse(_year.text.trim()),
       contactEveryDays: _every,
       notes: clean(_notes.text),
-    ));
+    );
+    final onSubmit = widget.onSubmit;
+    if (onSubmit == null) {
+      Navigator.of(context).pop(draft);
+      return;
+    }
+    if (await submit(() => onSubmit(draft)) && mounted) {
+      Navigator.of(context).pop(draft);
+    }
   }
 
   @override
@@ -185,162 +202,179 @@ class _PersonEditorSheetState extends State<_PersonEditorSheet> {
       ...cadenceChoices,
       if (!cadenceChoices.contains(_every)) _every,
     ];
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            TextField(
-              key: const Key('person-name'),
-              controller: _name,
-              autofocus: widget.person == null,
-              maxLength: 80,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                hintText: 'Anna, Mum, Tom de Vries…',
-                counterText: '',
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('person-relationship'),
-              controller: _relationship,
-              maxLength: 40,
-              textCapitalization: TextCapitalization.sentences,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Relationship (optional)',
-                hintText: 'Mother, Friend, Colleague…',
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 20),
-            _Label(icon: PhosphorIconsRegular.cake, text: 'Birthday'),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  // Rebuilt when the month changes so a clamped day shows.
-                  child: DropdownButtonFormField<int?>(
-                    key: ValueKey('person-birthday-day-$_daysInMonth'),
-                    initialValue: _day,
-                    isExpanded: true,
-                    icon: const Icon(PhosphorIconsRegular.caretDown, size: 16),
-                    decoration: const InputDecoration(labelText: 'Day'),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('—')),
-                      for (var day = 1; day <= _daysInMonth; day++)
-                        DropdownMenuItem(value: day, child: Text('$day')),
-                    ],
-                    onChanged: (value) => setState(() => _day = value),
-                  ),
+    return PopScope(
+      canPop: !submitting,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              TextField(
+                key: const Key('person-name'),
+                controller: _name,
+                autofocus: widget.person == null,
+                maxLength: 80,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  hintText: 'Anna, Mum, Tom de Vries…',
+                  counterText: '',
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 5,
-                  child: DropdownButtonFormField<int?>(
-                    key: const Key('person-birthday-month'),
-                    initialValue: _month,
-                    isExpanded: true,
-                    icon: const Icon(PhosphorIconsRegular.caretDown, size: 16),
-                    decoration: const InputDecoration(labelText: 'Month'),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('—')),
-                      for (var month = 1; month <= 12; month++)
-                        DropdownMenuItem(
-                          value: month,
-                          child: Text(monthName(month)),
-                        ),
-                    ],
-                    onChanged: (value) => setState(() {
-                      _month = value;
-                      if (_day != null && _day! > _daysInMonth) {
-                        _day = _daysInMonth;
-                      }
-                    }),
-                  ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('person-relationship'),
+                controller: _relationship,
+                maxLength: 40,
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Relationship (optional)',
+                  hintText: 'Mother, Friend, Colleague…',
+                  counterText: '',
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    key: const Key('person-birth-year'),
-                    controller: _year,
-                    enabled: _month != null,
-                    keyboardType: TextInputType.number,
-                    maxLength: 4,
-                    decoration: InputDecoration(
-                      labelText: 'Year',
-                      hintText: 'Optional',
-                      counterText: '',
-                      errorText: _yearError,
-                      errorMaxLines: 2,
+              ),
+              const SizedBox(height: 20),
+              _Label(icon: PhosphorIconsRegular.cake, text: 'Birthday'),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    // Rebuilt when the month changes so a clamped day shows.
+                    child: DropdownButtonFormField<int?>(
+                      key: ValueKey('person-birthday-day-$_daysInMonth'),
+                      initialValue: _day,
+                      isExpanded: true,
+                      icon: const Icon(
+                        PhosphorIconsRegular.caretDown,
+                        size: 16,
+                      ),
+                      decoration: const InputDecoration(labelText: 'Day'),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('—')),
+                        for (var day = 1; day <= _daysInMonth; day++)
+                          DropdownMenuItem(value: day, child: Text('$day')),
+                      ],
+                      onChanged: (value) => setState(() => _day = value),
                     ),
-                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 5,
+                    child: DropdownButtonFormField<int?>(
+                      key: const Key('person-birthday-month'),
+                      initialValue: _month,
+                      isExpanded: true,
+                      icon: const Icon(
+                        PhosphorIconsRegular.caretDown,
+                        size: 16,
+                      ),
+                      decoration: const InputDecoration(labelText: 'Month'),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('—')),
+                        for (var month = 1; month <= 12; month++)
+                          DropdownMenuItem(
+                            value: month,
+                            child: Text(monthName(month)),
+                          ),
+                      ],
+                      onChanged: (value) => setState(() {
+                        _month = value;
+                        if (_day != null && _day! > _daysInMonth) {
+                          _day = _daysInMonth;
+                        }
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      key: const Key('person-birth-year'),
+                      controller: _year,
+                      enabled: _month != null,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      decoration: InputDecoration(
+                        labelText: 'Year',
+                        hintText: 'Optional',
+                        counterText: '',
+                        errorText: _yearError,
+                        errorMaxLines: 2,
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ],
+              ),
+              if ((_month == null) != (_day == null))
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 4),
+                  child: Text(
+                    'Pick both a day and a month.',
+                    style: TextStyle(fontSize: 12.5, color: colors.danger),
                   ),
                 ),
-              ],
-            ),
-            if ((_month == null) != (_day == null))
-              Padding(
-                padding: const EdgeInsets.only(top: 6, left: 4),
-                child: Text(
-                  'Pick both a day and a month.',
-                  style: TextStyle(fontSize: 12.5, color: colors.danger),
+              const SizedBox(height: 20),
+              _Label(
+                icon: PhosphorIconsRegular.phoneCall,
+                text: 'Remind me to stay in touch',
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final every in everyChoices)
+                    ChoiceChip(
+                      key: Key('person-every-${every ?? 'off'}'),
+                      label: Text(cadenceChoiceLabel(every)),
+                      selected: _every == every,
+                      showCheckmark: false,
+                      onSelected: (_) => setState(() => _every = every),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                key: const Key('person-notes'),
+                controller: _notes,
+                maxLength: 2000,
+                minLines: 2,
+                maxLines: 6,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Notes (optional)',
+                  hintText: 'Gift ideas, kids’ names, what you talked about…',
+                  counterText: '',
+                  alignLabelWithHint: true,
                 ),
               ),
-            const SizedBox(height: 20),
-            _Label(
-              icon: PhosphorIconsRegular.phoneCall,
-              text: 'Remind me to stay in touch',
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final every in everyChoices)
-                  ChoiceChip(
-                    key: Key('person-every-${every ?? 'off'}'),
-                    label: Text(cadenceChoiceLabel(every)),
-                    selected: _every == every,
-                    showCheckmark: false,
-                    onSelected: (_) => setState(() => _every = every),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              key: const Key('person-notes'),
-              controller: _notes,
-              maxLength: 2000,
-              minLines: 2,
-              maxLines: 6,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                hintText: 'Gift ideas, kids’ names, what you talked about…',
-                counterText: '',
-                alignLabelWithHint: true,
+              submitErrorNotice(),
+              const SizedBox(height: 12),
+              FilledButton(
+                key: const Key('person-save'),
+                onPressed: _valid && !submitting ? _submit : null,
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
+                child: submitting
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(widget.confirmLabel),
               ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              key: const Key('person-save'),
-              onPressed: _valid ? _submit : null,
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 46)),
-              child: Text(widget.confirmLabel),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -9,6 +9,8 @@ class MessageBubble extends StatefulWidget {
     this.onEdit,
     this.photoLoader,
     this.onRegenerate,
+    this.onSaveToLibrary,
+    this.onRemindMe,
     this.onCancelQueued,
     this.onSendQueuedNow,
     this.thinkingLabel = 'Thinking',
@@ -34,6 +36,12 @@ class MessageBubble extends StatefulWidget {
 
   /// Answers the last message again; offered on the latest reply only.
   final VoidCallback? onRegenerate;
+
+  /// Keeps this message in the Library; offered once the message is complete.
+  final VoidCallback? onSaveToLibrary;
+
+  /// Starts a reminder from this message's text.
+  final VoidCallback? onRemindMe;
 
   /// Drops a message that is waiting for a connection.
   final VoidCallback? onCancelQueued;
@@ -66,28 +74,54 @@ class _MessageBubbleState extends State<MessageBubble> {
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(PhosphorIconsRegular.copy),
-              title: const Text('Copy'),
-              onTap: () => Navigator.pop(sheetContext, 'copy'),
-            ),
-            if (widget.onEdit != null)
+        // Scrolls on short screens and at large text, so no action is cut off.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               ListTile(
-                leading: const Icon(PhosphorIconsRegular.pencilSimple),
-                title: const Text('Edit as new message'),
-                subtitle: const Text('Puts this text back in the message box'),
-                onTap: () => Navigator.pop(sheetContext, 'edit'),
+                leading: const Icon(PhosphorIconsRegular.copy),
+                title: const Text('Copy'),
+                onTap: () => Navigator.pop(sheetContext, 'copy'),
               ),
-            ListTile(
-              leading: const Icon(PhosphorIconsRegular.cursor),
-              title: const Text('Select text'),
-              onTap: () => Navigator.pop(sheetContext, 'select'),
-            ),
-          ],
+              ListTile(
+                key: const Key('message-share'),
+                leading: const Icon(PhosphorIconsRegular.shareNetwork),
+                title: const Text('Share'),
+                onTap: () => Navigator.pop(sheetContext, 'share'),
+              ),
+              if (widget.onEdit != null)
+                ListTile(
+                  leading: const Icon(PhosphorIconsRegular.pencilSimple),
+                  title: const Text('Edit as new message'),
+                  subtitle: const Text(
+                    'Puts this text back in the message box',
+                  ),
+                  onTap: () => Navigator.pop(sheetContext, 'edit'),
+                ),
+              if (widget.onSaveToLibrary != null)
+                ListTile(
+                  key: const Key('message-save-library'),
+                  leading: const Icon(PhosphorIconsRegular.bookmarkSimple),
+                  title: const Text('Save to Library'),
+                  onTap: () => Navigator.pop(sheetContext, 'library'),
+                ),
+              if (widget.onRemindMe != null)
+                ListTile(
+                  key: const Key('message-remind-me'),
+                  leading: const Icon(PhosphorIconsRegular.alarm),
+                  title: const Text('Remind me'),
+                  onTap: () => Navigator.pop(sheetContext, 'remind'),
+                ),
+              ListTile(
+                leading: const Icon(PhosphorIconsRegular.cursor),
+                title: const Text('Select text'),
+                onTap: () => Navigator.pop(sheetContext, 'select'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -103,8 +137,14 @@ class _MessageBubbleState extends State<MessageBubble> {
         ScaffoldMessenger.maybeOf(context)
           ?..hideCurrentSnackBar()
           ..showSnackBar(const SnackBar(content: Text('Message copied')));
+      case 'share':
+        await shareText(context, message.content);
       case 'edit':
         widget.onEdit?.call(message.content);
+      case 'library':
+        widget.onSaveToLibrary?.call();
+      case 'remind':
+        widget.onRemindMe?.call();
       case 'select':
         await showModalBottomSheet<void>(
           context: context,
@@ -201,6 +241,39 @@ class _MessageBubbleState extends State<MessageBubble> {
                             onPressed: () => widget.onRate!('down'),
                           ),
                         ],
+                        if (message.content.trim().isNotEmpty)
+                          PopupMenuButton<String>(
+                            key: const Key('message-more'),
+                            tooltip: 'Message actions',
+                            icon: Icon(
+                              PhosphorIconsRegular.dotsThree,
+                              size: 18,
+                              color: JarvisColors.of(context).muted,
+                            ),
+                            onSelected: (value) => switch (value) {
+                              'library' => widget.onSaveToLibrary?.call(),
+                              'share' => unawaited(
+                                shareText(context, message.content),
+                              ),
+                              _ => widget.onRemindMe?.call(),
+                            },
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(
+                                value: 'share',
+                                child: Text('Share'),
+                              ),
+                              if (widget.onSaveToLibrary != null)
+                                const PopupMenuItem(
+                                  value: 'library',
+                                  child: Text('Save to Library'),
+                                ),
+                              if (widget.onRemindMe != null)
+                                const PopupMenuItem(
+                                  value: 'remind',
+                                  child: Text('Remind me'),
+                                ),
+                            ],
+                          ),
                         if (widget.onRegenerate != null)
                           IconButton(
                             tooltip: 'Try again',
@@ -287,9 +360,8 @@ class _MessageBubbleState extends State<MessageBubble> {
                       ),
                       border: message.failed
                           ? Border.all(
-                              color: JarvisColors.of(
-                                context,
-                              ).danger.withValues(alpha: .35),
+                              color: JarvisColors.of(context).danger
+                                  .withValues(alpha: .35),
                             )
                           : null,
                     ),

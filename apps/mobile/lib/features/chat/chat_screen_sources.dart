@@ -19,7 +19,9 @@ mixin _ChatScreenSources on _ChatScreenController {
           for (final file in files)
             ConversationSourceChip(
               id: '${file['fileId']}',
-              label: file['fileName'] is String ? file['fileName'] as String : 'File',
+              label: file['fileName'] is String
+                  ? file['fileName'] as String
+                  : 'File',
               kind: 'file',
             ),
           for (final collection in collections)
@@ -65,7 +67,9 @@ mixin _ChatScreenSources on _ChatScreenController {
     if (conversationId == null) return;
     try {
       final filesResponse = await _http.get<dynamic>('/api/v1/files');
-      final collectionsResponse = await _http.get<dynamic>('/api/v1/collections');
+      final collectionsResponse = await _http.get<dynamic>(
+        '/api/v1/collections',
+      );
       if (!mounted) return;
       final files = jsonMaps(filesResponse.data);
       final collections = jsonMaps(collectionsResponse.data);
@@ -111,7 +115,9 @@ mixin _ChatScreenSources on _ChatScreenController {
                   ListTile(
                     leading: const Icon(PhosphorIconsRegular.folders),
                     title: Text('${collection['name']}'),
-                    subtitle: Text('${(collection['fileIds'] is List ? (collection['fileIds'] as List).length : 0)} files'),
+                    subtitle: Text(
+                      '${(collection['fileIds'] is List ? (collection['fileIds'] as List).length : 0)} files',
+                    ),
                     onTap: () async {
                       Navigator.pop(context);
                       await _http.post<dynamic>(
@@ -150,17 +156,19 @@ mixin _ChatScreenSources on _ChatScreenController {
       if (data == null || !mounted) return;
       final status = data['sourceStatus'] ?? data['SourceStatus'];
       if (status is String && status != 'available') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Source is $status.')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Source is $status.')));
         return;
       }
-      await file_download.downloadAndOpen(_http, citation.fileId, citation.displayName);
+      await file_download.downloadAndOpen(
+        _http,
+        citation.fileId,
+        citation.displayName,
+      );
     } on DioException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(describeApiError(error))),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(describeApiError(error))));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

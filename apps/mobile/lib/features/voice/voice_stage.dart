@@ -22,6 +22,7 @@ class VoiceStage extends StatelessWidget {
     this.muted = false,
     this.error,
     this.onToggleMute,
+    this.onToggleCaptions,
     this.level,
     this.cards = const [],
     this.onCardOpen,
@@ -55,6 +56,9 @@ class VoiceStage extends StatelessWidget {
   final String? error;
   final VoidCallback? onToggleMute;
 
+  /// Shows or hides the live captions for this session.
+  final VoidCallback? onToggleCaptions;
+
   bool get _live => phase != 'idle';
 
   @override
@@ -67,151 +71,187 @@ class VoiceStage extends StatelessWidget {
       children: [
         const Positioned.fill(child: _VoiceBackdrop()),
         SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _VoicePill(voiceName: voiceName),
-                    const SizedBox(height: 28),
-                    SizedBox.square(
-                      dimension: 240,
-                      child: Center(
-                        child: JarvisOrb(
-                          size: speaking ? 148 : 128,
-                          animate: waiting || speaking,
-                          thinking: phase == 'thinking',
-                          listening: listening,
-                          level: _live && !waiting ? level : null,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 240),
-                      child: Text(
-                        _title,
-                        key: ValueKey(phase),
-                        textAlign: TextAlign.center,
-                        style: JarvisType.displayOf(context)
-                            .copyWith(fontSize: 40),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (phase == 'connecting')
-                      const _ConnectingHint()
-                    else
-                      Text(
-                        _subtitle,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: JarvisColors.of(context).inkSoft,
-                          height: 1.4,
-                        ),
-                      ),
-                    if (captions && caption != null && caption!.isNotEmpty) ...[
-                      const SizedBox(height: 22),
-                      _CaptionCard(role: captionRole, text: caption!),
-                    ],
-                    if (cards.isNotEmpty)
-                      VoiceCompanionCards(
-                        cards: cards,
-                        onOpen: onCardOpen ?? (_) {},
-                        onSave: onCardSave ?? (_) {},
-                        onDismiss: onCardDismiss ?? (_) {},
-                      ),
-                    if (!_live && onRecap != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: TextButton.icon(
-                          key: const Key('voice-recap-open'),
-                          onPressed: onRecap,
-                          icon: const Icon(PhosphorIconsRegular.listChecks),
-                          label: const Text('See what we did'),
-                        ),
-                      ),
-                    if (error != null)
-                      InlineNotice(
-                        message: error!,
-                        tone: NoticeTone.danger,
-                        margin: const EdgeInsets.only(top: 20),
-                      ),
-                    const SizedBox(height: 28),
-                    FilledButton.icon(
-                      key: const Key('voice-primary'),
-                      onPressed: _live || canStart ? onPrimary : null,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _live
-                            ? JarvisColors.of(context).danger
-                            : JarvisColors.of(context).ink,
-                        minimumSize: const Size(220, 56),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(40),
-                        ),
-                      ),
-                      icon: waiting
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              _live
-                                  ? PhosphorIconsRegular.stop
-                                  : PhosphorIconsRegular.microphone,
-                            ),
-                      label: Text(
-                        _live ? 'End voice chat' : 'Start voice chat',
-                      ),
-                    ),
-                    if (onToggleMute != null) ...[
-                      const SizedBox(height: 12),
-                      TextButton.icon(
-                        key: const Key('voice-mute'),
-                        onPressed: onToggleMute,
-                        icon: Icon(
-                          muted
-                              ? PhosphorIconsRegular.microphoneSlash
-                              : PhosphorIconsRegular.microphone,
-                        ),
-                        label: Text(
-                          muted ? 'Unmute microphone' : 'Mute microphone',
-                        ),
-                      ),
-                    ],
-                    if (!_live) ...[
-                      const SizedBox(height: 28),
-                      const Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 440),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          _VoiceHint(
-                            icon: PhosphorIconsRegular.waveform,
-                            label: 'Continuous voice',
+                          _VoicePill(voiceName: voiceName),
+                          const SizedBox(height: 28),
+                          SizedBox.square(
+                            dimension: 240,
+                            child: Center(
+                              child: JarvisOrb(
+                                size: speaking ? 148 : 128,
+                                animate: waiting || speaking,
+                                thinking: phase == 'thinking',
+                                listening: listening,
+                                level: _live && !waiting ? level : null,
+                              ),
+                            ),
                           ),
-                          _VoiceHint(
-                            icon: PhosphorIconsRegular.ear,
-                            label: 'Interrupt by speaking',
+                          const SizedBox(height: 8),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 240),
+                            child: Text(
+                              _title,
+                              key: ValueKey(phase),
+                              textAlign: TextAlign.center,
+                              style: JarvisType.displayOf(context)
+                                  .copyWith(fontSize: 40),
+                            ),
                           ),
-                          _VoiceHint(
-                            icon: PhosphorIconsRegular.brain,
-                            label: 'Uses your memory',
-                          ),
+                          const SizedBox(height: 10),
+                          if (phase == 'connecting')
+                            const _ConnectingHint()
+                          else
+                            Text(
+                              _subtitle,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: JarvisColors.of(context).inkSoft,
+                                height: 1.4,
+                              ),
+                            ),
+                          if (captions &&
+                              caption != null &&
+                              caption!.isNotEmpty) ...[
+                            const SizedBox(height: 22),
+                            _CaptionCard(role: captionRole, text: caption!),
+                          ],
+                          if (cards.isNotEmpty)
+                            VoiceCompanionCards(
+                              cards: cards,
+                              onOpen: onCardOpen ?? (_) {},
+                              onSave: onCardSave ?? (_) {},
+                              onDismiss: onCardDismiss ?? (_) {},
+                            ),
+                          if (!_live && onRecap != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16),
+                              child: TextButton.icon(
+                                key: const Key('voice-recap-open'),
+                                onPressed: onRecap,
+                                icon: const Icon(
+                                  PhosphorIconsRegular.listChecks,
+                                ),
+                                label: const Text('See what we did'),
+                              ),
+                            ),
+                          if (error != null)
+                            InlineNotice(
+                              message: error!,
+                              tone: NoticeTone.danger,
+                              margin: const EdgeInsets.only(top: 20),
+                            ),
+                          if (!_live) ...[
+                            const SizedBox(height: 28),
+                            const Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _VoiceHint(
+                                  icon: PhosphorIconsRegular.waveform,
+                                  label: 'Continuous voice',
+                                ),
+                                _VoiceHint(
+                                  icon: PhosphorIconsRegular.ear,
+                                  label: 'Interrupt by speaking',
+                                ),
+                                _VoiceHint(
+                                  icon: PhosphorIconsRegular.brain,
+                                  label: 'Uses your memory',
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
-                    ],
-                  ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+              _pinnedControls(context, waiting),
+            ],
           ),
         ),
       ],
     );
   }
+
+  /// The end and mute buttons stay at the bottom while the captions, cards or
+  /// large text scroll above them, so ending a call is never out of reach.
+  Widget _pinnedControls(BuildContext context, bool waiting) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 440),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FilledButton.icon(
+            key: const Key('voice-primary'),
+            onPressed: _live || canStart ? onPrimary : null,
+            style: FilledButton.styleFrom(
+              backgroundColor: _live
+                  ? JarvisColors.of(context).danger
+                  : JarvisColors.of(context).ink,
+              minimumSize: const Size(220, 56),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(40),
+              ),
+            ),
+            icon: waiting
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(
+                    _live
+                        ? PhosphorIconsRegular.stop
+                        : PhosphorIconsRegular.microphone,
+                  ),
+            label: Text(_live ? 'End voice chat' : 'Start voice chat'),
+          ),
+          if (onToggleMute != null) ...[
+            const SizedBox(height: 12),
+            TextButton.icon(
+              key: const Key('voice-mute'),
+              onPressed: onToggleMute,
+              icon: Icon(
+                muted
+                    ? PhosphorIconsRegular.microphoneSlash
+                    : PhosphorIconsRegular.microphone,
+              ),
+              label: Text(muted ? 'Unmute microphone' : 'Mute microphone'),
+            ),
+          ],
+          Wrap(
+            alignment: WrapAlignment.center,
+            children: [
+              if (_live && onToggleCaptions != null)
+                TextButton.icon(
+                  key: const Key('voice-captions'),
+                  onPressed: onToggleCaptions,
+                  icon: Icon(
+                    captions
+                        ? PhosphorIconsRegular.eyeSlash
+                        : PhosphorIconsRegular.eye,
+                  ),
+                  label: Text(captions ? 'Hide captions' : 'Show captions'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
 
   String get _title => switch (phase) {
     'connecting' => 'Connecting',

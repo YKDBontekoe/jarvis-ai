@@ -22,6 +22,8 @@ mixin _ChatScreenSession on _ChatScreenController {
       // Push setup can wait on a permission dialog or the network; the chat
       // must not.
       unawaited(_enablePush());
+      // Things shared into Jarvis wait for this account; others' are discarded.
+      unawaited(_bindCaptures());
       if (stale()) return;
       final list = await _http.get<dynamic>('/api/v1/conversations');
       if (stale()) return;
@@ -81,7 +83,8 @@ mixin _ChatScreenSession on _ChatScreenController {
       reportError(error, stack, context: 'startup');
       if (mounted && generation == _initGeneration) {
         setState(() {
-          _error = 'Could not connect to Jarvis. Check your connection and retry.';
+          _error =
+              'Could not connect to Jarvis. Check your connection and retry.';
           _restoringSession = false;
         });
       }
@@ -147,6 +150,9 @@ mixin _ChatScreenSession on _ChatScreenController {
     await previous?.stop();
     if (!isCurrent() || !isLatestOpen()) return;
     _restoreDraft(_conversationId, conversationId);
+    // Leaving a chat midway keeps the place; a different chat starts with fresh message keys.
+    _saveReadingPosition();
+    if (_conversationId != conversationId) _anchors.reset();
     setState(() {
       _conversationId = conversationId;
       _profileId = asJsonString(body?['profileId']);
@@ -192,7 +198,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       _error = null;
     });
     if (responding) unawaited(_catchUpRemoteQuery(conversationId));
-    _scrollToBottom(jump: true, force: true);
+    unawaited(_restoreReadingPosition(conversationId));
     unawaited(_loadRecent());
     unawaited(_loadConversationSources(conversationId));
     // An open question shows even when realtime cannot connect; the load
@@ -291,7 +297,10 @@ mixin _ChatScreenSession on _ChatScreenController {
     _hub = null;
     await previous?.stop();
     if (!mounted || _signedOut || _signingOut) return;
-    if (_conversationId case final deleted?) _drafts.remove(deleted);
+    if (_conversationId case final deleted?) {
+      _drafts.remove(deleted);
+      _chatList.setDrafts(_drafts.previews());
+    }
     _replaceComposerText('');
     setState(() {
       _conversationId = null;
@@ -368,10 +377,68 @@ mixin _ChatScreenSession on _ChatScreenController {
     }
   }
 
+  /// Remembers where the owner stopped reading, or forgets it when they were
+  /// at the latest messages.
+  void _saveReadingPosition() {
+    final id = _conversationId;
+    if (id == null || !_scroll.hasClients) return;
+    if (_nearBottom) {
+      _readingPositions.remove(id);
+    } else if (_anchors.anchor(_scroll) case final spot?) {
+      _readingPositions.write(id, spot);
+    }
+    unawaited(_readingPositions.flush());
+  }
+
+  /// Opens a conversation at the spot where reading stopped, loading older
+  /// messages until that one is there. Without a saved spot, or when it cannot
+  /// be found, the chat opens at the latest message as before.
+  Future<void> _restoreReadingPosition(String conversationId) async {
+    final spot = _readingPositions.read(conversationId);
+    bool loaded() => _entries.any(
+      (entry) => entry is MessageEntry && entry.id == spot?.messageId,
+    );
+    if (spot == null) {
+      _scrollToBottom(jump: true, force: true);
+      return;
+    }
+    var pages = 0;
+    while (!loaded() && _hasOlderMessages && pages++ < 6) {
+      await _loadOlderMessages();
+      if (!mounted || _conversationId != conversationId) return;
+    }
+    if (!loaded()) {
+      _readingPositions.remove(conversationId);
+      _scrollToBottom(jump: true, force: true);
+      return;
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || _conversationId != conversationId) return;
+    final index = _entries.indexWhere(
+      (entry) => entry is MessageEntry && entry.id == spot.messageId,
+    );
+    final placed =
+        _scroll.hasClients &&
+        await _anchors.reveal(
+          _scroll,
+          spot,
+          estimate: () => _entries.length < 2
+              ? 0
+              : _scroll.position.maxScrollExtent *
+                    index /
+                    (_entries.length - 1),
+        );
+    if (!placed && mounted && _conversationId == conversationId) {
+      _scrollToBottom(jump: true, force: true);
+    }
+  }
+
   Future<void> _loadOlderMessages() async {
     final conversationId = _conversationId;
     final cursor = _messageCursor;
-    if (conversationId == null || cursor == null || !_hasOlderMessages ||
+    if (conversationId == null ||
+        cursor == null ||
+        !_hasOlderMessages ||
         _loadingOlderMessages) {
       return;
     }
@@ -381,7 +448,8 @@ mixin _ChatScreenSession on _ChatScreenController {
         '/api/v1/conversations/$conversationId/messages',
         queryParameters: {'limit': 50, 'cursor': cursor},
       );
-      if (!mounted || _conversationId != conversationId ||
+      if (!mounted ||
+          _conversationId != conversationId ||
           _messageCursor != cursor) {
         return;
       }
@@ -396,8 +464,7 @@ mixin _ChatScreenSession on _ChatScreenController {
           .whereType<String>()
           .toSet();
       messages.removeWhere(
-        (message) =>
-            message.id != null && existingIds.contains(message.id),
+        (message) => message.id != null && existingIds.contains(message.id),
       );
       final beforeExtent = _scroll.hasClients
           ? _scroll.position.maxScrollExtent
@@ -411,9 +478,11 @@ mixin _ChatScreenSession on _ChatScreenController {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scroll.hasClients) return;
         final addedExtent = _scroll.position.maxScrollExtent - beforeExtent;
-        _scroll.jumpTo((_scroll.position.pixels + addedExtent)
-            .clamp(0.0, _scroll.position.maxScrollExtent)
-            .toDouble());
+        _scroll.jumpTo(
+          (_scroll.position.pixels + addedExtent)
+              .clamp(0.0, _scroll.position.maxScrollExtent)
+              .toDouble(),
+        );
       });
     } on DioException {
       // Keep the current page and allow a later scroll to retry.
@@ -469,7 +538,8 @@ mixin _ChatScreenSession on _ChatScreenController {
           if (!mounted) return;
           setState(() {
             _profileId = asJsonString(body?['profileId']) ?? id;
-            _profileName = asJsonString(body?['profileName']) ??
+            _profileName =
+                asJsonString(body?['profileName']) ??
                 asJsonString(selected['name']);
             _profileDeleted = asJsonBool(body?['profileDeleted']);
             _preferredProfileId = _profileId;
@@ -477,7 +547,9 @@ mixin _ChatScreenSession on _ChatScreenController {
           return;
         } on DioException catch (error) {
           if (error.response?.statusCode != 409 || confirm) rethrow;
-          final details = jsonStrings(jsonObject(error.response?.data)?['details']);
+          final details = jsonStrings(
+            jsonObject(error.response?.data)?['details'],
+          );
           final confirmed = await showJarvisConfirm(
             context,
             title: 'Switch profile?',
@@ -502,7 +574,9 @@ mixin _ChatScreenSession on _ChatScreenController {
   }
 
   MessageEntry? _messageEntryFromJson(Map<String, dynamic> message) {
-    if (message['role'] is! String || message['content'] is! String) return null;
+    if (message['role'] is! String || message['content'] is! String) {
+      return null;
+    }
     return MessageEntry(
       role: message['role'] as String,
       content: message['content'] as String,

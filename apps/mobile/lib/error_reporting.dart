@@ -5,8 +5,11 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Receives errors that would otherwise vanish. Plug a crash service in here;
 /// the default only logs.
-typedef ErrorSink =
-    void Function(Object error, StackTrace? stack, String? context);
+typedef ErrorSink = void Function(
+  Object error,
+  StackTrace? stack,
+  String? context,
+);
 
 ErrorSink? errorSink;
 
@@ -15,8 +18,7 @@ bool sentryTracingEnabled = false;
 
 const sentryDsn = String.fromEnvironment(
   'JARVIS_SENTRY_DSN',
-  defaultValue:
-      'https://0b6943d19bd2891c9bc52565264bc631@o4512185266339840.ingest.de.sentry.io/4512185389482064',
+  defaultValue: 'https://0b6943d19bd2891c9bc52565264bc631@o4512185266339840.ingest.de.sentry.io/4512185389482064',
 );
 
 /// Release builds report to Sentry. Debug and tests stay quiet unless

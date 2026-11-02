@@ -30,6 +30,10 @@ mixin _ChatScreenRealtime on _ChatScreenController {
         // Apply buffered text first so events keep their order.
         if (event != 'message.delta') _flushDeltas();
         handler(arguments);
+        // Open task pages refresh when their conversation moves.
+        if (event != 'message.delta') {
+          TaskRefreshBus.instance.bump(_conversationId);
+        }
       } catch (error, stack) {
         reportError(error, stack, context: 'realtime $event');
       }
@@ -324,13 +328,15 @@ mixin _ChatScreenRealtime on _ChatScreenController {
     });
     _onHub(hub, 'voice.card', (arguments) {
       final card = jsonObject(_payload(arguments)?['card']);
-      if (card == null || !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
+      if (card == null ||
+          !_hubIsCurrent(hub, conversationId, expectedGeneration)) {
         return;
       }
       setState(() {
         _voiceCards = [
           for (final existing in _voiceCards)
-            if (existing['kind'] != card['kind'] || existing['title'] != card['title'])
+            if (existing['kind'] != card['kind'] ||
+                existing['title'] != card['title'])
               existing,
           card,
         ];

@@ -11,6 +11,7 @@ import '../../ui/phosphor_icons.dart';
 import '../whatsapp/catch_up_card.dart';
 import '../whatsapp/read_along_screen.dart';
 import '../whatsapp/whatsapp_models.dart';
+import '../shell/tab_memory.dart';
 import 'chat_list.dart';
 import 'chat_row.dart';
 import 'quick_replies.dart';
@@ -32,6 +33,11 @@ class ChatsScreen extends StatefulWidget {
     this.selectedKey,
     this.http,
     this.clock,
+    this.scrollSlot,
+    this.initialFilter = ChatFilter.forYou,
+    this.initialQuery = '',
+    this.onFilterChanged,
+    this.onQueryChanged,
     super.key,
   });
 
@@ -63,14 +69,23 @@ class ChatsScreen extends StatefulWidget {
   /// Replaces the wall clock in tests.
   final DateTime Function()? clock;
 
+  /// Keeps the list position, filter and search between visits to Chats.
+  final TabScrollSlot? scrollSlot;
+  final ChatFilter initialFilter;
+  final String initialQuery;
+  final ValueChanged<ChatFilter>? onFilterChanged;
+  final ValueChanged<String>? onQueryChanged;
+
   @override
   State<ChatsScreen> createState() => _ChatsScreenState();
 }
 
 class _ChatsScreenState extends State<ChatsScreen> {
-  final _query = TextEditingController();
+  late final _query = TextEditingController(text: widget.initialQuery);
   final _searchFocus = FocusNode();
-  var _filter = ChatFilter.forYou;
+  late final ScrollController _list =
+      widget.scrollSlot?.create() ?? ScrollController();
+  late var _filter = widget.initialFilter;
   var _remindersOpen = false;
 
   /// When each chat last moved, so a newer message can light its row up.
@@ -80,6 +95,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_key);
+    _query.addListener(() => widget.onQueryChanged?.call(_query.text));
   }
 
   @override
@@ -87,6 +103,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
     HardwareKeyboard.instance.removeHandler(_key);
     _query.dispose();
     _searchFocus.dispose();
+    final slot = widget.scrollSlot;
+    slot == null ? _list.dispose() : slot.release(_list);
     super.dispose();
   }
 
@@ -122,6 +140,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     if (_filter == filter) return;
     unawaited(HapticFeedback.selectionClick());
     setState(() => _filter = filter);
+    widget.onFilterChanged?.call(filter);
   }
 
   Future<void> _pin(ChatListItem item) async {
@@ -277,6 +296,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 FilterPills(
                   selected: _filter,
                   unread: widget.chats.unreadChats,
+                  drafts: widget.chats.draftCount,
                   onSelected: _select,
                 ),
                 Expanded(
@@ -297,6 +317,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                               )
                             : CustomScrollView(
                                 key: const Key('chats-list'),
+                                controller: _list,
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 slivers: [
                                   if (widget.chats.whatsAppError)
@@ -310,8 +331,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                       sliver: SliverToBoxAdapter(
                                         child: InlineNotice(
                                           key: Key('chats-whatsapp-error'),
-                                          message:
-                                              'WhatsApp is out of reach. These are the last chats it sent.',
+                                          message: 'WhatsApp is out of reach. These are the last chats it sent.',
                                         ),
                                       ),
                                     ),
@@ -749,11 +769,15 @@ class FilterPills extends StatefulWidget {
     required this.selected,
     required this.unread,
     required this.onSelected,
+    this.drafts = 0,
     super.key,
   });
 
   final ChatFilter selected;
   final int unread;
+
+  /// Conversations with an unsent draft; the Drafts pill only shows while there are some.
+  final int drafts;
   final ValueChanged<ChatFilter> onSelected;
 
   @override
@@ -843,17 +867,24 @@ class _FilterPillsState extends State<FilterPills> {
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Row(
                 children: [
-                  for (final filter in ChatFilter.values) ...[
-                    if (filter != ChatFilter.values.first)
-                      const SizedBox(width: 8),
-                    _Pill(
-                      key: _keys[filter],
-                      filter: filter,
-                      selected: filter == widget.selected,
-                      count: filter == ChatFilter.unread ? widget.unread : 0,
-                      onTap: () => widget.onSelected(filter),
-                    ),
-                  ],
+                  for (final filter in ChatFilter.values)
+                    if (filter != ChatFilter.drafts ||
+                        widget.drafts > 0 ||
+                        widget.selected == ChatFilter.drafts) ...[
+                      if (filter != ChatFilter.values.first)
+                        const SizedBox(width: 8),
+                      _Pill(
+                        key: _keys[filter],
+                        filter: filter,
+                        selected: filter == widget.selected,
+                        count: switch (filter) {
+                          ChatFilter.unread => widget.unread,
+                          ChatFilter.drafts => widget.drafts,
+                          _ => 0,
+                        },
+                        onTap: () => widget.onSelected(filter),
+                      ),
+                    ],
                 ],
               ),
             ),
@@ -1241,6 +1272,11 @@ class _Empty extends StatelessWidget {
         'You are all caught up',
         'Unread WhatsApp chats show up here.',
       ),
+      (_, ChatFilter.drafts) => (
+        PhosphorIconsRegular.pencilSimple,
+        'No drafts',
+        'Messages you start but do not send show up here.',
+      ),
       (_, ChatFilter.whatsapp) when !linked => (
         PhosphorIconsRegular.whatsappLogo,
         'Bring your WhatsApp in',
@@ -1510,9 +1546,8 @@ class _ChatPreview extends StatelessWidget {
                                     const SizedBox(width: 8),
                                     Text(
                                       'WHAT YOU MISSED',
-                                      style: JarvisType.capsOf(
-                                        context,
-                                      ).copyWith(color: colors.accentDeep),
+                                      style: JarvisType.capsOf(context)
+                                          .copyWith(color: colors.accentDeep),
                                     ),
                                   ],
                                 ),
@@ -1562,10 +1597,10 @@ class _ChatPreview extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if ((http, onReply) case (
-                          final http?,
-                          final reply?,
-                        ) when !item.isJarvis && !item.group && item.unread > 0)
+                        if ((http, onReply) case (final http?, final reply?)
+                            when !item.isJarvis &&
+                                !item.group &&
+                                item.unread > 0)
                           QuickReplies(
                             http: http,
                             item: item,

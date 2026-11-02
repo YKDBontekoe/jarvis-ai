@@ -193,7 +193,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
         loading: _loading,
         error: _error,
         isEmpty: false,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         empty: const SizedBox.shrink(),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -221,8 +221,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
               EmptyState(
                 icon: PhosphorIconsRegular.chatsCircle,
                 title: 'No messaging channels yet',
-                message:
-                    'Connect a channel to talk to Jarvis from WhatsApp or Signal.',
+                message: 'Connect a channel to talk to Jarvis from WhatsApp or Signal.',
                 action: FilledButton.icon(
                   onPressed: () => unawaited(_pickKind()),
                   icon: const Icon(PhosphorIconsRegular.plus),
@@ -232,8 +231,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
             if (!signalReady)
               ContentWidth(
                 child: InlineNotice(
-                  message:
-                      'Signal needs signal-cli on the server. WhatsApp links by QR code when the WhatsApp bridge is running, or through a Meta Cloud API app.',
+                  message: 'Signal needs signal-cli on the server. WhatsApp links by QR code when the WhatsApp bridge is running, or through a Meta Cloud API app.',
                   tone: NoticeTone.info,
                   margin: const EdgeInsets.only(bottom: 12),
                 ),

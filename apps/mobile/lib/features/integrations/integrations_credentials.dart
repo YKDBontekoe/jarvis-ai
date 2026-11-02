@@ -383,9 +383,9 @@ mixin _IntegrationsCredentials on _IntegrationsController {
   Widget _providerCard(Map<String, dynamic> provider) {
     final slug = asJsonString(provider['provider']) ?? '';
     final info = _appInfo(slug);
-    final names = jsonStrings(
-      provider['secretNames'],
-    ).where((name) => !isInternalSecret(name)).toList();
+    final names = jsonStrings(provider['secretNames'])
+        .where((name) => !isInternalSecret(name))
+        .toList();
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),

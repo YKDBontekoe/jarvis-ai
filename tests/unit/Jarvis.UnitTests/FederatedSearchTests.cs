@@ -49,6 +49,33 @@ public sealed class FederatedSearchTests
     }
 
     [Fact]
+    public async Task A_search_inside_a_conversation_asks_only_providers_that_can_scope_to_one()
+    {
+        var chat = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        var scoped = new ScopedProvider();
+        var memories = new RecordingProvider();
+        var service = CreateService(memories, scoped);
+
+        var response = await service.SearchAsync(Owner, "boiler", null, CancellationToken.None, null, chat);
+
+        Assert.Equal((Owner, chat, "boiler"), Assert.Single(scoped.Calls));
+        Assert.Empty(memories.OwnerIds);
+        // Newest first, with no cross-kind capping.
+        Assert.Equal(["new", "mid", "old"], response.Results.Select(r => r.Id));
+        Assert.True(Assert.Single(response.Providers).Succeeded);
+    }
+
+    [Fact]
+    public async Task A_scoped_search_that_fails_reports_it_without_throwing()
+    {
+        var service = CreateService(new ScopedProvider(throws: true));
+        var response = await service.SearchAsync(Owner, "boiler", null, CancellationToken.None, null,
+            Guid.NewGuid());
+        Assert.Empty(response.Results);
+        Assert.Equal("Search provider unavailable.", Assert.Single(response.Providers).Error);
+    }
+
+    [Fact]
     public async Task Owner_id_is_required_at_boundary()
     {
         var service = CreateService(new StubProvider("memories", SearchResultKinds.Memory, Owner, "x"));
@@ -220,6 +247,27 @@ public sealed class FederatedSearchTests
         {
             OwnerIds.Add(ownerId);
             return Task.FromResult<IReadOnlyList<FederatedSearchResult>>([]);
+        }
+    }
+
+    private sealed class ScopedProvider(bool throws = false) : IConversationScopedSearchProvider
+    {
+        public List<(Guid Owner, Guid Conversation, string Query)> Calls { get; } = [];
+        public string ProviderId => "messages";
+        public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.Message };
+
+        public Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+            CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FederatedSearchResult>>([]);
+
+        public Task<IReadOnlyList<FederatedSearchResult>> SearchInConversationAsync(Guid ownerId,
+            Guid conversationId, string query, int limit, CancellationToken cancellationToken)
+        {
+            if (throws) throw new InvalidOperationException("boom");
+            Calls.Add((ownerId, conversationId, query));
+            FederatedSearchResult Hit(string id, int day) => new(SearchResultKinds.Message, id, "Chat", "x",
+                new DateTimeOffset(2026, 10, day, 0, 0, 0, TimeSpan.Zero),
+                new SearchRouteTarget("message", new Dictionary<string, string>()), .6, false);
+            return Task.FromResult<IReadOnlyList<FederatedSearchResult>>([Hit("old", 1), Hit("new", 9), Hit("mid", 5)]);
         }
     }
 }

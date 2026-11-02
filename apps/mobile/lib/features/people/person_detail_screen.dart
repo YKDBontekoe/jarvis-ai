@@ -128,36 +128,35 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   }
 
   Future<void> _edit() async {
-    final draft = await showPersonEditor(
+    // The sheet saves the changes itself, so a failure keeps it open.
+    await showPersonEditor(
       context,
       person: _person,
       title: 'Edit ${_person.name}',
       confirmLabel: 'Save',
+      onSubmit: (draft) async {
+        try {
+          final response = await widget.http.put<dynamic>(
+            _path,
+            data: {
+              'name': draft.name,
+              'relationship': draft.relationship,
+              'birthdayMonth': draft.birthdayMonth,
+              'birthdayDay': draft.birthdayDay,
+              'birthYear': draft.birthYear,
+              'contactEveryDays': draft.contactEveryDays,
+              'notes': draft.notes,
+            },
+          );
+          final person = PersonData.fromJson(response.data);
+          if (mounted && person != null) setState(() => _person = person);
+          return null;
+        } on DioException catch (error) {
+          return firstProblemMessage(error.response?.data) ??
+              'Could not save changes.';
+        }
+      },
     );
-    if (draft == null || !mounted) return;
-    setState(() => _saving = true);
-    try {
-      final response = await widget.http.put<dynamic>(
-        _path,
-        data: {
-          'name': draft.name,
-          'relationship': draft.relationship,
-          'birthdayMonth': draft.birthdayMonth,
-          'birthdayDay': draft.birthdayDay,
-          'birthYear': draft.birthYear,
-          'contactEveryDays': draft.contactEveryDays,
-          'notes': draft.notes,
-        },
-      );
-      final person = PersonData.fromJson(response.data);
-      if (mounted && person != null) setState(() => _person = person);
-    } on DioException catch (error) {
-      _toast(
-        firstProblemMessage(error.response?.data) ?? 'Could not save changes.',
-      );
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
   }
 
   Future<void> _delete() async {
@@ -182,9 +181,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -344,10 +342,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
           ContentWidth(
             child: FadeSlideIn(
               index: 3,
-              child: FollowThroughCard(
-                http: widget.http,
-                personId: _person.id,
-              ),
+              child: FollowThroughCard(http: widget.http, personId: _person.id),
             ),
           ),
           if (_radar != null) ...[

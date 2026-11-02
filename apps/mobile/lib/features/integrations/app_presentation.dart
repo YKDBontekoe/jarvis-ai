@@ -161,15 +161,12 @@ AppHealth appHealth(
   final toolCount = asJsonInt(connection['toolCount']);
   final issueCode = asJsonString(connection['issue']);
   final issue = switch (issueCode) {
-    'too_many_tools' =>
-      'It offers too many actions at once. Ask Jarvis to keep only the ones you need.',
-    'no_matching_tools' =>
-      'The actions you picked are no longer offered. Ask Jarvis to pick new ones.',
+    'too_many_tools' => 'It offers too many actions at once. Ask Jarvis to keep only the ones you need.',
+    'no_matching_tools' => 'The actions you picked are no longer offered. Ask Jarvis to pick new ones.',
     'invalid_configuration' => 'Its setup needs fixing. Ask Jarvis to help.',
     'connection_timed_out' =>
       'It took too long to answer. It may be busy or offline.',
-    'runner_required' =>
-      'Apps Jarvis builds run in a separate, locked-down helper that this Jarvis server does not have yet.',
+    'runner_required' => 'Apps Jarvis builds run in a separate, locked-down helper that this Jarvis server does not have yet.',
     'not_activated' => 'Review its code and approve it to switch it on.',
     'sign_in_expired' => 'The sign-in ran out. Sign in again to keep using it.',
     _ => null,
@@ -298,8 +295,7 @@ Future<AppSignInOutcome> signInToApp(
   if (target.isEmpty && url.isEmpty) {
     return (
       status: 'failed',
-      message:
-          'Jarvis doesn’t know where to sign in for this app yet. Ask Jarvis in chat to set it up.',
+      message: 'Jarvis doesn’t know where to sign in for this app yet. Ask Jarvis in chat to set it up.',
     );
   }
   try {

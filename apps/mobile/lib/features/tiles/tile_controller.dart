@@ -48,6 +48,72 @@ class TileLayoutController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- Editing session -------------------------------------------------
+  //
+  // While Home is being customised every change is kept in memory with an undo
+  // history; the layout is saved only when the owner taps Done, and Cancel puts
+  // back what Home looked like before.
+
+  List<TilePlacement>? _sessionStart;
+  final List<List<TilePlacement>> _undo = [];
+
+  /// Most steps Undo can go back.
+  static const maxUndo = 50;
+
+  bool get editing => _sessionStart != null;
+  bool get canUndo => _undo.isNotEmpty;
+
+  /// Starts an editing session. Changes are not saved until [commitEdit].
+  void beginEdit() {
+    if (editing) return;
+    _sessionStart = List.of(_layout);
+    _undo.clear();
+    notifyListeners();
+  }
+
+  /// Saves the edited layout and ends the session.
+  void commitEdit() {
+    if (!editing) return;
+    final changed = !_same(_sessionStart!, _layout);
+    _sessionStart = null;
+    _undo.clear();
+    if (changed) {
+      unawaited(_store.write(_layout));
+    }
+    notifyListeners();
+  }
+
+  /// Puts back the layout from before the session and ends it.
+  void cancelEdit() {
+    final start = _sessionStart;
+    if (start == null) return;
+    _layout = List.of(start);
+    _sessionStart = null;
+    _undo.clear();
+    notifyListeners();
+  }
+
+  /// Takes back the latest move, resize or removal.
+  void undo() {
+    if (_undo.isEmpty) return;
+    _layout = _undo.removeLast();
+    notifyListeners();
+  }
+
+  static bool _same(List<TilePlacement> a, List<TilePlacement> b) =>
+      a.length == b.length &&
+      [
+        for (var i = 0; i < a.length; i++)
+          a[i].id == b[i].id && a[i].size == b[i].size,
+      ].every((same) => same);
+
+  /// Records the layout before a change so [undo] can return to it.
+  void _remember() {
+    if (!editing) return;
+    _undo.add(List.of(_layout));
+    if (_undo.length > maxUndo) _undo.removeAt(0);
+  }
+
   bool contains(String id) => _layout.any((item) => item.id == id);
 
   TileSize? sizeOf(String id) {
@@ -62,6 +128,7 @@ class TileLayoutController extends ChangeNotifier {
     if (spec == null) return;
     final next = TilePlacement(id, spec.nearest(size));
     final index = _layout.indexWhere((item) => item.id == id);
+    _remember();
     if (index >= 0) {
       _layout[index] = next;
     } else {
@@ -72,8 +139,13 @@ class TileLayoutController extends ChangeNotifier {
 
   void unpin(String id) {
     final before = _layout.length;
+    _remember();
     _layout.removeWhere((item) => item.id == id);
-    if (_layout.length != before) _changed();
+    if (_layout.length != before) {
+      _changed();
+    } else if (editing && _undo.isNotEmpty) {
+      _undo.removeLast();
+    }
   }
 
   /// Moves to the next size the tile supports, wrapping around.
@@ -83,6 +155,7 @@ class TileLayoutController extends ChangeNotifier {
     if (index < 0 || spec == null || spec.sizes.length < 2) return;
     final at = spec.sizes.indexOf(_layout[index].size);
     final next = spec.sizes[(at + 1) % spec.sizes.length];
+    _remember();
     _layout[index] = _layout[index].withSize(next);
     _changed();
   }
@@ -95,17 +168,20 @@ class TileLayoutController extends ChangeNotifier {
         to >= _layout.length) {
       return;
     }
+    _remember();
     _layout.insert(to, _layout.removeAt(from));
     _changed();
   }
 
   void reset() {
+    _remember();
     _layout = List.of(defaultTileLayout);
     _changed();
   }
 
   void _changed() {
-    unawaited(_store.write(_layout));
+    // During an editing session nothing is saved until Done.
+    if (!editing) unawaited(_store.write(_layout));
     notifyListeners();
   }
 }

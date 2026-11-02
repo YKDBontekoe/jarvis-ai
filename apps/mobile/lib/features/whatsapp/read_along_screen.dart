@@ -111,8 +111,7 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
         setState(() {
           _live = false;
           _state = 'unreachable';
-          _refreshError =
-              'Could not refresh chats. Showing the last saved list; retrying automatically.';
+          _refreshError = 'Could not refresh chats. Showing the last saved list; retrying automatically.';
         });
         return;
       }
@@ -341,7 +340,7 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
         loading: _loading,
         error: _error,
         isEmpty: false,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         empty: const SizedBox.shrink(),
         child: OrbRefresh(
           onRefresh: _load,
@@ -364,9 +363,8 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
                       children: [
                         Text(
                           'A little help with your chats.',
-                          style: JarvisType.displayOf(
-                            context,
-                          ).copyWith(fontSize: 30),
+                          style: JarvisType.displayOf(context)
+                              .copyWith(fontSize: 30),
                         ),
                         const SizedBox(height: 8),
                         Text(

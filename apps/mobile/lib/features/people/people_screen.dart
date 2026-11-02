@@ -7,6 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import 'people_filter.dart';
 import 'people_models.dart';
 import 'person_detail_screen.dart';
 import 'person_widgets.dart';
@@ -43,6 +44,16 @@ class _PeopleScreenState extends State<PeopleScreen>
   int _requestRevision = 0;
   final Set<String> _busy = {};
   late String? _pendingOpen = widget.openPersonId;
+  final _search = TextEditingController();
+  String? _relationship;
+
+  bool get _filtering =>
+      _search.text.trim().isNotEmpty || _relationship != null;
+
+  void _clearFilters() => setState(() {
+    _search.clear();
+    _relationship = null;
+  });
 
   @override
   void initState() {
@@ -54,6 +65,7 @@ class _PeopleScreenState extends State<PeopleScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _search.dispose();
     super.dispose();
   }
 
@@ -188,52 +200,65 @@ class _PeopleScreenState extends State<PeopleScreen>
     if (mounted) unawaited(_load());
   }
 
+  Map<String, Object?> _draftBody(PersonDraft draft) => {
+    'name': draft.name,
+    'relationship': draft.relationship,
+    'birthdayMonth': draft.birthdayMonth,
+    'birthdayDay': draft.birthdayDay,
+    'birthYear': draft.birthYear,
+    'contactEveryDays': draft.contactEveryDays,
+    'notes': draft.notes,
+  };
+
   Future<void> _add() async {
-    final draft = await showPersonEditor(context);
+    PersonData? created;
+    // The sheet saves the person itself, so a failure keeps it open.
+    final draft = await showPersonEditor(
+      context,
+      onSubmit: (draft) async {
+        final result = await _create(_draftBody(draft));
+        created = result.person;
+        return result.error;
+      },
+    );
     if (draft == null || !mounted) return;
-    await _create({
-      'name': draft.name,
-      'relationship': draft.relationship,
-      'birthdayMonth': draft.birthdayMonth,
-      'birthdayDay': draft.birthdayDay,
-      'birthYear': draft.birthYear,
-      'contactEveryDays': draft.contactEveryDays,
-      'notes': draft.notes,
-    });
+    unawaited(_load());
+    if (created != null) await _open(created!);
   }
 
   Future<void> _addSuggestion(PersonSuggestionData suggestion) async {
     setState(() => _busy.add(suggestion.graphEntityId));
-    await _create({
+    final result = await _create({
       'name': suggestion.name,
       'relationship': suggestion.relationship,
       'birthdayMonth': suggestion.birthdayMonth,
       'birthdayDay': suggestion.birthdayDay,
       'birthYear': suggestion.birthYear,
       'graphEntityId': suggestion.graphEntityId,
-    }, openAfter: false);
-    if (mounted) setState(() => _busy.remove(suggestion.graphEntityId));
+    });
+    if (!mounted) return;
+    setState(() => _busy.remove(suggestion.graphEntityId));
+    if (result.error != null) {
+      _toast(result.error!);
+    } else {
+      unawaited(_load());
+    }
   }
 
-  Future<void> _create(
-    Map<String, Object?> body, {
-    bool openAfter = true,
-  }) async {
+  Future<({PersonData? person, String? error})> _create(
+    Map<String, Object?> body,
+  ) async {
     try {
       final response = await widget.http.post<dynamic>(
         '/api/v1/people',
         data: body,
       );
-      final person = PersonData.fromJson(response.data);
-      if (!mounted) return;
-      if (person == null || !openAfter) {
-        unawaited(_load());
-        return;
-      }
-      await _open(person);
+      return (person: PersonData.fromJson(response.data), error: null);
     } on DioException catch (error) {
-      _toast(
-        firstProblemMessage(error.response?.data) ??
+      return (
+        person: null,
+        error:
+            firstProblemMessage(error.response?.data) ??
             'Could not add that person.',
       );
     }
@@ -265,9 +290,8 @@ class _PeopleScreenState extends State<PeopleScreen>
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -289,6 +313,11 @@ class _PeopleScreenState extends State<PeopleScreen>
           a.daysSinceContact ?? 1 << 20,
         ),
       );
+    final shown = filterPeople(
+      _people,
+      query: _search.text,
+      relationship: _relationship,
+    );
     var index = 0;
     return Scaffold(
       appBar: AppBar(
@@ -305,7 +334,7 @@ class _PeopleScreenState extends State<PeopleScreen>
         loading: _loading,
         error: _error,
         isEmpty: _people.isEmpty,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         onRefresh: _load,
         empty: _empty(),
         child: ListView(
@@ -316,7 +345,8 @@ class _PeopleScreenState extends State<PeopleScreen>
             32 + MediaQuery.paddingOf(context).bottom,
           ),
           children: [
-            if (upcoming.isNotEmpty)
+            _filters(context),
+            if (!_filtering && upcoming.isNotEmpty)
               ContentWidth(
                 child: FadeSlideIn(
                   index: index++,
@@ -329,7 +359,7 @@ class _PeopleScreenState extends State<PeopleScreen>
                   ),
                 ),
               ),
-            if (due.isNotEmpty)
+            if (!_filtering && due.isNotEmpty)
               ContentWidth(
                 child: FadeSlideIn(
                   index: index++,
@@ -365,18 +395,19 @@ class _PeopleScreenState extends State<PeopleScreen>
                   ),
                 ),
               ),
-            if (_radar case final radar? when radar.people.isNotEmpty)
-              ContentWidth(
-                child: FadeSlideIn(
-                  index: index++,
-                  child: RadarSection(
-                    overview: radar,
-                    onOpen: _openById,
-                    onToneChanged: (value) => unawaited(_setTone(value)),
+            if (!_filtering)
+              if (_radar case final radar? when radar.people.isNotEmpty)
+                ContentWidth(
+                  child: FadeSlideIn(
+                    index: index++,
+                    child: RadarSection(
+                      overview: radar,
+                      onOpen: _openById,
+                      onToneChanged: (value) => unawaited(_setTone(value)),
+                    ),
                   ),
                 ),
-              ),
-            if (_linkSuggestions.isNotEmpty)
+            if (!_filtering && _linkSuggestions.isNotEmpty)
               ContentWidth(
                 child: FadeSlideIn(
                   index: index++,
@@ -391,34 +422,38 @@ class _PeopleScreenState extends State<PeopleScreen>
               child: FadeSlideIn(
                 index: index++,
                 child: _Section(
-                  title: 'Everyone',
+                  title: _filtering ? 'Matches' : 'Everyone',
                   trailing: Text(
-                    '${_people.length}',
+                    _filtering
+                        ? '${shown.length} of ${_people.length}'
+                        : '${_people.length}',
                     style: TextStyle(
                       fontSize: 13,
                       color: JarvisColors.of(context).muted,
                     ),
                   ),
-                  child: GroupedSection(
-                    dividerIndent: 68,
-                    children: [
-                      for (final person in _people)
-                        _PersonRow(
-                          person: person,
-                          subtitle: _summary(person),
-                          onTap: () => unawaited(_open(person)),
-                          trailing: Icon(
-                            PhosphorIconsRegular.caretRight,
-                            size: 16,
-                            color: JarvisColors.of(context).muted,
-                          ),
+                  child: _filtering && shown.isEmpty
+                      ? _noMatches(context)
+                      : GroupedSection(
+                          dividerIndent: 68,
+                          children: [
+                            for (final person in shown)
+                              _PersonRow(
+                                person: person,
+                                subtitle: _summary(person),
+                                onTap: () => unawaited(_open(person)),
+                                trailing: Icon(
+                                  PhosphorIconsRegular.caretRight,
+                                  size: 16,
+                                  color: JarvisColors.of(context).muted,
+                                ),
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
                 ),
               ),
             ),
-            if (_suggestions.isNotEmpty)
+            if (!_filtering && _suggestions.isNotEmpty)
               ContentWidth(
                 child: FadeSlideIn(
                   index: index++,
@@ -449,6 +484,91 @@ class _PeopleScreenState extends State<PeopleScreen>
       ),
     );
   }
+
+  /// Name search and relationship chips above the list of everyone.
+  Widget _filters(BuildContext context) {
+    if (_people.length < 2) return const SizedBox.shrink();
+    final colors = JarvisColors.of(context);
+    final choices = relationshipChoices(_people);
+    return ContentWidth(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              key: const Key('people-search'),
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: 'Search by name or relationship',
+                prefixIcon: Icon(
+                  PhosphorIconsRegular.magnifyingGlass,
+                  size: 18,
+                  color: colors.muted,
+                ),
+                suffixIcon: _search.text.isEmpty
+                    ? null
+                    : IconButton(
+                        key: const Key('people-search-clear'),
+                        tooltip: 'Clear search',
+                        onPressed: () => setState(_search.clear),
+                        icon: const Icon(PhosphorIconsRegular.x, size: 16),
+                      ),
+              ),
+            ),
+            if (choices.isNotEmpty)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    for (final choice in choices)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          key: Key('people-relationship-${choice.label}'),
+                          label: Text('${choice.label} · ${choice.count}'),
+                          selected:
+                              _relationship?.toLowerCase() ==
+                              choice.label.toLowerCase(),
+                          onSelected: (on) => setState(
+                            () => _relationship = on ? choice.label : null,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            if (_filtering)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const Key('people-clear-filters'),
+                  onPressed: _clearFilters,
+                  icon: const Icon(PhosphorIconsRegular.x, size: 14),
+                  label: const Text('Clear filters'),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _noMatches(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+    child: Center(
+      child: Text(
+        'No one matches. Your list has ${_people.length} '
+        '${_people.length == 1 ? 'person' : 'people'}.',
+        key: const Key('people-no-match'),
+        textAlign: TextAlign.center,
+        style: TextStyle(color: JarvisColors.of(context).muted),
+      ),
+    ),
+  );
 
   Widget _empty() => EmptyState(
     icon: PhosphorIconsRegular.users,

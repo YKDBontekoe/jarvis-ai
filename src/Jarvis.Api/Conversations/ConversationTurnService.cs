@@ -5,6 +5,9 @@ using Jarvis.Application.Conversations;
 using Jarvis.Application.Workflows;
 using Jarvis.Domain.Conversations;
 using Microsoft.AspNetCore.SignalR;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Jarvis.Api.Conversations;
 
@@ -15,6 +18,50 @@ public abstract record ConversationTurnResult
     public sealed record AwaitingApproval(IReadOnlyList<ToolApprovalRecord> Approvals) : ConversationTurnResult;
     public sealed record Completed(Message Message) : ConversationTurnResult;
     public sealed record Failed(string Message) : ConversationTurnResult;
+}
+
+/// <summary>Rules for the id a client gives a send so that retrying it cannot start a second turn.</summary>
+public static partial class ClientMessageIds
+{
+    public const int MaxLength = 64;
+
+    [GeneratedRegex("^[A-Za-z0-9._:-]{1,64}$")]
+    private static partial Regex Allowed();
+
+    public static bool IsValid(string? id) => id is not null && Allowed().IsMatch(id);
+
+    /// <summary>Fingerprint of a send's content and attachments, stored with the id and compared on every retry.</summary>
+    public static string Hash(string content, string? attachmentsJson) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content + "\n" + attachmentsJson)));
+
+    /// <summary>What to do with a send that carries a client id, given the message already stored under it.</summary>
+    public abstract record Replay
+    {
+        /// <summary>No message has this id: it is a new send.</summary>
+        public sealed record New : Replay;
+
+        /// <summary>The id was used for different content; nothing is started.</summary>
+        public sealed record Conflict(string Message) : Replay;
+
+        /// <summary>The original turn already has its reply: answer with it.</summary>
+        public sealed record Answered(Message Reply) : Replay;
+
+        /// <summary>The original message is the last one and has no reply yet: carry on with it.</summary>
+        public sealed record Resume(Message Original) : Replay;
+    }
+
+    public static Replay Decide(Message? original, string payloadHash, IReadOnlyList<Message> transcript)
+    {
+        if (original is null) return new Replay.New();
+        if (original.ClientPayloadHash != payloadHash)
+            return new Replay.Conflict("This message id was already used for a different message.");
+        var position = transcript.ToList().FindIndex(x => x.Id == original.Id);
+        var next = position < 0 ? null : transcript.Skip(position + 1).FirstOrDefault(x => x.Role != "tool");
+        if (next is { Role: "assistant" }) return new Replay.Answered(next);
+        // Later messages without a reply to this one: the conversation moved on, so never run it again.
+        if (next is not null) return new Replay.Conflict("This message was already sent.");
+        return new Replay.Resume(original);
+    }
 }
 
 /// <summary>
@@ -37,7 +84,8 @@ public sealed class ConversationTurnService(
 
     public async Task<ConversationTurnResult> SendAsync(Guid ownerId, Guid conversationId, string content,
         CancellationToken cancellationToken, Func<string, CancellationToken, Task>? onTextDelta = null,
-        Func<CancellationToken, Task>? beforeRun = null, IReadOnlyList<MessageAttachment>? attachments = null)
+        Func<CancellationToken, Task>? beforeRun = null, IReadOnlyList<MessageAttachment>? attachments = null,
+        string? clientMessageId = null)
     {
         var conversation = await store.GetAsync(conversationId, ownerId, cancellationToken);
         if (conversation is null) return new ConversationTurnResult.NotFound();
@@ -48,8 +96,27 @@ public sealed class ConversationTurnService(
         var existingMessages = await store.GetMessagesAsync(conversationId, cancellationToken);
         var lastMessage = existingMessages.Count > 0 ? existingMessages[^1] : null;
         var attachmentsJson = MessageAttachments.Serialize(attachments);
+        var payloadHash = clientMessageId is null ? null : ClientMessageIds.Hash(content, attachmentsJson);
+        // Without a client id a send counts as a retry when it repeats the last message. With one, only the
+        // message stored under that same id is the original; identical text under a new id is a new message.
         var isSameUserTurn = lastMessage is { Role: "user" } && lastMessage.Content == content &&
                              lastMessage.AttachmentsJson == attachmentsJson;
+        if (clientMessageId is not null)
+        {
+            var original = await store.FindByClientMessageIdAsync(conversationId, clientMessageId, cancellationToken);
+            isSameUserTurn = false;
+            switch (ClientMessageIds.Decide(original, payloadHash!, existingMessages))
+            {
+                case ClientMessageIds.Replay.Conflict conflict:
+                    return new ConversationTurnResult.Conflict(conflict.Message);
+                case ClientMessageIds.Replay.Answered answered:
+                    return new ConversationTurnResult.Completed(answered.Reply);
+                case ClientMessageIds.Replay.Resume resume:
+                    lastMessage = resume.Original;
+                    isSameUserTurn = true;
+                    break;
+            }
+        }
         var pendingApprovals = await approvals.ListActionableForConversationAsync(ownerId, conversationId,
             cancellationToken);
         if (pendingApprovals.Count > 0)
@@ -64,7 +131,8 @@ public sealed class ConversationTurnService(
         if (beforeRun is not null) await beforeRun(cancellationToken);
         var userMessage = isSameUserTurn
             ? lastMessage!
-            : new Message(conversationId, "user", content, attachmentsJson: attachmentsJson);
+            : new Message(conversationId, "user", content, attachmentsJson: attachmentsJson,
+                clientMessageId: clientMessageId, clientPayloadHash: payloadHash);
         if (!isSameUserTurn)
         {
             await store.AddMessageAsync(userMessage, cancellationToken);

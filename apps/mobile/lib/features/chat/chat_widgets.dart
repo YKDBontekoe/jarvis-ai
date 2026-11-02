@@ -16,6 +16,7 @@ import 'image_paste_stub.dart'
 import 'incoming_photos.dart';
 import 'mcp_setup.dart';
 import 'outbox_store.dart';
+import 'share_text.dart';
 import 'tool_catalog.dart';
 
 part 'chat_message_widgets.dart';

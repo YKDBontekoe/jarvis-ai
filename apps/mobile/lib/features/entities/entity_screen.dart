@@ -118,9 +118,8 @@ class _EntityScreenState extends State<EntityScreen> {
     );
     if (page == null) return;
     unawaited(
-      Navigator.of(
-        context,
-      ).push<void>(MaterialPageRoute<void>(builder: (_) => page)),
+      Navigator.of(context)
+          .push<void>(MaterialPageRoute<void>(builder: (_) => page)),
     );
   }
 
@@ -164,9 +163,9 @@ class _EntityScreenState extends State<EntityScreen> {
                                 Text(
                                   _title ?? kind.label,
                                   key: const Key('entity-title'),
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium,
                                 ),
                                 const SizedBox(height: 2),
                                 Text(

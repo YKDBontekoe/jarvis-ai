@@ -190,8 +190,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
       if (!mounted || revision != _requestRevision) return;
       if (quiet) {
         setState(
-          () => _refreshError =
-              'Could not refresh messages. Showing saved messages; retrying automatically.',
+          () => _refreshError = 'Could not refresh messages. Showing saved messages; retrying automatically.',
         );
         return;
       }
@@ -303,8 +302,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Read along with ${_chat.name}?',
-      message:
-          'Jarvis will save new messages from this chat. You can also request available history from your phone.',
+      message: 'Jarvis will save new messages from this chat. You can also request available history from your phone.',
       confirmLabel: 'Start reading',
     );
     if (confirmed == true && mounted) await _save(readAlong: true);
@@ -571,9 +569,9 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
     if (confirmed == true && mounted) await _save(readAlong: false);
   }
 
-  void _snack(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _snack(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   /// The chat, with the About panel beside it when there is room and the
   /// chat is linked to a person.
@@ -710,8 +708,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
             if (_refreshError != null) InlineNotice(message: _refreshError!),
             if (!_chat.readAlong) ...[
               const InlineNotice(
-                message:
-                    'Reading is off for this chat. Jarvis is not receiving its messages.',
+                message: 'Reading is off for this chat. Jarvis is not receiving its messages.',
               ),
               TextButton(
                 onPressed: () => unawaited(_startReading()),
@@ -736,10 +733,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
               child: _loading
                   ? const SkeletonList(rows: 7, shape: SkeletonShape.chat)
                   : _error != null && _messages.isEmpty
-                  ? ErrorState(
-                      message: _error!,
-                      onRetry: () => unawaited(_load()),
-                    )
+                  ? ErrorState(message: _error!, onRetry: _load)
                   : _messages.isEmpty
                   ? EmptyState(
                       icon: PhosphorIconsRegular.chatsCircle,

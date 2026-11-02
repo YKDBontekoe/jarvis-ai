@@ -335,7 +335,11 @@ class _FocusSheetState extends State<_FocusSheet> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
                   children: [
-                    Icon(PhosphorIconsRegular.hand, size: 18, color: colors.ink),
+                    Icon(
+                      PhosphorIconsRegular.hand,
+                      size: 18,
+                      color: colors.ink,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

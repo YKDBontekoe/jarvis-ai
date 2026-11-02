@@ -5,6 +5,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/api/offline_cache.dart';
+import 'package:jarvis_mobile/api/waiting_changes.dart';
+import 'package:jarvis_mobile/features/chat/outbox_store.dart';
 import 'package:jarvis_mobile/ui/offline_banner.dart';
 
 /// Answers with canned JSON until [offline] is set, then fails like a dropped connection.
@@ -201,5 +203,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('offline-banner')), findsNothing);
     expect(find.text('Tasks'), findsOneWidget);
+  });
+
+  testWidgets('waiting chat messages are counted and the banner opens the '
+      'overview', (tester) async {
+    final waiting = WaitingChanges.instance;
+    addTearDown(waiting.reset);
+    final outbox = OutboxStore.memory();
+    await outbox.add(
+      OutboxMessage(
+        id: 'm1',
+        conversationId: 'c1',
+        content: 'Hello',
+        queuedAt: DateTime.now(),
+      ),
+    );
+    waiting.attach(outbox);
+    var opened = 0;
+    waiting.openOverview.value = () => opened++;
+    await tester.runAsync(() async {
+      await http.get<Object?>('/api/v1/tasks');
+      await pumpEventQueue();
+    });
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => OfflineBanner(cache: cache, child: child!),
+        home: const Scaffold(body: Text('Tasks')),
+      ),
+    );
+    adapter.offline = true;
+    await tester.runAsync(() => http.get<Object?>('/api/v1/tasks'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('1 change waiting to send'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('offline-banner-open')));
+    expect(opened, 1);
   });
 }

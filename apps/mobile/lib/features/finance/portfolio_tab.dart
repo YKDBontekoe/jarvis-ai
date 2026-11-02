@@ -7,7 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
-import '../expenses/expense_models.dart' show formatMoney;
+import '../expenses/expense_models.dart' show formatMoney, hasMixedCurrencies;
 import 'holding_detail_screen.dart';
 import 'trade_editor.dart';
 import 'wealth_models.dart';
@@ -34,6 +34,10 @@ class _PortfolioTabState extends State<PortfolioTab>
   bool get wantKeepAlive => true;
 
   DateTime get _now => widget.now ?? DateTime.now();
+
+  /// True when the holdings are in more than one currency.
+  bool get _mixed =>
+      hasMixedCurrencies([for (final h in _data?.holdings ?? []) h.currency]);
 
   @override
   void initState() {
@@ -65,9 +69,9 @@ class _PortfolioTabState extends State<PortfolioTab>
     }
   }
 
-  void _toast(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _refreshPrices() async {
     setState(() => _refreshing = true);
@@ -142,7 +146,7 @@ class _PortfolioTabState extends State<PortfolioTab>
       loading: _loading,
       error: _error,
       isEmpty: data == null || data.holdings.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       onRefresh: _load,
       empty: EmptyState(
         icon: PhosphorIconsRegular.chartLine,
@@ -341,7 +345,7 @@ class _PortfolioTabState extends State<PortfolioTab>
                 Text(
                   holding.isOpen
                       ? '${formatQuantity(holding.quantity)} × '
-                            '${holding.lastPrice == null ? 'no price' : formatMoney(holding.lastPrice!, holding.currency)}'
+                            '${holding.lastPrice == null ? 'no price' : formatMoney(holding.lastPrice!, holding.currency, code: _mixed)}'
                       : 'Sold',
                   style: TextStyle(color: colors.muted, fontSize: 13),
                 ),
@@ -362,6 +366,7 @@ class _PortfolioTabState extends State<PortfolioTab>
                   formatMoney(
                     holding.marketValue ?? holding.costBasis,
                     holding.currency,
+                    code: _mixed,
                   ),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),

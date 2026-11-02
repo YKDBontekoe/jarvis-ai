@@ -37,7 +37,11 @@ class _SearchScreenState extends State<SearchScreen> {
   var _loading = false;
   String? _error;
   List<FederatedSearchHit> _results = const [];
+  List<SearchProviderStatus> _providers = const [];
   Set<String> _kindFilter = {};
+
+  /// Bumped whenever the query or filters change, so an older response can't land.
+  var _revision = 0;
 
   /// Only hits from the last N days; null means any time. Hits with no date are left out when set.
   int? _windowDays;
@@ -65,6 +69,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _scheduleSearch() {
+    _revision++;
     _debounce?.cancel();
     _debounce = Timer(
       const Duration(milliseconds: 220),
@@ -73,10 +78,12 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _runSearch() async {
+    final revision = ++_revision;
     final text = _query.text.trim();
     if (text.isEmpty) {
       setState(() {
         _results = const [];
+        _providers = const [];
         _error = null;
         _loading = false;
       });
@@ -95,19 +102,20 @@ class _SearchScreenState extends State<SearchScreen> {
             ? null
             : DateTime.now().subtract(Duration(days: _windowDays!)),
       );
-      if (!mounted) return;
+      if (!mounted || revision != _revision) return;
       setState(() {
         _results = response.results;
+        _providers = response.providers;
         _loading = false;
       });
     } on DioException catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _revision) return;
       setState(() {
         _loading = false;
         _error = describeApiError(error);
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || revision != _revision) return;
       setState(() {
         _loading = false;
         _error = 'Search failed: $error';
@@ -258,6 +266,8 @@ class _SearchScreenState extends State<SearchScreen> {
                         child: SearchResultsBody(
                           loading: _loading,
                           results: _results,
+                          providers: _providers,
+                          onRetry: () => unawaited(_runSearch()),
                           onOpen: (hit) => unawaited(_openHit(hit)),
                         ),
                       ),
@@ -275,6 +285,8 @@ class SearchResultsBody extends StatelessWidget {
     required this.loading,
     required this.results,
     required this.onOpen,
+    this.providers = const [],
+    this.onRetry,
     super.key,
   });
 
@@ -282,15 +294,41 @@ class SearchResultsBody extends StatelessWidget {
   final List<FederatedSearchHit> results;
   final ValueChanged<FederatedSearchHit> onOpen;
 
+  /// Per-source outcome of the last search; failed ones make the results incomplete.
+  final List<SearchProviderStatus> providers;
+  final VoidCallback? onRetry;
+
   @override
   Widget build(BuildContext context) {
     if (loading && results.isEmpty) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
+    final failed = loading
+        ? const <SearchProviderStatus>[]
+        : providers.where((p) => !p.succeeded).toList();
+    final notice = failed.isEmpty
+        ? null
+        : Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: InlineNotice(
+              key: const Key('search-incomplete'),
+              message: incompleteSearchMessage(failed),
+              actions: [
+                if (onRetry != null)
+                  TextButton(onPressed: onRetry, child: const Text('Retry')),
+              ],
+            ),
+          );
     if (results.isEmpty) {
-      return const Center(child: Text('No matches yet.'));
+      if (notice == null) {
+        return const Center(child: Text('No matches yet.'));
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [notice, const SizedBox(height: 24)],
+      );
     }
-    return ListView.separated(
+    final list = ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       itemCount: results.length,
       separatorBuilder: (_, _) => const SizedBox(height: 6),
@@ -346,6 +384,14 @@ class SearchResultsBody extends StatelessWidget {
           ),
         );
       },
+    );
+    if (notice == null) return list;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        notice,
+        Expanded(child: list),
+      ],
     );
   }
 }

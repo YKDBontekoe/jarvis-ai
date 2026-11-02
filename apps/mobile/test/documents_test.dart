@@ -122,7 +122,9 @@ void main() {
       http.on('GET', _path, _view());
       await show(tester, DocumentScreen(http: http.client(), documentId: 'd1'));
 
-      expect(find.textContaining('Sources: project:p1'), findsOneWidget);
+      // Each cited source is its own row; a reference the app cannot open stays as plain text.
+      expect(find.byKey(const Key('sources-panel')), findsOneWidget);
+      expect(find.text('project:p1'), findsOneWidget);
       expect(find.text('[ADD: the next step]'), findsOneWidget);
       expect(find.textContaining('placeholders to fill'), findsOneWidget);
       expect(find.textContaining('does not send anything'), findsOneWidget);

@@ -21,8 +21,18 @@ class MessageContextScreen extends StatefulWidget {
     required this.messageId,
     required this.onOpenConversation,
     this.title,
+    this.position,
+    this.onPrevious,
+    this.onNext,
     super.key,
   });
+
+  /// "3 of 12" when this hit is one of several found by Find in chat.
+  final String? position;
+
+  /// Move to the previous or next hit; null when there is none that way.
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
 
   final Dio http;
   final String conversationId;
@@ -144,7 +154,9 @@ class _MessageContextScreenState extends State<MessageContextScreen> {
       if (!mounted) return;
       final page = jsonObject(response.data);
       final more = _readable(page?['items']);
-      final before = _scroll.hasClients ? _scroll.position.maxScrollExtent : 0.0;
+      final before = _scroll.hasClients
+          ? _scroll.position.maxScrollExtent
+          : 0.0;
       final have = {for (final item in _messages) item['id']};
       setState(() {
         final fresh = [
@@ -206,6 +218,35 @@ class _MessageContextScreenState extends State<MessageContextScreen> {
         ],
       ),
       body: _body(colors),
+      bottomNavigationBar: widget.position == null
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      key: const Key('hit-previous'),
+                      tooltip: 'Previous match',
+                      onPressed: widget.onPrevious,
+                      icon: const Icon(PhosphorIconsRegular.caretUp),
+                    ),
+                    Text(
+                      widget.position!,
+                      key: const Key('hit-position'),
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    IconButton(
+                      key: const Key('hit-next'),
+                      tooltip: 'Next match',
+                      onPressed: widget.onNext,
+                      icon: const Icon(PhosphorIconsRegular.caretDown),
+                    ),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 

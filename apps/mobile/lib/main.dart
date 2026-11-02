@@ -7,6 +7,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'api/offline_cache.dart';
 import 'app_lock.dart';
 import 'appearance.dart';
+import 'features/expenses/expense_models.dart' show moneyLocale;
 import 'error_reporting.dart';
 import 'features/chat/chat_screen.dart';
 import 'l10n/l10n.dart';
@@ -100,6 +101,10 @@ class _JarvisAppState extends State<JarvisApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Money follows the language chosen in Appearance, or the device's.
+    moneyLocale =
+        _appearance.language.locale?.languageCode ??
+        WidgetsBinding.instance.platformDispatcher.locale.languageCode;
     final appLock = widget.appLock;
     final app = AppearanceScope(
       controller: _appearance,

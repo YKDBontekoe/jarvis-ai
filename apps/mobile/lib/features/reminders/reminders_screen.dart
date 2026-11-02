@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../ui/phosphor_icons.dart';
+import '../../ui/submit_state.dart';
+import 'reminder_shortcuts.dart';
 
 import '../approvals/approvals_screen.dart';
 import '../chat/tool_catalog.dart';
@@ -43,6 +45,8 @@ class RemindersScreen extends StatefulWidget {
     this.initialTab = RemindersTab.reminders,
     this.startCreating = false,
     this.onCreateDone,
+    this.initialTitle,
+    this.sourceConversationId,
     this.locate = readDeviceLocationSnapshot,
     this.locationAccess = _checkLocationAccess,
     this.openLocationSettings = Geolocator.openAppSettings,
@@ -77,6 +81,13 @@ class RemindersScreen extends StatefulWidget {
   /// Called after a [startCreating] editor closes: with a confirmation when
   /// it saved, or null when it was cancelled.
   final ValueChanged<String?>? onCreateDone;
+
+  /// Text the new-reminder editor starts with, such as part of a chat message.
+  final String? initialTitle;
+
+  /// The chat the reminder is made from: the editor says so, and the saved
+  /// reminder is linked back to it.
+  final String? sourceConversationId;
   final Future<void> Function(String conversationId)? onOpenConversation;
 
   @override
@@ -104,16 +115,12 @@ abstract class _RemindersController extends State<RemindersScreen>
   int _requestRevision = 0;
   bool _showAllFinished = false;
   LocationPermission? _locationAccess;
-  String? _deviceZone;
 
   @override
   void initState() {
     super.initState();
     _load();
     if (widget.startCreating) afterRouteSettles(this, _quickCreate);
-    deviceTimeZoneLookup().then((zone) {
-      if (mounted && zone != null) setState(() => _deviceZone = zone);
-    });
   }
 
   Future<void> _load() async {
@@ -235,47 +242,53 @@ abstract class _RemindersController extends State<RemindersScreen>
   }
 
   /// The "new reminder" editor opened straight from chat: hands control back
-  /// once it is saved or cancelled, and stays here if saving failed.
+  /// once it is saved or cancelled. A failed save keeps the editor open.
   Future<void> _quickCreate() async {
     final created = await _createReminder();
-    if (created == false || !mounted) return;
+    if (!mounted) return;
     widget.onCreateDone?.call(created == true ? 'Reminder set' : null);
   }
 
-  /// Returns true when saved, null when cancelled, false when it failed
-  /// (the editor's caller stays put so nothing typed is lost).
+  /// Returns true when saved, null when cancelled. Saving happens inside the
+  /// editor, so a failure never closes it or loses what was typed.
   Future<bool?> _createReminder() async {
     final zoneLookup = _reminderTimeZone();
-    final created = await showJarvisDialog<_NewReminder>(
+    final created = await showJarvisDialog<bool>(
       context: context,
       builder: (_) => _NewReminderDialog(
         timeZone: zoneLookup,
+        initialTitle: widget.initialTitle,
+        fromChat: widget.sourceConversationId != null,
         places: savedPlaces(_reminders),
         locate: () => widget.locate(requestPermission: true),
+        onSubmit: (reminder) async => _saveReminder(reminder, await zoneLookup),
       ),
     );
-    if (created == null || !mounted) return null;
-    final timeZoneId = await zoneLookup;
-    if (!mounted) return null;
+    return created == true ? true : null;
+  }
+
+  /// Saves a reminder; returns null on success or a message for the editor.
+  Future<String?> _saveReminder(_NewReminder created, String timeZoneId) async {
     if (created.place case final place?) {
       return _createPlaceReminder(created.title, place, timeZoneId);
     }
-
-    final localDueAt = DateTime(
+    // The picked date and time are on the clock of the reminder's own zone,
+    // which is the phone's zone whenever the phone can tell it.
+    final picked = DateTime(
       created.date.year,
       created.date.month,
       created.date.day,
       created.time.hour,
       created.time.minute,
     );
+    final localDueAt = instantInZone(picked, timeZoneId)?.toLocal() ?? picked;
     if (!localDueAt.isAfter(DateTime.now()) && created.recurrence == 'once') {
-      _showError('Choose a time in the future.');
-      return false;
+      return 'Choose a time in the future.';
     }
     final localTime =
         '${created.time.hour.toString().padLeft(2, '0')}:${created.time.minute.toString().padLeft(2, '0')}:00';
     try {
-      await widget.http.post(
+      final response = await widget.http.post(
         '/api/v1/reminders',
         data: {
           'title': created.title,
@@ -287,25 +300,43 @@ abstract class _RemindersController extends State<RemindersScreen>
         },
       );
       await _seedOwnerZone(timeZoneId);
-      await _load();
-      if (mounted) _showMessage('Reminder set.');
-      return true;
-    } on DioException catch (error) {
+      await _linkToSourceChat(response.data);
       if (mounted) {
-        final message = error.response?.statusCode == 503
-            ? 'The reminder service is unavailable. Try again shortly.'
-            : firstProblemMessage(error.response?.data) ??
-                  'Jarvis could not create that reminder.';
-        _showError(message);
+        unawaited(_load());
+        _showMessage('Reminder set.');
       }
-      return false;
+      return null;
+    } on DioException catch (error) {
+      return error.response?.statusCode == 503
+          ? 'The reminder service is unavailable. Try again shortly.'
+          : firstProblemMessage(error.response?.data) ??
+                'Jarvis could not create that reminder.';
     } catch (_) {
-      if (mounted) _showError('Jarvis could not create that reminder.');
-      return false;
+      return 'Jarvis could not create that reminder.';
     }
   }
 
-  Future<bool> _createPlaceReminder(
+  /// Links a reminder made from a chat message back to that chat. The reminder
+  /// is saved either way.
+  Future<void> _linkToSourceChat(Object? created) async {
+    final chat = widget.sourceConversationId;
+    final id = created is Map ? created['id']?.toString() : null;
+    if (chat == null || id == null) return;
+    try {
+      await widget.http.post<dynamic>(
+        '/api/v1/entities/links',
+        data: {
+          'from': 'conversation:$chat',
+          'to': 'reminder:$id',
+          'relation': 'source',
+        },
+      );
+    } on DioException {
+      // Nothing to undo: the reminder exists.
+    }
+  }
+
+  Future<String?> _createPlaceReminder(
     String title,
     ReminderPlace place,
     String timeZoneId,
@@ -336,26 +367,36 @@ abstract class _RemindersController extends State<RemindersScreen>
           'place': place.toJson(),
         },
       );
-      await _load();
-      if (!mounted) return true;
-      _showMessage(
-        here.latitude == null
-            ? 'Reminder set. Allow location for Jarvis so it can fire.'
-            : '${place.label}, Jarvis will remind you.',
-      );
-      return true;
-    } on DioException catch (error) {
       if (mounted) {
-        _showError(
-          firstProblemMessage(error.response?.data) ??
-              'Jarvis could not create that reminder.',
+        unawaited(_load());
+        _showMessage(
+          here.latitude == null
+              ? 'Reminder set. Allow location for Jarvis so it can fire.'
+              : '${place.label}, Jarvis will remind you.',
         );
       }
-      return false;
+      return null;
+    } on DioException catch (error) {
+      return firstProblemMessage(error.response?.data) ??
+          'Jarvis could not create that reminder.';
     } catch (_) {
-      if (mounted) _showError('Jarvis could not create that reminder.');
-      return false;
+      return 'Jarvis could not create that reminder.';
     }
+  }
+
+  String? _zoneOfReminder(String id) {
+    for (final reminder in _reminders) {
+      if (jsonId(reminder) == id) return asJsonString(reminder['timeZoneId']);
+    }
+    return null;
+  }
+
+  /// Snoozes after the owner picks how long in the shared snooze sheet.
+  Future<void> _snoozeWithSheet(String? id) async {
+    if (id == null) return;
+    final choice = await showSnoozeSheet(context, zoneId: _zoneOfReminder(id));
+    if (choice == null || !mounted) return;
+    await _snooze(id, choice.by ?? Duration.zero, until: choice.until);
   }
 
   Future<void> _snooze(String? id, Duration by, {DateTime? until}) async {
@@ -370,7 +411,13 @@ abstract class _RemindersController extends State<RemindersScreen>
       final dueAt = jsonDate(jsonObject(response.data)?['dueAt'], local: true);
       await _load();
       if (mounted && dueAt != null) {
-        _showMessage('Snoozed until ${friendlyWhen(context, dueAt)}.');
+        final zone =
+            asJsonString(jsonObject(response.data)?['timeZoneId']) ??
+            _zoneOfReminder(id);
+        final when = describeScheduledInstant(context, dueAt, zone);
+        _showMessage(
+          'Snoozed until ${when.primary}${when.other == null ? '' : ' (${when.other})'}.',
+        );
       }
     } on DioException catch (error) {
       if (mounted) {
@@ -402,8 +449,7 @@ abstract class _RemindersController extends State<RemindersScreen>
         );
         if (mounted) {
           _showMessage(
-            queued.problem ??
-                'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not done yet.',
+            queued.problem ?? 'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not done yet.',
           );
         }
         return;
@@ -561,12 +607,18 @@ abstract class _RemindersController extends State<RemindersScreen>
             PhosphorIconsRegular.clockCounterClockwise,
             size: 16,
           ),
-          label: const Text('Snooze 10 min'),
+          label: const Text('+10 min'),
         ),
         OutlinedButton(
           onPressed: () => _snooze(reminderId, const Duration(hours: 1)),
           style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
-          child: const Text('1 hour'),
+          child: const Text('+1 hour'),
+        ),
+        OutlinedButton(
+          key: const Key('snooze-more'),
+          onPressed: () => _snoozeWithSheet(reminderId),
+          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
+          child: const Text('Later…'),
         ),
       ],
     ),
@@ -721,9 +773,8 @@ abstract class _RemindersController extends State<RemindersScreen>
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showMessage(String message) => _showError(message);
@@ -738,12 +789,6 @@ abstract class _RemindersController extends State<RemindersScreen>
     _tabs.dispose();
     super.dispose();
   }
-}
-
-/// Tomorrow at 09:00 local time, the "later" choice in snooze menus.
-DateTime _tomorrowMorning() {
-  final now = DateTime.now();
-  return DateTime(now.year, now.month, now.day + 1, 9);
 }
 
 /// How many finished reminders show before "Show more".

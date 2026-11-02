@@ -37,7 +37,10 @@ class RecentSearchesStore {
   Future<void> remember(String query) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
-    final next = [trimmed, ...read().where((item) => item != trimmed)].take(_maxRecent).toList();
+    final next = [
+      trimmed,
+      ...read().where((item) => item != trimmed),
+    ].take(_maxRecent).toList();
     await _prefs.setString(_storageKey, jsonEncode(next));
   }
 

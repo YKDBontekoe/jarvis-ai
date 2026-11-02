@@ -52,7 +52,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
         final queued = await MutationQueue.instance.enqueue(
           kind: MutationKinds.habitCheckIn,
           targetId: _habit.id,
-          label: '${done ? 'Check in' : 'Undo check-in'} “${_habit.name}” for $key',
+          label:
+              '${done ? 'Check in' : 'Undo check-in'} “${_habit.name}” for $key',
           group: 'habit:${_habit.id}:$key',
           payload: {'date': key, 'done': done},
         );
@@ -62,8 +63,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
             ..showSnackBar(
               SnackBar(
                 content: Text(
-                  queued.problem ??
-                      'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not recorded yet.',
+                  queued.problem ?? 'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not recorded yet.',
                 ),
               ),
             );

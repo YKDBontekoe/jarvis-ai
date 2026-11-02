@@ -5,6 +5,7 @@ part of 'chat_screen.dart';
 mixin _ChatScreenNav on _ChatScreenController {
   void _openUtility(String destination) {
     if (_signedOut || _signingOut) return;
+    unawaited(RecentFeatures.instance.recordDestination(destination));
     _dismissKeyboard();
     final page = utilityPageFor(
       destination,
@@ -19,6 +20,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       },
       onAskInChat:
           utilityBaseDestination(destination) == 'integrations' ||
+              destination == 'captures' ||
               destination == 'journal' ||
               destination.startsWith(appDestinationPrefix)
           ? (prompt) {
@@ -26,6 +28,12 @@ mixin _ChatScreenNav on _ChatScreenController {
               unawaited(_send(prompt));
             }
           : null,
+      onOpenDestination: (target) {
+        if (!_isWide && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        _openUtility(target);
+      },
       onQuickCreateDone: (message) => _quickCreateDone(destination, message),
     );
     final base = utilityBaseDestination(destination);
@@ -37,6 +45,55 @@ mixin _ChatScreenNav on _ChatScreenController {
       } else {
         unawaited(_openUtilityPage(base, page));
       }
+    }
+  }
+
+  /// Completed messages with some text can be saved or turned into a reminder.
+  bool _canActOnMessage(MessageEntry entry) =>
+      !entry.pending &&
+      !entry.failed &&
+      !entry.queued &&
+      _conversationId != null &&
+      entry.content.trim().isNotEmpty;
+
+  /// Saves a message to the Library after the owner reviews it, then offers to open it.
+  Future<void> _saveToLibrary(MessageEntry entry) async {
+    final saved = await showSaveToLibrarySheet(
+      context,
+      http: _http,
+      content: entry.content,
+      conversationId: _conversationId,
+    );
+    if (saved == null || !mounted) return;
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: const Text('Saved to Library'),
+          margin: const EdgeInsets.fromLTRB(20, 0, 20, 128),
+          action: SnackBarAction(
+            label: 'Open',
+            onPressed: () => _openUtility('library'),
+          ),
+        ),
+      );
+  }
+
+  /// Opens the new-reminder editor with this message's text, to review before saving.
+  Future<void> _remindFromMessage(MessageEntry entry) async {
+    final text = suggestedNoteTitle(entry.content, max: 200);
+    final page = RemindersScreen(
+      http: _http,
+      onOpenConversation: (id) async => _presentConversation(id),
+      startCreating: true,
+      initialTitle: text,
+      sourceConversationId: _conversationId,
+      onCreateDone: (message) => _quickCreateDone('reminders', message),
+    );
+    if (_isWide) {
+      _showInPane('reminders', page);
+    } else {
+      unawaited(_openUtilityPage('reminders', page));
     }
   }
 
@@ -76,9 +133,8 @@ mixin _ChatScreenNav on _ChatScreenController {
         paneContext != null &&
         paneContext.mounted) {
       unawaited(
-        Navigator.of(
-          paneContext,
-        ).push<void>(MaterialPageRoute<void>(builder: (_) => page)),
+        Navigator.of(paneContext)
+            .push<void>(MaterialPageRoute<void>(builder: (_) => page)),
       );
       return;
     }
@@ -105,9 +161,9 @@ mixin _ChatScreenNav on _ChatScreenController {
     try {
       final response = await _http.get<dynamic>('/api/v1/notifications');
       if (!mounted) return;
-      final unread = jsonMaps(
-        response.data,
-      ).where((item) => item['readAt'] == null).length;
+      final unread = jsonMaps(response.data)
+          .where((item) => item['readAt'] == null)
+          .length;
       if (unread != _unreadNotifications) {
         setState(() => _unreadNotifications = unread);
       }
@@ -119,9 +175,8 @@ mixin _ChatScreenNav on _ChatScreenController {
   }
 
   Future<void> _openUtilityPage(String destination, Widget page) async {
-    await Navigator.of(
-      context,
-    ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
+    await Navigator.of(context)
+        .push<void>(MaterialPageRoute<void>(builder: (_) => page));
     await _afterUtility(destination);
   }
 
@@ -300,12 +355,26 @@ mixin _ChatScreenNav on _ChatScreenController {
       await LearningSeenStore.clear();
       await _drafts.clear();
       await ComposerDrafts.clearAll();
+      await DraftStore.clearAll();
+      await ReadingPositions.clearAll();
+      _readingPositions = ReadingPositions.memory();
+      _anchors.reset();
+      await RecentFeatures.clearAll();
       _outboxTimer?.cancel();
       await _outbox.clear();
+      WaitingChanges.instance.reset();
       await OfflineCache.instance.clear();
       await MutationQueue.instance.clear();
       await OutboxStore.clearAll();
       _chatList.clear();
+      _tabMemory.clear();
+      _unreadReply = null;
+      _dismissedStrips.clear();
+      IncomingRoutes.instance.clear();
+      await CaptureStore.instance.clear();
+      // Nothing of this account stays on the home screen widget.
+      unawaited(HomeWidgetSync.instance.clear());
+      unawaited(AppShortcuts.clear());
       _tileSource.reset();
       _tiles.reset();
       await hub?.stop();
@@ -363,9 +432,10 @@ mixin _ChatScreenNav on _ChatScreenController {
         return;
       }
       setState(
-        () => _recent = jsonMaps(
-          response.data,
-        ).where((item) => item['id'] is String).toList(),
+        () =>
+            _recent = jsonMaps(response.data)
+                .where((item) => item['id'] is String)
+                .toList(),
       );
       _chatList.setConversations(_recent);
     } on DioException {
@@ -386,9 +456,10 @@ mixin _ChatScreenNav on _ChatScreenController {
         return;
       }
       setState(
-        () => _projects = jsonMaps(
-          response.data,
-        ).where((item) => item['id'] is String).toList(),
+        () =>
+            _projects = jsonMaps(response.data)
+                .where((item) => item['id'] is String)
+                .toList(),
       );
     } catch (_) {
       // Projects are a shortcut in the sidebar; keep the last known list.

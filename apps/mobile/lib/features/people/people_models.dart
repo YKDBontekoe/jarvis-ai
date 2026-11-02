@@ -126,10 +126,11 @@ class PersonSuggestionData {
     );
   }
 
-  static List<PersonSuggestionData> listFromJson(dynamic data) => jsonMaps(data)
-      .map(PersonSuggestionData.fromJson)
-      .whereType<PersonSuggestionData>()
-      .toList();
+  static List<PersonSuggestionData> listFromJson(dynamic data) =>
+      jsonMaps(data)
+          .map(PersonSuggestionData.fromJson)
+          .whereType<PersonSuggestionData>()
+          .toList();
 }
 
 /// "Anna de Vries" → "AV", "mama" → "M".

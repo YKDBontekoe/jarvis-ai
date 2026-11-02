@@ -24,7 +24,7 @@ public interface IConversationStore
     /// conversations of background tasks are left out.
     /// </summary>
     Task<IReadOnlyList<MessageSearchHit>> SearchMessagesAsync(Guid ownerId, string query, int limit,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, Guid? conversationId = null);
 
     /// <summary>One message with its conversation's title, only when the conversation is the owner's.</summary>
     Task<MessageSearchHit?> FindMessageAsync(Guid ownerId, Guid messageId, CancellationToken cancellationToken);
@@ -41,6 +41,10 @@ public interface IConversationStore
         CancellationToken cancellationToken);
 
     Task AddMessageAsync(Message message, CancellationToken cancellationToken);
+
+    /// <summary>The user message a client stored under <paramref name="clientMessageId"/>, if any.</summary>
+    Task<Message?> FindByClientMessageIdAsync(Guid conversationId, string clientMessageId,
+        CancellationToken cancellationToken);
     /// <summary>Removes one message of a conversation, with its feedback; true when it existed.</summary>
     Task<bool> DeleteMessageAsync(Guid conversationId, Guid messageId, CancellationToken cancellationToken);
     Task<string?> GetAgentSessionAsync(Guid conversationId, CancellationToken cancellationToken);

@@ -28,7 +28,11 @@ mixin _ChatScreenSend on _ChatScreenController {
 
   /// Sends [text], or the composer's text and photos when [text] is null.
   /// [photos] resends the photos of a message that failed.
-  Future<bool> _send([String? text, List<MessagePhoto>? photos]) async {
+  Future<bool> _send([
+    String? text,
+    List<MessagePhoto>? photos,
+    String? clientId,
+  ]) async {
     final content = (text ?? _input.text).trim();
     final conversationId = _conversationId;
     final generation = _realtimeGeneration;
@@ -57,6 +61,7 @@ mixin _ChatScreenSend on _ChatScreenController {
     if (text == null) {
       _input.clear();
       _pendingPhotos = [];
+      _rememberDraftPhotos();
     }
     // Typing over a docked card answers it in words, so the card closes
     // before the message goes out and Jarvis sees it as closed.
@@ -76,6 +81,7 @@ mixin _ChatScreenSend on _ChatScreenController {
       role: 'user',
       content: shownContent,
       photos: sentPhotos,
+      clientId: clientId ?? newClientMessageId(),
     );
     setState(() {
       _sending = true;
@@ -101,6 +107,7 @@ mixin _ChatScreenSend on _ChatScreenController {
         },
         data: {
           'content': content,
+          'clientMessageId': userMessage.clientId,
           if (sentPhotos.isNotEmpty)
             'imageFileIds': [for (final photo in sentPhotos) photo.fileId],
         },
@@ -570,7 +577,7 @@ mixin _ChatScreenSend on _ChatScreenController {
       return;
     }
     setState(() => _entries.remove(message));
-    final sent = await _send(message.content, message.photos);
+    final sent = await _send(message.content, message.photos, message.clientId);
     if (!sent && mounted && !_entries.contains(message)) {
       setState(() => _entries.add(message));
     }

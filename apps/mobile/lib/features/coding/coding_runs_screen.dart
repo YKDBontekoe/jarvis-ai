@@ -89,7 +89,7 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
       loading: _loading,
       error: _error,
       isEmpty: _runs.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.code,
         title: 'No coding runs yet',
@@ -154,7 +154,8 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
                         label: switch (asJsonString(run['pullRequestState'])) {
                           'merged' => 'PR merged',
                           'closed' => 'PR closed',
-                          _ => 'PR #${asJsonInt(run['pullRequestNumber'])} open',
+                          _ =>
+                            'PR #${asJsonInt(run['pullRequestNumber'])} open',
                         },
                         color: switch (asJsonString(run['pullRequestState'])) {
                           'merged' => JarvisColors.of(context).violet,

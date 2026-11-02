@@ -68,9 +68,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
   }
 
-  void _toast(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _call(Future<void> Function() action) async {
     try {
@@ -229,7 +229,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             : account == null
             ? ErrorState(
                 message: _error ?? 'Could not load this account.',
-                onRetry: () => unawaited(_load()),
+                onRetry: _load,
               )
             : Column(
                 children: [

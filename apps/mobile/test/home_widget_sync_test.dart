@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/home/home_context.dart';
 import 'package:jarvis_mobile/features/home/home_insights.dart';
 import 'package:jarvis_mobile/features/home/home_widget_sync.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   final now = DateTime.utc(2026, 10, 16, 7, 14);
@@ -125,5 +126,80 @@ void main() {
           .map((c) => c.arguments['id']),
       containsAll(['hero_title', 'needs_count', 'needs_items']),
     );
+  });
+
+  test('hiding details writes counts only, never titles or names', () {
+    final values = HomeWidgetPayload.build(
+      now: now,
+      context: context,
+      needsYou: needs,
+      hideDetails: true,
+    ).values;
+    expect(values['hide_details'], true);
+    expect(values['needs_count'], 2);
+    expect(values['hero_title'], 'Jarvis');
+    expect(values['hero_detail'], '');
+    expect(values['day_line'], '');
+    expect(values['needs_items'], '[]');
+    final everything = values.values.join(' ');
+    for (final secret in ['Rosa', 'Design review', 'charger', 'product team']) {
+      expect(everything, isNot(contains(secret)));
+    }
+  });
+
+  test('details are shown unless hidden', () {
+    expect(
+      HomeWidgetPayload.build(
+        now: now,
+        context: context,
+      ).values['hide_details'],
+      false,
+    );
+  });
+
+  test('the privacy choice is remembered', () async {
+    SharedPreferences.setMockInitialValues({});
+    expect(await WidgetPrivacy.hideDetails(), isFalse);
+    await WidgetPrivacy.setHideDetails(true);
+    expect(await WidgetPrivacy.hideDetails(), isTrue);
+  });
+
+  testWidgets('signing out empties every key the widget was given', (
+    tester,
+  ) async {
+    final calls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('home_widget'),
+      (call) async {
+        calls.add(call);
+        return true;
+      },
+    );
+    HomeWidgetSync.supported = () => true;
+    addTearDown(() {
+      HomeWidgetSync.supported = () => false;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('home_widget'),
+        null,
+      );
+    });
+
+    await HomeWidgetSync.instance.clear();
+
+    final cleared = calls
+        .where((c) => c.method == 'saveWidgetData')
+        .where((c) => c.arguments['data'] == null)
+        .map((c) => c.arguments['id'])
+        .toSet();
+    expect(cleared, containsAll(HomeWidgetSync.payloadKeys));
+    expect(calls.where((c) => c.method == 'updateWidget'), hasLength(1));
+  });
+
+  test('app-icon and Shortcuts addresses map to destinations too', () {
+    expect(
+      widgetDestination(Uri.parse('jarvis://captures?homeWidget')),
+      'captures',
+    );
+    expect(widgetDestination(Uri.parse('jarvis://chats')), 'chats');
   });
 }

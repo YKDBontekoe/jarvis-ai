@@ -94,9 +94,8 @@ void main() {
             : ValueListenableBuilder<bool>(
                 valueListenable: reducedMotion,
                 builder: (context, reduced, _) => MediaQuery(
-                  data: MediaQuery.of(
-                    context,
-                  ).copyWith(disableAnimations: reduced),
+                  data: MediaQuery.of(context)
+                      .copyWith(disableAnimations: reduced),
                   child: child!,
                 ),
               ),
@@ -581,6 +580,48 @@ void main() {
     expect(find.byType(Sheen).evaluate().length, before + 1);
     expect(washes(), findsWidgets);
     await tester.pumpAndSettle();
+  });
+
+  group('drafts', () {
+    testWidgets('an unsent draft replaces the preview and has its own filter', (
+      tester,
+    ) async {
+      chats.setDrafts({'c1': 'Can you book the hotel'});
+      await show(tester);
+
+      expect(find.byKey(const Key('chat-draft-label')), findsOneWidget);
+      expect(find.text('Can you book the hotel'), findsOneWidget);
+
+      await pick(tester, ChatFilter.drafts);
+      expect(find.text('Lisbon trip'), findsOneWidget);
+      expect(find.text('Pinned plan'), findsNothing);
+    });
+
+    testWidgets('the Drafts filter only appears while a draft exists', (
+      tester,
+    ) async {
+      await show(tester);
+      expect(find.byKey(const Key('chats-tab-drafts')), findsNothing);
+
+      chats.setDrafts({'c1': 'Hello'});
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chats-tab-drafts')), findsOneWidget);
+
+      // Sending or clearing the draft removes it again.
+      chats.setDrafts(const {});
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chats-tab-drafts')), findsNothing);
+      expect(find.byKey(const Key('chat-draft-label')), findsNothing);
+    });
+
+    testWidgets('an empty Drafts view explains itself', (tester) async {
+      chats.setDrafts({'c1': 'Hello'});
+      await show(tester);
+      await pick(tester, ChatFilter.drafts);
+      chats.setDrafts(const {});
+      await tester.pumpAndSettle();
+      expect(find.text('No drafts'), findsOneWidget);
+    });
   });
 }
 

@@ -111,7 +111,10 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
     };
     try {
       if (_editing) {
-        await widget.http.put('/api/v1/profiles/${jsonString(widget.profile!, 'id')}', data: body);
+        await widget.http.put(
+          '/api/v1/profiles/${jsonString(widget.profile!, 'id')}',
+          data: body,
+        );
       } else {
         await widget.http.post('/api/v1/profiles', data: body);
       }
@@ -120,7 +123,9 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = firstProblemMessage(error.response?.data) ?? 'Could not save this profile.';
+        _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not save this profile.';
       });
     } catch (_) {
       if (!mounted) return;
@@ -158,8 +163,9 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
             controller: _name,
             maxLength: 80,
             decoration: const InputDecoration(labelText: 'Name'),
-            validator: (value) =>
-                value == null || value.trim().isEmpty ? 'Enter a profile name.' : null,
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Enter a profile name.'
+                : null,
           ),
           TextFormField(
             controller: _description,
@@ -174,7 +180,8 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
             decoration: const InputDecoration(
               labelText: 'Persona instructions',
               alignLabelWithHint: true,
-              helperText: 'Owner text for this profile. It cannot bypass approvals.',
+              helperText:
+                  'Owner text for this profile. It cannot bypass approvals.',
             ),
           ),
           TextFormField(
@@ -242,8 +249,14 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
             decoration: const InputDecoration(labelText: 'Memory recall'),
             items: const [
               DropdownMenuItem(value: 'all', child: Text('All memories')),
-              DropdownMenuItem(value: 'profile', child: Text('This profile plus pinned facts')),
-              DropdownMenuItem(value: 'pinned', child: Text('Pinned facts only')),
+              DropdownMenuItem(
+                value: 'profile',
+                child: Text('This profile plus pinned facts'),
+              ),
+              DropdownMenuItem(
+                value: 'pinned',
+                child: Text('Pinned facts only'),
+              ),
             ],
             onChanged: (value) => setState(() => _memoryScope = value ?? 'all'),
           ),

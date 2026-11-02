@@ -394,9 +394,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
           borderColor: selected ? colors.outlineStrong : colors.outline,
-          onTap: () => Navigator.of(
-            context,
-          ).pop((conversationId: id, deletedCurrent: false)),
+          onTap: () =>
+              Navigator.of(context)
+                  .pop((conversationId: id, deletedCurrent: false)),
           child: Row(
             children: [
               IconBadge(
@@ -413,9 +413,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleSmall?.copyWith(fontSize: 15),
+                      style: Theme.of(context).textTheme.titleSmall
+                          ?.copyWith(fontSize: 15),
                     ),
                     const SizedBox(height: 3),
                     Text(

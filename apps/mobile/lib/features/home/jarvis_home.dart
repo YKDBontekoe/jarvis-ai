@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../shell/tab_memory.dart';
 import '../../ui/phosphor_icons.dart';
 import '../../json_maps.dart';
 import '../chat/mcp_setup.dart';
@@ -57,6 +58,7 @@ class JarvisHome extends StatefulWidget {
     this.onSuggestion,
     this.onReplyWith,
     this.jarvisBusy = false,
+    this.scrollSlot,
     this.clock,
     super.key,
   });
@@ -82,6 +84,9 @@ class JarvisHome extends StatefulWidget {
 
   /// Jarvis is writing a reply, possibly in a conversation that is not open.
   final bool jarvisBusy;
+
+  /// Remembers the scroll position between visits to Home.
+  final TabScrollSlot? scrollSlot;
 
   /// Replaces the wall clock in tests.
   final DateTime Function()? clock;
@@ -120,7 +125,8 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   final Set<String> _learningPending = {};
 
   /// Drives the parallax glow, the receding greeting and the compact header.
-  final _scroll = ScrollController();
+  late final ScrollController _scroll =
+      widget.scrollSlot?.create() ?? ScrollController();
 
   /// The Ask bar's text, so a follow-up on the brief can start it.
   final _ask = TextEditingController();
@@ -189,10 +195,13 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.layout.removeListener(_layoutChanged);
+    // Leaving Home mid-edit keeps what was done rather than losing it.
+    if (widget.layout.editing) widget.layout.commitEdit();
     widget.chats.removeListener(_rebuild);
     _tick?.cancel();
     _generation++;
-    _scroll.dispose();
+    final slot = widget.scrollSlot;
+    slot == null ? _scroll.dispose() : slot.release(_scroll);
     _ask.dispose();
     super.dispose();
   }
@@ -249,22 +258,27 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     _syncWidget();
   }
 
-  /// Hands the iOS widget what Home now shows.
+  /// Hands the iOS widget what Home now shows, or only counts when the owner
+  /// chose to hide details.
   void _syncWidget() {
     final now = _now;
-    unawaited(
-      HomeWidgetSync.instance.push(
+    final needs = needsYouItems(
+      now: now,
+      briefing: _briefing,
+      chats: widget.chats,
+    );
+    final context = _context;
+    unawaited(() async {
+      final hide = await WidgetPrivacy.hideDetails();
+      await HomeWidgetSync.instance.push(
         HomeWidgetPayload.build(
           now: now,
-          context: _context,
-          needsYou: needsYouItems(
-            now: now,
-            briefing: _briefing,
-            chats: widget.chats,
-          ),
+          context: context,
+          needsYou: needs,
+          hideDetails: hide,
         ),
-      ),
-    );
+      );
+    }());
   }
 
   /// Fetches the context again after something on it changed.
@@ -613,8 +627,10 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     if (change.action == 'open_skill') {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              SkillDetailScreen(http: widget.source.http, skillId: change.target),
+          builder: (_) => SkillDetailScreen(
+            http: widget.source.http,
+            skillId: change.target,
+          ),
         ),
       );
       return;
@@ -633,7 +649,9 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
             },
           );
         default:
-          await http.post<dynamic>('/api/v1/improvements/${change.target}/undo');
+          await http.post<dynamic>(
+            '/api/v1/improvements/${change.target}/undo',
+          );
       }
     } catch (_) {
       ok = false;
@@ -660,7 +678,10 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
 
   /// Accepts or turns down a suggestion from Jarvis's improvement loop. Accepting a built app switches on exactly
   /// the draft that passed its test; the server refuses if the code changed. A failure brings the row back.
-  Future<void> _decideImprovement(NeedsYouItem item, {required bool accept}) async {
+  Future<void> _decideImprovement(
+    NeedsYouItem item, {
+    required bool accept,
+  }) async {
     final id = item.id;
     if (_pending.contains(id)) return;
     setState(() {
@@ -806,13 +827,28 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     );
     if (!mounted || choice == null) return;
     if (choice == 'edit') {
-      setState(() => _editing = true);
+      _beginEdit();
     } else if (choice == 'remove') {
       widget.layout.unpin(spec.id);
     } else if (choice.startsWith('size:')) {
       final size = TileSize.parse(choice.substring(5));
       if (size != null) widget.layout.pin(spec.id, size);
     }
+  }
+
+  void _beginEdit() {
+    widget.layout.beginEdit();
+    setState(() => _editing = true);
+  }
+
+  /// Done saves the layout; Cancel puts back what Home looked like before.
+  void _endEdit({required bool save}) {
+    if (save) {
+      widget.layout.commitEdit();
+    } else {
+      widget.layout.cancelEdit();
+    }
+    if (mounted) setState(() => _editing = false);
   }
 
   @override
@@ -1034,10 +1070,25 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
+                          ListenableBuilder(
+                            listenable: widget.layout,
+                            builder: (context, _) => TextButton(
+                              key: const Key('home-edit-undo'),
+                              onPressed: widget.layout.canUndo
+                                  ? widget.layout.undo
+                                  : null,
+                              child: const Text('Undo'),
+                            ),
+                          ),
+                          TextButton(
+                            key: const Key('home-edit-cancel'),
+                            onPressed: () => _endEdit(save: false),
+                            child: const Text('Cancel'),
+                          ),
                           TextButton(
                             key: const Key('home-edit-done'),
-                            onPressed: () => setState(() => _editing = false),
+                            onPressed: () => _endEdit(save: true),
                             child: const Text('Done'),
                           ),
                         ],
@@ -1067,7 +1118,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                                 widget.onOpen(spec.destination);
                               }
                             },
-                            onEdit: () => setState(() => _editing = true),
+                            onEdit: _beginEdit,
                             now: now,
                             isLoading: _isLoading,
                             pending: _pending,
@@ -1085,7 +1136,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                       child: Center(
                         child: TextButton.icon(
                           key: const Key('home-edit'),
-                          onPressed: () => setState(() => _editing = true),
+                          onPressed: _beginEdit,
                           style: TextButton.styleFrom(
                             foregroundColor: JarvisColors.of(context).inkSoft,
                             minimumSize: const Size(44, 44),

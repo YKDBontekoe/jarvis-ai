@@ -567,6 +567,9 @@ class ErrorState extends StatelessWidget {
 }
 
 /// Loading, empty, full-page error, or a list that keeps rows visible when a refresh fails.
+///
+/// Pulling down refreshes in every state, including an empty list and a failed
+/// first load, and the indicator stays until the request has actually finished.
 class ListScreenBody extends StatelessWidget {
   const ListScreenBody({
     required this.loading,
@@ -576,6 +579,7 @@ class ListScreenBody extends StatelessWidget {
     required this.child,
     required this.onRetry,
     this.onRefresh,
+    this.emptyScrolls = false,
     super.key,
   });
 
@@ -584,19 +588,52 @@ class ListScreenBody extends StatelessWidget {
   final bool isEmpty;
   final Widget empty;
   final Widget child;
-  final VoidCallback onRetry;
 
-  /// Pull-to-refresh; when null the pull triggers [onRetry] and shows the
-  /// indicator briefly.
+  /// True when [empty] is already a scrollable list (for example one that
+  /// keeps its filters visible); it is pulled directly instead of being wrapped.
+  final bool emptyScrolls;
+
+  /// Reloads the list. Return the request's future so a pull-to-refresh lasts
+  /// exactly as long as the request does.
+  final FutureOr<void> Function() onRetry;
+
+  /// Pull-to-refresh; when null the pull awaits [onRetry].
   final Future<void> Function()? onRefresh;
+
+  Future<void> _refresh() async => await (onRefresh ?? onRetry)();
+
+  /// Lets a short or empty page be pulled down to refresh.
+  Widget _pullable(Widget page) => OrbRefresh(
+    onRefresh: _refresh,
+    child: LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(child: page),
+        ),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     if (loading && isEmpty) return const SkeletonList();
     if (error != null && isEmpty) {
-      return ErrorState(message: error!, onRetry: onRetry);
+      return _pullable(ErrorState(message: error!, onRetry: onRetry));
     }
-    if (isEmpty) return empty;
+    if (isEmpty) {
+      return emptyScrolls
+          ? OrbRefresh(
+              onRefresh: _refresh,
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context)
+                    .copyWith(physics: const AlwaysScrollableScrollPhysics()),
+                child: empty,
+              ),
+            )
+          : _pullable(empty);
+    }
     return Column(
       children: [
         if (error != null)
@@ -612,12 +649,7 @@ class ListScreenBody extends StatelessWidget {
           ),
         Expanded(
           child: OrbRefresh(
-            onRefresh:
-                onRefresh ??
-                () async {
-                  onRetry();
-                  await Future<void>.delayed(const Duration(milliseconds: 700));
-                },
+            onRefresh: _refresh,
             // Short lists must still be pullable.
             child: ScrollConfiguration(
               behavior: ScrollConfiguration.of(context)
@@ -924,43 +956,49 @@ class InlineNotice extends StatelessWidget {
         color: JarvisColors.of(context).ink,
       ),
     );
+    // Failures and confirmations that appear after an action are read out by
+    // VoiceOver without the person having to hunt for them.
     return Padding(
       padding: margin,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(14, 12, actions.isEmpty ? 14 : 6, 12),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(JarvisRadii.md),
-          border: tone == NoticeTone.danger
-              ? Border.all(color: fg.withValues(alpha: .15))
-              : null,
+      child: Semantics(
+        container: true,
+        liveRegion: tone == NoticeTone.danger || tone == NoticeTone.success,
+        child: Container(
+          padding: EdgeInsets.fromLTRB(14, 12, actions.isEmpty ? 14 : 6, 12),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(JarvisRadii.md),
+            border: tone == NoticeTone.danger
+                ? Border.all(color: fg.withValues(alpha: .15))
+                : null,
+          ),
+          child: stacked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(icon, size: 20, color: fg),
+                        const SizedBox(width: 10),
+                        Expanded(child: text),
+                      ],
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Wrap(children: actions),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Icon(icon, size: 20, color: fg),
+                    const SizedBox(width: 10),
+                    Expanded(child: text),
+                    ...actions,
+                  ],
+                ),
         ),
-        child: stacked
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(icon, size: 20, color: fg),
-                      const SizedBox(width: 10),
-                      Expanded(child: text),
-                    ],
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Wrap(children: actions),
-                  ),
-                ],
-              )
-            : Row(
-                children: [
-                  Icon(icon, size: 20, color: fg),
-                  const SizedBox(width: 10),
-                  Expanded(child: text),
-                  ...actions,
-                ],
-              ),
       ),
     );
   }

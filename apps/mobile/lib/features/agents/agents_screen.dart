@@ -229,7 +229,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
       loading: _loading,
       error: _error,
       isEmpty: false,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       empty: const SizedBox.shrink(),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -241,8 +241,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                 FadeSlideIn(
                   child: _section(
                     title: 'Remote agents',
-                    description:
-                        'Add another assistant’s Agent2Agent URL. Jarvis will ask before delegating.',
+                    description: 'Add another assistant’s Agent2Agent URL. Jarvis will ask before delegating.',
                     children: [
                       if (_agents.isEmpty)
                         const _EmptyRow(
@@ -258,8 +257,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                   index: 1,
                   child: _section(
                     title: 'Inbound tokens',
-                    description:
-                        'Other agents use these bearer tokens at POST /a2a. Copy a token when you create it; Jarvis only stores a hash.',
+                    description: 'Other agents use these bearer tokens at POST /a2a. Copy a token when you create it; Jarvis only stores a hash.',
                     action: OutlinedButton.icon(
                       onPressed: () => unawaited(_createToken()),
                       icon: const Icon(PhosphorIconsRegular.key, size: 18),
@@ -312,8 +310,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
         ),
       ),
       ...children,
-      if (action != null)
-        Align(alignment: Alignment.centerLeft, child: action),
+      if (action != null) Align(alignment: Alignment.centerLeft, child: action),
     ],
   );
 
@@ -413,9 +410,8 @@ class _EmptyRow extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colors.inkSoft,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: colors.inkSoft),
             ),
           ),
         ],

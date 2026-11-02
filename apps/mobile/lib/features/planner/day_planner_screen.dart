@@ -122,9 +122,9 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
       _toast(
         planResultMessage(
           asJsonInt(result['scheduled']),
-          jsonMaps(
-            result['didNotFit'],
-          ).map((item) => asJsonString(item['title']) ?? 'A to-do').toList(),
+          jsonMaps(result['didNotFit'])
+              .map((item) => asJsonString(item['title']) ?? 'A to-do')
+              .toList(),
         ),
       );
     } catch (error) {
@@ -240,9 +240,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
   @override
   Widget build(BuildContext context) {
     final today = _today;
-    final hasOpen = jsonMaps(
-      today?['items'],
-    ).any((item) => !asJsonBool(item['done']));
+    final hasOpen = jsonMaps(today?['items'])
+        .any((item) => !asJsonBool(item['done']));
     return Scaffold(
       appBar: AppBar(
         title: const PageTitle('Today'),
@@ -267,7 +266,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
         loading: _loading,
         error: _error,
         isEmpty: today == null,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         onRefresh: _load,
         empty: const SizedBox.shrink(),
         child: today == null ? const SizedBox.shrink() : _content(today),
@@ -306,9 +305,8 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                     Text(
                       date == null ? 'Today' : longDayLabel(date),
                       key: const Key('planner-date'),
-                      style: JarvisType.displayOf(
-                        context,
-                      ).copyWith(fontSize: 34),
+                      style: JarvisType.displayOf(context)
+                          .copyWith(fontSize: 34),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -326,8 +324,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                 InlineNotice(
                   key: const Key('planner-connect'),
                   tone: NoticeTone.info,
-                  message:
-                      'Connect a calendar so your events show up and Jarvis plans around them.',
+                  message: 'Connect a calendar so your events show up and Jarvis plans around them.',
                   actions: [
                     TextButton(
                       onPressed: () => _ask(mcpCalendarPrompt),
@@ -339,8 +336,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                 const SizedBox(height: 16),
                 const InlineNotice(
                   key: Key('planner-calendar-down'),
-                  message:
-                      'Your calendar could not be read just now, so events are missing.',
+                  message: 'Your calendar could not be read just now, so events are missing.',
                 ),
               ],
               const SizedBox(height: 28),
@@ -417,9 +413,9 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
 
   void _toggleEntry(Map<String, dynamic> entry) {
     final id = asJsonString(entry['id']);
-    final item = jsonMaps(
-      _today?['items'],
-    ).where((item) => item['id'] == id).firstOrNull;
+    final item = jsonMaps(_today?['items'])
+        .where((item) => item['id'] == id)
+        .firstOrNull;
     if (item != null) unawaited(_toggle(item));
   }
 

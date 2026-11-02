@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -9,6 +11,7 @@ import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/plain_text.dart';
+import '../../ui/submit_state.dart';
 
 part 'task_editor.dart';
 
@@ -36,7 +39,6 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   List<Map<String, dynamic>> _tasks = [];
   bool _loading = true;
-  bool _creating = false;
   String? _error;
   int _requestRevision = 0;
 
@@ -80,15 +82,17 @@ class _TasksScreenState extends State<TasksScreen> {
     widget.onCreateDone?.call(created == true ? 'Task started' : null);
   }
 
-  /// True when started, null when cancelled, false when it failed.
+  /// True when started, null when cancelled. A failed start keeps the dialog
+  /// open with what was typed, so this never returns false.
   Future<bool?> _createTask() async {
-    final created = await showJarvisDialog<_NewTask>(
+    final created = await showJarvisDialog<bool>(
       context: context,
-      builder: (_) => _NewTaskDialog(http: widget.http),
+      builder: (_) => _NewTaskDialog(http: widget.http, onSubmit: _startTask),
     );
-    if (created == null || !mounted) return null;
+    return created == true ? true : null;
+  }
 
-    setState(() => _creating = true);
+  Future<String?> _startTask(_NewTask created) async {
     try {
       await widget.http.post(
         '/api/v1/tasks',
@@ -98,21 +102,14 @@ class _TasksScreenState extends State<TasksScreen> {
           if (created.profileId != null) 'profileId': created.profileId,
         },
       );
-      await _load();
-      return true;
+      if (mounted) unawaited(_load());
+      return null;
     } on DioException catch (error) {
-      if (mounted) {
-        final message = error.response?.statusCode == 503
-            ? 'The durable task service is unavailable. Try again shortly.'
-            : 'Jarvis could not start that task.';
-        _showError(message);
-      }
-      return false;
+      return error.response?.statusCode == 503
+          ? 'The durable task service is unavailable. Try again shortly.'
+          : 'Jarvis could not start that task.';
     } catch (_) {
-      if (mounted) _showError('Jarvis could not start that task.');
-      return false;
-    } finally {
-      if (mounted) setState(() => _creating = false);
+      return 'Jarvis could not start that task.';
     }
   }
 
@@ -161,9 +158,8 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _date(dynamic value) {
@@ -236,7 +232,7 @@ class _TasksScreenState extends State<TasksScreen> {
           label: 'New task',
           icon: PhosphorIconsRegular.plus,
           onPressed: _createTask,
-          busy: _creating,
+          busy: false,
         ),
       ],
     ),
@@ -249,8 +245,7 @@ class _TasksScreenState extends State<TasksScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.checkCircle,
         title: 'No tasks yet',
-        message:
-            'Hand Jarvis something to work on in the background, like research or a summary. It reports back here.',
+        message: 'Hand Jarvis something to work on in the background, like research or a summary. It reports back here.',
       ),
       child: OrbRefresh(
         onRefresh: _load,
@@ -359,9 +354,8 @@ class _TasksScreenState extends State<TasksScreen> {
               children: [
                 Text(
                   asJsonString(task['title']) ?? 'Task',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontSize: 15, height: 1.3),
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(fontSize: 15, height: 1.3),
                 ),
                 const SizedBox(height: 5),
                 // One quiet line of status and time, in the status colour.
@@ -386,10 +380,8 @@ class _TasksScreenState extends State<TasksScreen> {
                     plainPreview(summary!),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colors.inkSoft,
-                      fontSize: 13.5,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: colors.inkSoft, fontSize: 13.5),
                   ),
                 ],
               ],

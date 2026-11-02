@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../entities/entity_ref.dart';
+import '../entities/sources_panel.dart';
 import '../../ui/phosphor_icons.dart';
 import 'calibration_card.dart';
 import 'decision_editor_screen.dart';
@@ -91,7 +93,7 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _DecisionSheet(decision: decision),
+      builder: (_) => _DecisionSheet(decision: decision, http: widget.http),
     );
     if (result == null || !mounted) return;
     final id = jsonId(decision);
@@ -153,9 +155,9 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
     }
   }
 
-  void _show(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _show(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   List<Map<String, dynamic>> _withStatus(String status) => [
     for (final d in _decisions)
@@ -183,7 +185,7 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
         loading: _loading,
         error: _error,
         isEmpty: _decisions.isEmpty,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         empty: EmptyState(
           icon: PhosphorIconsRegular.hourglassMedium,
           title: 'No decisions logged',
@@ -318,9 +320,10 @@ class _Delete extends _SheetResult {
 
 /// One decision in full, with the buttons to answer, change or remove it.
 class _DecisionSheet extends StatefulWidget {
-  const _DecisionSheet({required this.decision});
+  const _DecisionSheet({required this.decision, required this.http});
 
   final Map<String, dynamic> decision;
+  final Dio http;
 
   @override
   State<_DecisionSheet> createState() => _DecisionSheetState();
@@ -383,6 +386,15 @@ class _DecisionSheetState extends State<_DecisionSheet> {
                     style: TextStyle(fontSize: 14, color: colors.inkSoft),
                   ),
                 ),
+              // Where the decision was logged, when it came from a chat.
+              if (EntityRef.tryParse('decision:${jsonId(d)}') case final ref?)
+                SourcesPanel.of(
+                  key: const Key('decision-sources'),
+                  http: widget.http,
+                  entity: ref,
+                  expectsSource: false,
+                  relations: const {'created', 'source'},
+                ),
               const SizedBox(height: 16),
               Text(
                 resolved ? 'Change your answer' : 'Did it happen?',
@@ -405,9 +417,9 @@ class _DecisionSheetState extends State<_DecisionSheet> {
                   Expanded(
                     child: FilledButton.icon(
                       key: const Key('decision-happened'),
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).pop(_Resolve(true, _note.text.trim())),
+                      onPressed: () =>
+                          Navigator.of(context)
+                              .pop(_Resolve(true, _note.text.trim())),
                       icon: const Icon(
                         PhosphorIconsRegular.checkCircle,
                         size: 18,
@@ -419,9 +431,9 @@ class _DecisionSheetState extends State<_DecisionSheet> {
                   Expanded(
                     child: OutlinedButton.icon(
                       key: const Key('decision-did-not-happen'),
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).pop(_Resolve(false, _note.text.trim())),
+                      onPressed: () =>
+                          Navigator.of(context)
+                              .pop(_Resolve(false, _note.text.trim())),
                       icon: const Icon(PhosphorIconsRegular.xCircle, size: 18),
                       label: const Text('It did not'),
                     ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/search/search_screen.dart';
@@ -107,5 +109,120 @@ void main() {
     for (final label in ['Journal', 'Projects', 'Missions', 'Goals', 'Trips']) {
       expect(find.text(label), findsOneWidget);
     }
+  });
+
+  testWidgets('an older, slower response never replaces newer results', (
+    tester,
+  ) async {
+    final slow = Completer<void>();
+    http.beforeRespond = (options) async {
+      if (options.queryParameters['query'] == 'old') await slow.future;
+    };
+    http.on('GET', '/api/v1/search?query=old', {
+      'results': [
+        hit('project', 'p1', 'Old result', {'projectId': 'p1'}),
+      ],
+      'providers': <Object>[],
+    });
+    http.on('GET', '/api/v1/search?query=new', {
+      'results': [
+        hit('project', 'p2', 'New result', {'projectId': 'p2'}),
+      ],
+      'providers': <Object>[],
+    });
+    await show(tester);
+
+    await tester.enterText(find.byType(TextField), 'old');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byType(TextField), 'new');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.text('New result'), findsOneWidget);
+
+    slow.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('New result'), findsOneWidget);
+    expect(find.text('Old result'), findsNothing);
+  });
+
+  testWidgets('clearing the query drops a response still in flight', (
+    tester,
+  ) async {
+    final slow = Completer<void>();
+    http.beforeRespond = (_) => slow.future;
+    http.on('GET', '/api/v1/search', {
+      'results': [
+        hit('project', 'p1', 'Late result', {'projectId': 'p1'}),
+      ],
+      'providers': <Object>[],
+    });
+    await show(tester);
+
+    await tester.enterText(find.byType(TextField), 'late');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pump(const Duration(milliseconds: 300));
+
+    slow.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Late result'), findsNothing);
+    expect(find.text('RECENT'), findsOneWidget);
+  });
+
+  testWidgets('a failed source keeps results visible and offers Retry', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/search', {
+      'results': [
+        hit('project', 'p1', 'Home renovation', {'projectId': 'p1'}),
+      ],
+      'providers': [
+        {'providerId': 'file', 'succeeded': false, 'error': 'timeout'},
+        {'providerId': 'project', 'succeeded': true},
+      ],
+    });
+    await show(tester);
+
+    await tester.enterText(find.byType(TextField), 'home');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Home renovation'), findsOneWidget);
+    expect(find.byKey(const Key('search-incomplete')), findsOneWidget);
+    expect(find.textContaining('Files did not respond'), findsOneWidget);
+
+    final before = http.sent('GET', '/api/v1/search').length;
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(http.sent('GET', '/api/v1/search').length, before + 1);
+  });
+
+  testWidgets('no matches and an incomplete search look different', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/search', {
+      'results': <Object>[],
+      'providers': [
+        {'providerId': 'memory', 'succeeded': false},
+      ],
+    });
+    await show(tester);
+
+    await tester.enterText(find.byType(TextField), 'zzz');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('search-incomplete')), findsOneWidget);
+    expect(find.text('No matches yet.'), findsNothing);
+
+    http.on('GET', '/api/v1/search', {
+      'results': <Object>[],
+      'providers': [
+        {'providerId': 'memory', 'succeeded': true},
+      ],
+    });
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('No matches yet.'), findsOneWidget);
+    expect(find.byKey(const Key('search-incomplete')), findsNothing);
   });
 }

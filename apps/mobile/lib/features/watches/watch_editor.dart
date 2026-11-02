@@ -52,8 +52,7 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
   String _kind = 'public_json';
   String _comparison = 'below';
 
-  bool get _isJson =>
-      _kind == 'public_json' || _kind == 'authenticated_json';
+  bool get _isJson => _kind == 'public_json' || _kind == 'authenticated_json';
 
   @override
   void dispose() {
@@ -73,9 +72,7 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
   void _save() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final parsedInterval = int.tryParse(_interval.text);
-    if (parsedInterval == null ||
-        parsedInterval < 5 ||
-        parsedInterval > 1440) {
+    if (parsedInterval == null || parsedInterval < 5 || parsedInterval > 1440) {
       return;
     }
     var comparison = _comparison;
@@ -112,9 +109,7 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
       threshold = radius;
     } else if (_kind == 'calendar') {
       minutesBefore = int.tryParse(_minutesBefore.text);
-      if (minutesBefore == null ||
-          minutesBefore < 5 ||
-          minutesBefore > 1440) {
+      if (minutesBefore == null || minutesBefore < 5 || minutesBefore > 1440) {
         return;
       }
       threshold = minutesBefore.toDouble();
@@ -356,21 +351,13 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
                 },
               ),
               const SizedBox(height: 12),
-              Text(
-                switch (_kind) {
-                  'authenticated_json' =>
-                    'Jarvis polls the HTTPS JSON URL with the stored provider token as Authorization. Never put secrets in the URL.',
-                  'device_battery' =>
-                    'Jarvis uses the latest battery snapshot from this app. Open Jarvis on the phone so the reading stays fresh.',
-                  'device_location' =>
-                    'Jarvis measures distance from this phone’s last location to the point you set. Alert when the distance is at or below the radius.',
-                  'calendar' =>
-                    'Jarvis reads the connected ICS calendar pack and alerts when the next event is within the chosen number of minutes.',
-                  _ =>
-                    'Jarvis checks the public endpoint on a timer and stops after the threshold is reached. URLs requiring sign-in or containing credentials are not supported.',
-                },
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+              Text(switch (_kind) {
+                'authenticated_json' => 'Jarvis polls the HTTPS JSON URL with the stored provider token as Authorization. Never put secrets in the URL.',
+                'device_battery' => 'Jarvis uses the latest battery snapshot from this app. Open Jarvis on the phone so the reading stays fresh.',
+                'device_location' => 'Jarvis measures distance from this phone’s last location to the point you set. Alert when the distance is at or below the radius.',
+                'calendar' => 'Jarvis reads the connected ICS calendar pack and alerts when the next event is within the chosen number of minutes.',
+                _ => 'Jarvis checks the public endpoint on a timer and stops after the threshold is reached. URLs requiring sign-in or containing credentials are not supported.',
+              }, style: Theme.of(context).textTheme.bodySmall),
             ],
           ),
         ),

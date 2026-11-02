@@ -60,4 +60,76 @@ void main() {
     await tester.tap(find.byKey(const Key('voice-primary')));
     expect(ended, isTrue);
   });
+
+  testWidgets('End stays on screen while long captions scroll above it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(
+          size: Size(360, 640),
+          textScaler: TextScaler.linear(2.5),
+        ),
+        child: _host(
+          VoiceStage(
+            phase: 'speaking',
+            voiceName: 'Cove',
+            handsFree: true,
+            captions: true,
+            caption: List.filled(
+              40,
+              'A long answer that keeps going.',
+            ).join(' '),
+            captionRole: 'assistant',
+            canStart: true,
+            onPrimary: () {},
+            onToggleMute: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+
+    for (final key in ['voice-primary', 'voice-mute']) {
+      final rect = tester.getRect(find.byKey(Key(key)));
+      expect(rect.bottom, lessThanOrEqualTo(640), reason: '$key is off screen');
+      expect(rect.top, greaterThanOrEqualTo(0));
+    }
+  });
+
+  testWidgets('captions can be hidden and shown during a call', (tester) async {
+    var captions = true;
+    late StateSetter update;
+    await tester.pumpWidget(
+      _host(
+        StatefulBuilder(
+          builder: (context, setState) {
+            update = setState;
+            return VoiceStage(
+              phase: 'listening',
+              voiceName: 'Cove',
+              handsFree: true,
+              captions: captions,
+              caption: 'Hello there',
+              captionRole: 'assistant',
+              canStart: true,
+              onPrimary: () {},
+              onToggleCaptions: () => update(() => captions = !captions),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Hello there'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('voice-captions')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Hello there'), findsNothing);
+    expect(find.text('Show captions'), findsOneWidget);
+  });
 }

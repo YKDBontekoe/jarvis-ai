@@ -179,4 +179,52 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get turnQualityFlagLowCache =>
       'Few prompts are reused from cache, so each reply costs more time.';
+
+  @override
+  String get capturesTitle => 'Captures';
+
+  @override
+  String get capturesEmptyTitle => 'Nothing shared yet';
+
+  @override
+  String get capturesEmptyMessage =>
+      'Use Share in another app and choose Jarvis. What you share waits here until you decide what to do with it.';
+
+  @override
+  String get capturesDiscardTitle => 'Discard this capture?';
+
+  @override
+  String get capturesDiscardMessage =>
+      'It will be removed from this phone. Nothing is sent anywhere.';
+
+  @override
+  String get capturesKeep => 'Keep';
+
+  @override
+  String get capturesDiscard => 'Discard';
+
+  @override
+  String get capturesLinkNote => 'Add a note about this link (optional)';
+
+  @override
+  String get capturesEditFirst => 'Edit before you decide';
+
+  @override
+  String get capturesSaveToFiles => 'Save to Files';
+
+  @override
+  String get capturesSaveToLibrary => 'Save to Library';
+
+  @override
+  String get capturesAsk => 'Ask Jarvis';
+
+  @override
+  String get capturesRemind => 'Create reminder';
+
+  @override
+  String get hideInSwitcherTitle => 'Hide in app switcher';
+
+  @override
+  String get hideInSwitcherSubtitle =>
+      'Blur Jarvis when you swipe up or switch apps';
 }

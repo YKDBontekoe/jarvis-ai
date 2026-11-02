@@ -91,8 +91,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'decisions',
-    description:
-        'Log a call with how sure you are, answer later, and see how well calibrated you are.',
+    description: 'Log a call with how sure you are, answer later, and see how well calibrated you are.',
     name: 'Decisions',
     icon: PhosphorIconsRegular.hourglassMedium,
     category: TileCategory.plan,
@@ -239,6 +238,16 @@ final List<TileSpec> tileSpecs = [
     destination: 'files',
     load: _files,
     fallback: 'Documents Jarvis can search',
+  ),
+  const TileSpec(
+    id: 'captures',
+    description: 'Review what you shared into Jarvis from other apps.',
+    name: 'Captures',
+    icon: PhosphorIconsRegular.tray,
+    category: TileCategory.know,
+    sizes: [_icon, _strip],
+    destination: 'captures',
+    fallback: 'Shared from other apps',
   ),
   const TileSpec(
     id: 'graph',
@@ -1296,9 +1305,8 @@ Future<TileData?> _activity(TileEnv env) async {
             null => null,
           },
           attention: asJsonString(event['kind']) == 'approval.requested',
-          target: EntityRef.tryParse(
-            asJsonString(event['subjectRef']),
-          )?.destination,
+          target: EntityRef.tryParse(asJsonString(event['subjectRef']))
+              ?.destination,
         ),
     ],
   );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 /// Reads the device's IANA time zone (for example Europe/Amsterdam). Tests
 /// replace this; null means the platform could not tell.
@@ -74,3 +76,86 @@ String? repeatLabel(String? recurrence, int weekdays) => switch (recurrence) {
 String _weekdayName(int weekday) => weekdayNames[weekday - 1].$2;
 
 DateTime _day(DateTime value) => DateTime(value.year, value.month, value.day);
+
+bool _zonesReady = false;
+final Map<String, tz.Location?> _zones = {};
+
+tz.Location? _zone(String? id) {
+  if (id == null || id.isEmpty) return null;
+  if (!_zonesReady) {
+    tz_data.initializeTimeZones();
+    _zonesReady = true;
+  }
+  return _zones.putIfAbsent(id, () {
+    try {
+      return tz.getLocation(id);
+    } catch (_) {
+      return null;
+    }
+  });
+}
+
+/// The moment a clock set to [zoneId] shows [wallClock] (its year, month, day,
+/// hour and minute), as a UTC instant. Null when the zone is not known.
+DateTime? instantInZone(DateTime wallClock, String? zoneId) {
+  final location = _zone(zoneId);
+  if (location == null) return null;
+  return tz.TZDateTime(
+    location,
+    wallClock.year,
+    wallClock.month,
+    wallClock.day,
+    wallClock.hour,
+    wallClock.minute,
+  ).toUtc();
+}
+
+/// What a clock set to [zoneId] shows at [instant], as plain date and time
+/// fields. Null when the zone is not known.
+DateTime? wallClockInZone(DateTime instant, String? zoneId) {
+  final location = _zone(zoneId);
+  if (location == null) return null;
+  final zoned = tz.TZDateTime.from(instant.toUtc(), location);
+  return DateTime(zoned.year, zoned.month, zoned.day, zoned.hour, zoned.minute);
+}
+
+/// "Lisbon" for `Europe/Lisbon`, "Buenos Aires" for `America/Argentina/Buenos_Aires`.
+String zoneCity(String zoneId) => zoneId.split('/').last.replaceAll('_', ' ');
+
+/// How a scheduled [instant] reads on the clock of its own [zoneId], for example
+/// "Tomorrow 9:00 AM in Lisbon". Null when that is the same time the phone
+/// shows (so there is nothing to explain) or the zone is unknown.
+String? zoneEquivalentLine(
+  BuildContext context,
+  DateTime instant,
+  String? zoneId, {
+  DateTime? now,
+}) {
+  final there = wallClockInZone(instant, zoneId);
+  if (there == null || zoneId == null) return null;
+  final here = instant.toLocal();
+  final same =
+      there.year == here.year &&
+      there.month == here.month &&
+      there.day == here.day &&
+      there.hour == here.hour &&
+      there.minute == here.minute;
+  if (same) return null;
+  final nowThere = wallClockInZone(now ?? DateTime.now(), zoneId);
+  return '${friendlyWhen(context, there, now: nowThere)} in ${zoneCity(zoneId)}';
+}
+
+/// One scheduled [instant] described on both clocks when they differ: the
+/// reminder's own zone first, then the phone. When they read the same (or the
+/// zone is unknown) there is only the phone's reading and [other] is null.
+({String primary, String? other}) describeScheduledInstant(
+  BuildContext context,
+  DateTime instant,
+  String? zoneId, {
+  DateTime? now,
+}) {
+  final zoneLine = zoneEquivalentLine(context, instant, zoneId, now: now);
+  final phone = friendlyWhen(context, instant.toLocal(), now: now);
+  if (zoneLine == null) return (primary: phone, other: null);
+  return (primary: zoneLine, other: '$phone on your phone');
+}

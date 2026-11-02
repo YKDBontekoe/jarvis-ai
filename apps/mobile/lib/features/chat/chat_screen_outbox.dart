@@ -12,6 +12,7 @@ mixin _ChatScreenOutbox on _ChatScreenController {
     final stored = await OutboxStore.open();
     if (!mounted || _signedOut) return;
     _outbox = stored;
+    WaitingChanges.instance.attach(stored);
     final id = _conversationId;
     if (id == null) return;
     final missing = _queuedEntries(id)
@@ -45,7 +46,10 @@ mixin _ChatScreenOutbox on _ChatScreenController {
     String conversationId,
   ) async {
     final item = OutboxMessage(
-      id: 'outbox-${DateTime.now().microsecondsSinceEpoch}-${++_outboxSerial}',
+      // The send keeps its id while it waits, so the server can recognise it when it finally goes out.
+      id:
+          message.clientId ??
+          'outbox-${DateTime.now().microsecondsSinceEpoch}-${++_outboxSerial}',
       conversationId: conversationId,
       content: message.content,
       queuedAt: DateTime.now(),
@@ -61,6 +65,7 @@ mixin _ChatScreenOutbox on _ChatScreenController {
       photos: message.photos,
       outboxId: item.id,
       queuedAt: item.queuedAt,
+      clientId: item.id,
     );
     if (index >= 0) {
       _entries[index] = queued;
@@ -140,7 +145,7 @@ mixin _ChatScreenOutbox on _ChatScreenController {
         await _send(item.content, [
           for (final photo in item.photos)
             MessagePhoto(fileId: photo.fileId, fileName: photo.fileName),
-        ]);
+        ], item.id);
         if (_lastSendQueued) return;
       }
     } catch (_) {
@@ -168,7 +173,7 @@ mixin _ChatScreenOutbox on _ChatScreenController {
     await _send(item.content, [
       for (final photo in item.photos)
         MessagePhoto(fileId: photo.fileId, fileName: photo.fileName),
-    ]);
+    ], item.id);
     _scheduleOutboxRetry();
   }
 
@@ -186,6 +191,34 @@ mixin _ChatScreenOutbox on _ChatScreenController {
       );
     }
     _scheduleOutboxRetry();
+  }
+
+  /// Discards a waiting message from the overview page, wherever it was typed.
+  Future<void> _discardWaitingMessage(String id) async {
+    await _outbox.remove(id);
+    if (!mounted) return;
+    setState(
+      () => _entries.removeWhere(
+        (entry) => entry is MessageEntry && entry.outboxId == id,
+      ),
+    );
+    _scheduleOutboxRetry();
+  }
+
+  /// Lets the offline banner and the overview page reach this screen.
+  void _registerWaitingChanges() {
+    final waiting = WaitingChanges.instance;
+    waiting.openOverview.value = () => _openUtility('queued-changes');
+    waiting.openConversation = (id) {
+      if (_isWide) {
+        _closeUtilityPane();
+      } else if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      unawaited(_presentConversation(id));
+    };
+    waiting.openDestination = _openUtility;
+    waiting.discardMessage = _discardWaitingMessage;
   }
 
   bool _photoOnlyContent(MessageEntry entry) =>

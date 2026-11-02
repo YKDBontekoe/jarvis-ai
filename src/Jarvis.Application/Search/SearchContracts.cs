@@ -69,10 +69,24 @@ public interface IFederatedSearchProvider
         CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// A provider that can also search inside one conversation. Only these providers answer a search that carries a
+/// conversation id; every other provider is left out of it.
+/// </summary>
+public interface IConversationScopedSearchProvider : IFederatedSearchProvider
+{
+    Task<IReadOnlyList<FederatedSearchResult>> SearchInConversationAsync(Guid ownerId, Guid conversationId,
+        string query, int limit, CancellationToken cancellationToken);
+}
+
 public interface IFederatedSearchService
 {
+    /// <summary>
+    /// Searches everything the owner has. With <paramref name="conversationId"/> it searches only inside that
+    /// conversation (the whole transcript, newest first); the caller must already have checked it is the owner's.
+    /// </summary>
     Task<FederatedSearchResponse> SearchAsync(Guid ownerId, string query, IReadOnlySet<string>? kindsFilter,
-        CancellationToken cancellationToken, SearchWindow? window = null);
+        CancellationToken cancellationToken, SearchWindow? window = null, Guid? conversationId = null);
 }
 
 public sealed class FederatedSearchOptions
@@ -80,5 +94,8 @@ public sealed class FederatedSearchOptions
     public const string SectionName = "Search";
     public int MaxPerProvider { get; set; } = 8;
     public int MaxTotal { get; set; } = 40;
+
+    /// <summary>Most hits a search inside one conversation returns.</summary>
+    public int MaxInConversation { get; set; } = 100;
     public TimeSpan ProviderTimeout { get; set; } = TimeSpan.FromSeconds(2);
 }

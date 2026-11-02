@@ -79,7 +79,7 @@ class _OverviewTabState extends State<OverviewTab>
       loading: _loading,
       error: _error,
       isEmpty: data == null,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       onRefresh: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.wallet,

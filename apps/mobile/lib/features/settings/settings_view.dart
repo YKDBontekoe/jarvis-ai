@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../everything/feature_search.dart' show foldForSearch;
+import '../shell/tab_memory.dart';
 
 typedef SettingsDestination = ({
   String title,
@@ -21,6 +23,12 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
         subtitle: 'Light, dark, or match this device',
         icon: PhosphorIconsRegular.circleHalf,
         destination: 'appearance',
+      ),
+      (
+        title: 'Widgets',
+        subtitle: 'What the home screen widgets show',
+        icon: PhosphorIconsRegular.eyeSlash,
+        destination: 'widget-privacy',
       ),
       (
         title: 'Face ID lock',
@@ -213,17 +221,167 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
   ),
 ];
 
-class SettingsView extends StatelessWidget {
+/// Words people use for a setting besides its title, in English and Dutch, by
+/// destination: "dark mode" finds Appearance, "tijdzone" finds Time zone.
+const settingAliases = <String, List<String>>{
+  'appearance': [
+    'dark mode',
+    'donker',
+    'theme',
+    'thema',
+    'light',
+    'licht',
+    'display',
+    'text size',
+    'tekstgrootte',
+    'motion',
+  ],
+  'widget-privacy': [
+    'widget',
+    'widgets',
+    'home screen',
+    'startscherm',
+    'hide',
+    'verbergen',
+    'privacy',
+    'lock screen',
+  ],
+  'app-lock': [
+    'face id',
+    'touch id',
+    'passcode',
+    'pincode',
+    'biometrics',
+    'security',
+    'beveiliging',
+    'vergrendeling',
+  ],
+  'voice-settings': [
+    'speech',
+    'spraak',
+    'microphone',
+    'microfoon',
+    'hands-free',
+    'captions',
+    'ondertiteling',
+  ],
+  'queued-changes': ['offline', 'sync', 'synchroniseren', 'pending', 'queue'],
+  'home-zone': ['timezone', 'tijdzone', 'region', 'clock', 'tijd'],
+  'do-not-learn': ['forget', 'vergeten', 'privacy', 'block', 'topics'],
+  'locale': [
+    'language',
+    'taal',
+    'currency',
+    'valuta',
+    'euro',
+    'dollar',
+    'nederlands',
+    'english',
+    'dutch',
+  ],
+  'briefing': ['morning', 'ochtend', 'summary', 'daily', 'dagelijks'],
+  'weekly-review': ['sunday', 'zondag', 'trends', 'recap'],
+  'integrations': [
+    'calendar',
+    'agenda',
+    'mail',
+    'gmail',
+    'smart home',
+    'mcp',
+    'koppelingen',
+  ],
+  'channels': ['whatsapp', 'signal', 'messaging', 'berichten'],
+  'devices': [
+    'location',
+    'locatie',
+    'clipboard',
+    'permissions',
+    'toestemmingen',
+    'phone',
+    'telefoon',
+  ],
+  'reminders': ['notifications', 'meldingen', 'alerts', 'herinneringen'],
+  'watches': ['monitor', 'price', 'prijs', 'alert'],
+  'automations': ['rules', 'regels', 'workflows', 'triggers'],
+  'modes': ['focus', 'sleep', 'slaap', 'do not disturb', 'niet storen'],
+  'persona': ['personality', 'persoonlijkheid', 'tone', 'style'],
+  'skills': ['routines', 'abilities', 'vaardigheden'],
+  'profiles': ['workspace', 'werk', 'thuis', 'work', 'home'],
+  'learning': ['lessons', 'lessen', 'reflect', 'leren'],
+  'approvals': ['permissions', 'toestemming', 'allow', 'toestaan', 'confirm'],
+  'audit': ['history', 'log', 'geschiedenis', 'activity'],
+  'files': ['documents', 'documenten', 'uploads', 'bestanden'],
+  'graph': ['people', 'places', 'mensen', 'kennis'],
+  'usage': ['cost', 'kosten', 'tokens', 'spend', 'gebruik'],
+  'models': ['ai', 'model', 'openrouter', 'codex', 'gpt'],
+  'coding': ['code', 'github', 'programming'],
+  'agents': ['a2a', 'assistants', 'assistenten'],
+};
+
+/// A setting that matched a search, with the group it lives in.
+typedef SettingsMatch = ({String group, SettingsDestination item, int score});
+
+/// Settings that answer [query] by title, description or alias, best first.
+/// An exact title beats a title that starts with the words, which beats an
+/// alias, which beats a word in the description or the group name.
+List<SettingsMatch> searchSettings(String query) {
+  final needle = foldForSearch(query);
+  if (needle.isEmpty) return const [];
+  final matches = <SettingsMatch>[];
+  for (final (group, items) in settingsGroups) {
+    for (final item in items) {
+      final title = foldForSearch(item.title);
+      var score = 0;
+      void consider(int value) {
+        if (value > score) score = value;
+      }
+
+      if (title == needle) consider(100);
+      if (title.startsWith(needle)) consider(90);
+      if (title.split(RegExp(r'[\s&-]+')).any((w) => w.startsWith(needle))) {
+        consider(80);
+      }
+      if (title.contains(needle)) consider(70);
+      for (final alias in settingAliases[item.destination] ?? const []) {
+        final folded = foldForSearch(alias);
+        if (folded == needle) consider(60);
+        if (folded.startsWith(needle)) consider(50);
+        if (folded.contains(needle)) consider(40);
+      }
+      if (foldForSearch(item.subtitle).contains(needle)) consider(30);
+      if (foldForSearch(group).contains(needle)) consider(20);
+      if (score > 0) matches.add((group: group, item: item, score: score));
+    }
+  }
+  // Stable: equal scores keep the order the settings are listed in.
+  final order = {for (final (i, m) in matches.indexed) m.item.destination: i};
+  matches.sort((a, b) {
+    final byScore = b.score.compareTo(a.score);
+    return byScore != 0
+        ? byScore
+        : order[a.item.destination]!.compareTo(order[b.item.destination]!);
+  });
+  return matches;
+}
+
+class SettingsView extends StatefulWidget {
   const SettingsView({
     required this.connected,
     required this.onOpen,
     this.onSignOut,
+    this.scrollSlot,
     super.key,
   });
+
+  /// Keeps the list position between visits to You.
+  final TabScrollSlot? scrollSlot;
 
   final bool connected;
   final ValueChanged<String> onOpen;
   final VoidCallback? onSignOut;
+
+  @override
+  State<SettingsView> createState() => _SettingsViewState();
 
   /// Each group has its own colour, so a long list is easy to scan.
   static Color _groupColor(JarvisColors colors, String group) =>
@@ -235,12 +393,27 @@ class SettingsView extends StatelessWidget {
         'Privacy & data' => colors.warning,
         _ => colors.inkSoft,
       };
+}
+
+class _SettingsViewState extends State<SettingsView> {
+  final _query = TextEditingController();
+  late final ScrollController _list =
+      widget.scrollSlot?.create() ?? ScrollController();
+
+  @override
+  void dispose() {
+    _query.dispose();
+    final slot = widget.scrollSlot;
+    slot == null ? _list.dispose() : slot.release(_list);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     return SafeArea(
       child: ListView(
+        controller: _list,
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
           ContentWidth(
@@ -248,17 +421,25 @@ class SettingsView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _hero(context, colors),
-                for (final (title, items) in settingsGroups)
-                  _group(context, title, [
-                    for (final item in items)
-                      _tile(context, item, _groupColor(colors, title)),
-                  ]),
-                if (onSignOut != null)
+                _search(context, colors),
+                if (_query.text.trim().isNotEmpty)
+                  _results(context, colors)
+                else
+                  for (final (title, items) in settingsGroups)
+                    _group(context, title, [
+                      for (final item in items)
+                        _tile(
+                          context,
+                          item,
+                          SettingsView._groupColor(colors, title),
+                        ),
+                    ]),
+                if (widget.onSignOut != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 28),
                     child: SurfaceCard(
                       padding: EdgeInsets.zero,
-                      onTap: onSignOut,
+                      onTap: widget.onSignOut,
                       child: SizedBox(
                         height: 52,
                         child: Row(
@@ -290,6 +471,76 @@ class SettingsView extends StatelessWidget {
     );
   }
 
+  Widget _search(BuildContext context, JarvisColors colors) => Padding(
+    padding: const EdgeInsets.only(top: 16),
+    // The page is shown with and without a Scaffold around it.
+    child: Material(
+      type: MaterialType.transparency,
+      child: TextField(
+        key: const Key('settings-search'),
+        controller: _query,
+        onChanged: (_) => setState(() {}),
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search settings',
+          prefixIcon: Icon(
+            PhosphorIconsRegular.magnifyingGlass,
+            size: 18,
+            color: colors.muted,
+          ),
+          suffixIcon: _query.text.isEmpty
+              ? null
+              : IconButton(
+                  key: const Key('settings-clear-search'),
+                  tooltip: 'Clear settings search',
+                  onPressed: () => setState(_query.clear),
+                  icon: Icon(
+                    PhosphorIconsRegular.x,
+                    size: 16,
+                    color: colors.inkSoft,
+                  ),
+                ),
+        ),
+      ),
+    ),
+  );
+
+  /// Matching settings, each with the group it belongs to.
+  Widget _results(BuildContext context, JarvisColors colors) {
+    final matches = searchSettings(_query.text);
+    if (matches.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Text(
+            'No setting matches “${_query.text.trim()}”',
+            key: const Key('settings-no-match'),
+            style: TextStyle(color: colors.muted),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: SurfaceCard(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          children: [
+            for (final (index, match) in matches.indexed) ...[
+              if (index > 0) const Divider(indent: 62, height: 1),
+              _tile(
+                context,
+                match.item,
+                SettingsView._groupColor(colors, match.group),
+                group: match.group,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _hero(BuildContext context, JarvisColors colors) => SurfaceCard(
     radius: JarvisRadii.xl,
     padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
@@ -305,14 +556,13 @@ class SettingsView extends StatelessWidget {
             children: [
               Text(
                 'Your assistant',
-                style: JarvisType.displayOf(
-                  context,
-                ).copyWith(fontSize: 20, letterSpacing: -.4),
+                style: JarvisType.displayOf(context)
+                    .copyWith(fontSize: 20, letterSpacing: -.4),
               ),
               const SizedBox(height: 8),
               StatusChip(
-                label: connected ? 'Live' : 'Offline, updates paused',
-                color: connected ? colors.success : colors.muted,
+                label: widget.connected ? 'Live' : 'Offline, updates paused',
+                color: widget.connected ? colors.success : colors.muted,
               ),
             ],
           ),
@@ -354,7 +604,12 @@ class SettingsView extends StatelessWidget {
         ),
       );
 
-  Widget _tile(BuildContext context, SettingsDestination item, Color tint) {
+  Widget _tile(
+    BuildContext context,
+    SettingsDestination item,
+    Color tint, {
+    String? group,
+  }) {
     final colors = JarvisColors.of(context);
     return ListTile(
       key: Key('settings-${item.destination}'),
@@ -369,13 +624,15 @@ class SettingsView extends StatelessWidget {
         child: Icon(item.icon, size: 18, color: tint),
       ),
       title: Text(item.title),
-      subtitle: Text(item.subtitle),
+      subtitle: Text(
+        group == null ? item.subtitle : '$group · ${item.subtitle}',
+      ),
       trailing: Icon(
         PhosphorIconsRegular.caretRight,
         size: 16,
         color: colors.muted,
       ),
-      onTap: () => onOpen(item.destination),
+      onTap: () => widget.onOpen(item.destination),
     );
   }
 }

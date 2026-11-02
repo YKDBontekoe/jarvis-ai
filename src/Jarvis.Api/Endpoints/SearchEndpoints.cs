@@ -7,11 +7,16 @@ internal static class SearchEndpoints
 {
     public static RouteGroupBuilder MapSearchEndpoints(this RouteGroupBuilder api)
     {
-        api.MapGet("/search", async (IFederatedSearchService search, ICurrentUser currentUser, string? query,
-                string? kinds, string? from, string? to, CancellationToken ct) =>
+        api.MapGet("/search", async (IFederatedSearchService search, IConversationStore conversations,
+                ICurrentUser currentUser, string? query, string? kinds, string? from, string? to,
+                Guid? conversationId, CancellationToken ct) =>
             {
                 if (string.IsNullOrWhiteSpace(query))
                     return EndpointHelpers.Invalid("query", "Query must contain 1 to 2,000 characters.");
+                // A conversation that is not the caller's is "not found", the same as one that does not exist.
+                if (conversationId is { } scope &&
+                    await conversations.GetAsync(scope, currentUser.OwnerId, ct) is null)
+                    return Results.NotFound();
                 IReadOnlySet<string>? kindFilter = null;
                 if (!string.IsNullOrWhiteSpace(kinds))
                 {
@@ -32,7 +37,7 @@ internal static class SearchEndpoints
                     window = new SearchWindow(start, end);
                 }
 
-                var response = await search.SearchAsync(currentUser.OwnerId, query!, kindFilter, ct, window);
+                var response = await search.SearchAsync(currentUser.OwnerId, query!, kindFilter, ct, window, conversationId);
                 return Results.Ok(new FederatedSearchResponseDto(
                     response.Results.Select(ToDto).ToArray(),
                     response.Providers.Select(status => new SearchProviderStatusDto(status.ProviderId, status.Succeeded,

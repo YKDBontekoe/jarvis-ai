@@ -103,9 +103,21 @@ List<ReminderPlace> savedPlaces(Iterable<Map<String, dynamic>> reminders) {
 class _NewReminderDialog extends StatefulWidget {
   const _NewReminderDialog({
     required this.timeZone,
+    this.initialTitle,
+    this.fromChat = false,
     this.places = const [],
     this.locate = readDeviceLocationSnapshot,
+    required this.onSubmit,
   });
+
+  /// Saves the reminder; null on success, otherwise the message to show here.
+  final Future<String?> Function(_NewReminder reminder) onSubmit;
+
+  /// Text the title starts with, for a reminder made from a chat message.
+  final String? initialTitle;
+
+  /// The reminder is being made from a chat message, which the editor says.
+  final bool fromChat;
 
   /// Resolves to the zone the reminder will be saved in, shown under the time.
   final Future<String> timeZone;
@@ -122,14 +134,16 @@ class _NewReminderDialog extends StatefulWidget {
   State<_NewReminderDialog> createState() => _NewReminderDialogState();
 }
 
-class _NewReminderDialogState extends State<_NewReminderDialog> {
+class _NewReminderDialogState extends State<_NewReminderDialog>
+    with SubmitState {
   final _formKey = GlobalKey<FormState>();
-  final _title = TextEditingController();
+  late final _title = TextEditingController(text: widget.initialTitle);
   DateTime _date = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _time = const TimeOfDay(hour: 9, minute: 0);
   String _recurrence = 'once';
   int _weekdays = 0;
   bool _atPlace = false;
+  ReminderShortcut? _shortcut;
   final _placeName = TextEditingController();
   ({double latitude, double longitude, double? accuracy})? _spot;
   String? _savedPlace;
@@ -138,6 +152,19 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
   bool _everyVisit = false;
   bool _locating = false;
   String? _placeError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Starts on "Tomorrow morning" on the reminder's own clock.
+    widget.timeZone
+        .then((_) {
+          if (mounted && _shortcut == null) {
+            unawaited(_useShortcut(ReminderShortcut.tomorrowMorning));
+          }
+        })
+        .catchError((_) {});
+  }
 
   static const _radii = [(150.0, '150 m'), (300.0, '300 m'), (750.0, '750 m')];
 
@@ -158,8 +185,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     setState(() {
       _locating = false;
       if (fix.latitude == null || fix.longitude == null) {
-        _placeError =
-            'Jarvis could not read your location. Allow location for Jarvis in Settings, then try again.';
+        _placeError = 'Jarvis could not read your location. Allow location for Jarvis in Settings, then try again.';
         return;
       }
       _spot = (
@@ -178,6 +204,26 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     });
   }
 
+  /// Fills the date and time from a shortcut, on the clock of the reminder's own zone.
+  Future<void> _useShortcut(ReminderShortcut shortcut) async {
+    final zone = await widget.timeZone;
+    if (!mounted) return;
+    final when = resolveReminderShortcut(shortcut, nowOnClock(zone));
+    if (when == null) return;
+    setState(() {
+      _shortcut = shortcut;
+      _date = DateTime(when.year, when.month, when.day);
+      _time = TimeOfDay(hour: when.hour, minute: when.minute);
+    });
+  }
+
+  /// Leaves the shortcuts and opens the time picker.
+  Future<void> _pickATime() async {
+    setState(() => _shortcut = null);
+    final value = await showTimePicker(context: context, initialTime: _time);
+    if (value != null && mounted) setState(() => _time = value);
+  }
+
   void _pickSaved(ReminderPlace place) => setState(() {
     _savedPlace = place.name;
     _spot = (
@@ -192,16 +238,15 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     _placeError = null;
   });
 
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  Future<void> _save() async {
+    if (submitting || !(_formKey.currentState?.validate() ?? false)) return;
     if (_atPlace) {
       final spot = _spot;
       if (spot == null) {
         setState(() => _placeError = 'Choose where this reminder should fire.');
         return;
       }
-      Navigator.pop(
-        context,
+      await _send(
         _NewReminder(
           title: _title.text.trim(),
           date: _date,
@@ -226,8 +271,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
       );
       return;
     }
-    Navigator.pop(
-      context,
+    await _send(
       _NewReminder(
         title: _title.text.trim(),
         date: _date,
@@ -236,6 +280,12 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
         weekdays: _weekdays,
       ),
     );
+  }
+
+  Future<void> _send(_NewReminder reminder) async {
+    if (await submit(() => widget.onSubmit(reminder)) && mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   @override
@@ -252,6 +302,21 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.fromChat)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      const Icon(PhosphorIconsRegular.chatCircle, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        'From a message in this chat',
+                        key: const Key('reminder-from-chat'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
               TextFormField(
                 controller: _title,
                 autofocus: true,
@@ -291,6 +356,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
                 alignment: Alignment.topCenter,
                 child: _atPlace ? _placeFields(context) : _timeFields(context),
               ),
+              submitErrorNotice(),
             ],
           ),
         ),
@@ -298,10 +364,10 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     ),
     actions: [
       TextButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: submitting ? null : () => Navigator.pop(context),
         child: const Text('Cancel'),
       ),
-      FilledButton(onPressed: _save, child: const Text('Save')),
+      SubmitButton(label: 'Save', busy: submitting, onPressed: _save),
     ],
   );
 
@@ -508,6 +574,38 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
           ],
         ),
       ],
+      if (_recurrence == 'once') ...[
+        const SizedBox(height: 10),
+        FutureBuilder<String>(
+          future: widget.timeZone,
+          builder: (context, snapshot) {
+            final now = nowOnClock(snapshot.data);
+            return Wrap(
+              key: const Key('reminder-shortcuts'),
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final shortcut in ReminderShortcut.values)
+                  if (resolveReminderShortcut(shortcut, now) != null)
+                    ChoiceChip(
+                      key: Key('shortcut-${shortcut.name}'),
+                      label: Text(shortcut.label),
+                      selected: _shortcut == shortcut,
+                      onSelected: snapshot.hasData
+                          ? (_) => _useShortcut(shortcut)
+                          : null,
+                    ),
+                ChoiceChip(
+                  key: const Key('shortcut-pick'),
+                  label: const Text('Pick a time'),
+                  selected: _shortcut == null,
+                  onSelected: (_) => _pickATime(),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
       const SizedBox(height: 10),
       ListTile(
         tileColor: JarvisColors.of(context).surfaceMuted,
@@ -524,7 +622,12 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
             firstDate: DateTime.now(),
             lastDate: DateTime.now().add(const Duration(days: 730)),
           );
-          if (value != null && mounted) setState(() => _date = value);
+          if (value != null && mounted) {
+            setState(() {
+              _date = value;
+              _shortcut = null;
+            });
+          }
         },
       ),
       const SizedBox(height: 8),
@@ -541,22 +644,59 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
             context: context,
             initialTime: _time,
           );
-          if (value != null && mounted) setState(() => _time = value);
+          if (value != null && mounted) {
+            setState(() {
+              _time = value;
+              _shortcut = null;
+            });
+          }
         },
       ),
       FutureBuilder<String>(
         future: widget.timeZone,
-        builder: (context, snapshot) => Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-          child: Text(
-            snapshot.hasData
-                ? 'Time zone: ${snapshot.data!.replaceAll('_', ' ')}'
-                : ' ',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: JarvisColors.of(context).muted,
+        builder: (context, snapshot) {
+          final zone = snapshot.data;
+          final style = Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: JarvisColors.of(context).muted);
+          // The exact moment this will fire, on the reminder's clock and the phone's.
+          String? when;
+          String? phone;
+          if (zone != null && _recurrence == 'once') {
+            final picked = DateTime(
+              _date.year,
+              _date.month,
+              _date.day,
+              _time.hour,
+              _time.minute,
+            );
+            final instant = instantInZone(picked, zone) ?? picked.toUtc();
+            final described = describeScheduledInstant(context, instant, zone);
+            when = 'Reminds you ${described.primary}';
+            phone = described.other;
+          }
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  zone != null
+                      ? 'Time zone: ${zone.replaceAll('_', ' ')}'
+                      : ' ',
+                  style: style,
+                ),
+                if (when != null)
+                  Text(when, key: const Key('reminder-when'), style: style),
+                if (phone != null)
+                  Text(
+                    phone,
+                    key: const Key('reminder-when-phone'),
+                    style: style,
+                  ),
+              ],
             ),
-          ),
-        ),
+          );
+        },
       ),
     ],
   );

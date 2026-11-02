@@ -71,8 +71,7 @@ mixin _IntegrationsPacks on _IntegrationsController {
         saved.icsUrl.isNotEmpty &&
         parsePublicHttpsUrl(saved.icsUrl) == null) {
       setState(
-        () => _error =
-            'That calendar link doesn’t work. Use the secret address that starts with https:// and ends in .ics.',
+        () => _error = 'That calendar link doesn’t work. Use the secret address that starts with https:// and ends in .ics.',
       );
       return;
     }

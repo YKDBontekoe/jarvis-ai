@@ -104,6 +104,7 @@ class MessageEntry extends ChatEntry {
     this.photos = const [],
     this.outboxId,
     this.queuedAt,
+    this.clientId,
   });
 
   final String role;
@@ -131,6 +132,10 @@ class MessageEntry extends ChatEntry {
   /// When a waiting message was written, so the transcript can say how long it has waited.
   final DateTime? queuedAt;
 
+  /// The id this send carries to the server. It stays the same through every retry and reconnect, so
+  /// the server can tell a repeat of this send from a new message.
+  final String? clientId;
+
   bool get queued => outboxId != null;
 
   bool get isUser => role == 'user';
@@ -153,6 +158,7 @@ class MessageEntry extends ChatEntry {
     photos: photos,
     outboxId: outboxId,
     queuedAt: queuedAt,
+    clientId: clientId,
   );
 }
 

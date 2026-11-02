@@ -85,6 +85,25 @@ abstract class _ChatScreenController extends State<ChatScreen>
   bool _orbFlying = false;
   JarvisTab _tab = JarvisTab.home;
   final _chatList = ChatList();
+
+  /// Where each tab was left: list position, search and filter.
+  final _tabMemory = TabMemory();
+
+  /// The tab capsule folds to the open tab while a list is scrolled down.
+  bool _dockCompact = false;
+
+  /// A reply that finished while the owner was on a tab instead of in the chat:
+  /// its conversation and first line. Cleared when that chat is opened.
+  ({String conversationId, String preview, int serial})? _unreadReply;
+  int _replySerial = 0;
+
+  /// Strips the owner hid; each stays hidden until something newer replaces it.
+  final Set<String> _dismissedStrips = {};
+
+  /// Where reading stopped in each long conversation, and the message keys
+  /// that tell where the screen is within the transcript.
+  ReadingPositions _readingPositions = ReadingPositions.memory();
+  final _anchors = TranscriptAnchors();
   final _tiles = TileLayoutController.device();
   late final _tileSource = TileDataSource(_http, ensureMorningBriefing: true);
   Timer? _chatsTimer;
@@ -117,6 +136,10 @@ abstract class _ChatScreenController extends State<ChatScreen>
 
   /// Photos picked for the next message, and bytes of photos already shown.
   List<PendingPhoto> _pendingPhotos = [];
+
+  /// Photos picked in a conversation the owner left before sending, kept for
+  /// when they come back (uploads that were still running keep running).
+  final Map<String, List<PendingPhoto>> _stashedPhotos = {};
   final Map<String, Future<Uint8List?>> _photoBytes = {};
 
   /// Messages waiting for a connection, and whether the last send joined them.
@@ -135,6 +158,12 @@ abstract class _ChatScreenController extends State<ChatScreen>
   /// into a bar and the composer comes back.
   String? _typingOverSurfaceId;
 
+  Future<void> _openReadingPositions() async {
+    final stored = await ReadingPositions.open();
+    if (!mounted || _signedOut) return;
+    _readingPositions = stored;
+  }
+
   Future<void> _openDrafts() async {
     final stored = await ComposerDrafts.open();
     if (!mounted || _signedOut) return;
@@ -143,12 +172,31 @@ abstract class _ChatScreenController extends State<ChatScreen>
     if (id != null && _input.text.isEmpty) {
       _replaceComposerText(_drafts.read(id));
     }
+    if (id != null && _pendingPhotos.isEmpty) {
+      unawaited(_restoreStoredPhotos(id));
+    }
+    _chatList.setDrafts(_drafts.previews());
   }
+
+  /// Saves which photos of the open conversation are uploaded, next to its text.
+  void _rememberDraftPhotos() {
+    final id = _conversationId;
+    if (id == null) return;
+    _drafts.writePhotos(id, [
+      for (final photo in _pendingPhotos)
+        if (photo.fileId != null)
+          (fileId: photo.fileId!, fileName: photo.fileName),
+    ]);
+    _chatList.setDrafts(_drafts.previews());
+  }
+
+  Future<void> _restoreStoredPhotos(String conversationId);
 
   void _rememberDraft() {
     if (_applyingDraft) return;
     final id = _conversationId;
     if (id != null) _drafts.write(id, _input.text);
+    _chatList.setDrafts(_drafts.previews());
   }
 
   /// Sets the composer without saving it as a draft of the open conversation.
@@ -168,7 +216,21 @@ abstract class _ChatScreenController extends State<ChatScreen>
   /// before any conversation was open moves along into the new one.
   void _restoreDraft(String? previousId, String conversationId) {
     if (previousId == conversationId) return;
-    if (previousId != null) _pendingPhotos = [];
+    if (previousId != null) {
+      final keep = [
+        for (final photo in _pendingPhotos)
+          if (!photo.failed) photo,
+      ];
+      if (keep.isEmpty) {
+        _stashedPhotos.remove(previousId);
+      } else {
+        _stashedPhotos[previousId] = keep;
+      }
+      _pendingPhotos = _stashedPhotos.remove(conversationId) ?? [];
+      if (_pendingPhotos.isEmpty) {
+        unawaited(_restoreStoredPhotos(conversationId));
+      }
+    }
     final draft = _drafts.read(conversationId);
     if (previousId == null && draft.isEmpty && _input.text.trim().isNotEmpty) {
       _drafts.write(conversationId, _input.text);
@@ -223,6 +285,11 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _createAndOpenConversation();
   Future<void> _switchConversationProfile();
   void _openUtility(String destination);
+  Future<void> _bindCaptures();
+  Future<void> _findInChat();
+  bool _canActOnMessage(MessageEntry entry);
+  Future<void> _saveToLibrary(MessageEntry entry);
+  Future<void> _remindFromMessage(MessageEntry entry);
 
   Future<void> _voiceCardAction(String id, String action);
 
@@ -267,7 +334,11 @@ abstract class _ChatScreenController extends State<ChatScreen>
   Future<void> _openSearch(BuildContext context);
   Future<void> _openSearchRouteFromNotification(Map<String, dynamic> data);
 
-  Future<bool> _send([String? text, List<MessagePhoto>? photos]);
+  Future<bool> _send([
+    String? text,
+    List<MessagePhoto>? photos,
+    String? clientId,
+  ]);
   void _upsertSurface(UiSurfaceEntry surface);
   void _upsertBrowserSession(BrowserSessionEntry session);
   void _appendBrowserStep(String sessionId, BrowserStepItem step);

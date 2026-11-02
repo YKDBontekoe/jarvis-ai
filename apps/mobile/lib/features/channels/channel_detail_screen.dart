@@ -173,9 +173,8 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     );
     if (updated == null || !mounted) return;
     setState(() => _channel = updated);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Notifications updated.')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Notifications updated.')));
   }
 
   String _forwardingSummary(Map<String, dynamic> channel) {
@@ -201,8 +200,7 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     final confirmed = await showJarvisConfirm(
       context,
       title: 'Disconnect this channel?',
-      message:
-          'Jarvis will stop reading and sending messages on this number. You can connect it again later.',
+      message: 'Jarvis will stop reading and sending messages on this number. You can connect it again later.',
       confirmLabel: 'Disconnect',
       destructive: true,
     );
@@ -241,9 +239,8 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
       return;
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Webhook URL copied.')));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Webhook URL copied.')));
   }
 
   @override
@@ -315,9 +312,8 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                         Text(
                           jsonStrings(channel['allowedSenders']).isEmpty
                               ? 'No automatic replies. Jarvis reads only chats you choose.'
-                              : jsonStrings(
-                                  channel['allowedSenders'],
-                                ).join(', '),
+                              : jsonStrings(channel['allowedSenders'])
+                                    .join(', '),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         Align(
@@ -473,9 +469,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                                   children: [
                                     Text(
                                       asJsonString(thread['peer']) ?? 'Unknown',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall,
                                     ),
                                     Text(
                                       asJsonString(
@@ -486,9 +482,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
                                           '${asJsonInt(thread['messageCount'])} messages',
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
                                     ),
                                   ],
                                 ),

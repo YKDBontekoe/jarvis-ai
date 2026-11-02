@@ -169,9 +169,8 @@ class _ChannelLinkSheetState extends State<ChannelLinkSheet> {
               _whatsapp
                   ? '${widget.readAlong ? 'Use your personal WhatsApp account. ' : ''}Open WhatsApp → Settings → Linked devices → Link a device, then scan this code.'
                   : 'Open Signal → Settings → Linked devices → Link new device, then scan this code.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: colors.inkSoft),
             ),
             const SizedBox(height: 16),
             if (_error != null) ...[
@@ -208,9 +207,8 @@ class _ChannelLinkSheetState extends State<ChannelLinkSheet> {
                   ? 'Your own number is allowed automatically, so you can message yourself to talk to Jarvis.'
                   : 'Scan with the same phone number to reconnect.',
               textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colors.muted),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: colors.muted),
             ),
           ],
         ),

@@ -75,7 +75,8 @@ class LearningChange {
             final action?,
             final target?,
             final at?,
-          ) when seenAt == null || at.isAfter(seenAt))
+          )
+          when seenAt == null || at.isAfter(seenAt))
         LearningChange(
           id: id,
           kind: asJsonString(change['kind']) ?? '',
@@ -143,9 +144,8 @@ class LearningCard extends StatelessWidget {
                       header: true,
                       child: Text(
                         'JARVIS IS LEARNING',
-                        style: JarvisType.capsOf(
-                          context,
-                        ).copyWith(color: colors.accent),
+                        style: JarvisType.capsOf(context)
+                            .copyWith(color: colors.accent),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -202,7 +202,9 @@ class LearningCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                child: Text(more > 0 ? '$more more in Learning ›' : 'Learning ›'),
+                child: Text(
+                  more > 0 ? '$more more in Learning ›' : 'Learning ›',
+                ),
               ),
             ],
           ),
@@ -232,7 +234,11 @@ class _ChangeRow extends StatelessWidget {
         colors.accent,
         colors.accentSoft,
       ),
-      'lesson' => (PhosphorIconsRegular.lightbulb, colors.info, colors.infoSoft),
+      'lesson' => (
+        PhosphorIconsRegular.lightbulb,
+        colors.info,
+        colors.infoSoft,
+      ),
       'memory' => (PhosphorIconsRegular.brain, colors.info, colors.infoSoft),
       'skill_retired' => (
         PhosphorIconsRegular.prohibit,

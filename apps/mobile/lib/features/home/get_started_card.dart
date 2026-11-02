@@ -73,9 +73,8 @@ class _GetStartedCardState extends State<GetStartedCard> {
     final memories = asJsonInt(
       jsonObject(usage['personalization'])?['activeMemories'],
     );
-    final connected = jsonMaps(
-      widget.briefing?['packs'],
-    ).any((pack) => asJsonBool(pack['installed']));
+    final connected = jsonMaps(widget.briefing?['packs'])
+        .any((pack) => asJsonBool(pack['installed']));
     final steps = [
       _Step(
         'Say hello',

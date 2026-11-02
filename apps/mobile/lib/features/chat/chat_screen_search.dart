@@ -32,7 +32,28 @@ mixin _ChatScreenSearch on _ChatScreenController {
     );
   }
 
-  Future<void> _openSearchRouteFromNotification(Map<String, dynamic> data) async {
+  /// Searches inside the open conversation, beyond what is loaded on screen.
+  Future<void> _findInChat() async {
+    final id = _conversationId;
+    if (id == null || _signedOut || _signingOut) return;
+    _dismissKeyboard();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => FindInChatScreen(
+          http: _http,
+          conversationId: id,
+          onOpenConversation: (target) async {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+            await _presentConversation(target);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSearchRouteFromNotification(
+    Map<String, dynamic> data,
+  ) async {
     final route = searchRouteFromNotification(data);
     if (route == null || !mounted || _signedOut) return;
     await navigateSearchRoute(

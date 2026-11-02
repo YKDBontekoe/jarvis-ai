@@ -119,7 +119,7 @@ class _JournalScreenState extends State<JournalScreen> {
       loading: _loading,
       error: _error,
       isEmpty: _entries.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       empty: EmptyState(
         icon: PhosphorIconsRegular.notebook,
         title: 'Your journal is empty',

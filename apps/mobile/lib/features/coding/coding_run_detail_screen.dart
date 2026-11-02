@@ -127,7 +127,9 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
         );
       }
     } catch (_) {
-      if (mounted) setState(() => _actionError = 'That did not work. Try again.');
+      if (mounted) {
+        setState(() => _actionError = 'That did not work. Try again.');
+      }
     } finally {
       if (mounted) setState(() => _busyAction = null);
     }
@@ -165,9 +167,8 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
     if (uri == null || !await launchHttpUrl(uri)) {
       await Clipboard.setData(ClipboardData(text: url));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Link copied.')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Link copied.')));
     }
   }
 
@@ -188,10 +189,7 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
       body: run == null
           ? (_error == null
                 ? const SkeletonList(shape: SkeletonShape.detail)
-                : ErrorState(
-                    message: _error!,
-                    onRetry: () => unawaited(_load()),
-                  ))
+                : ErrorState(message: _error!, onRetry: _load))
           : _body(run),
     );
   }
@@ -307,13 +305,23 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
     );
   }
 
-  Widget _pullRequestCard(Map<String, dynamic> run, {required bool hasChanges}) {
+  Widget _pullRequestCard(
+    Map<String, dynamic> run, {
+    required bool hasChanges,
+  }) {
     final colors = JarvisColors.of(context);
     final status = _pullRequest;
     final hasPullRequest = run['pullRequestNumber'] != null || status != null;
-    final number = asJsonInt(status?['number'], asJsonInt(run['pullRequestNumber']));
-    final state = asJsonString(status?['state']) ?? asJsonString(run['pullRequestState']) ?? '';
-    final url = asJsonString(status?['url']) ?? asJsonString(run['pullRequestUrl']);
+    final number = asJsonInt(
+      status?['number'],
+      asJsonInt(run['pullRequestNumber']),
+    );
+    final state =
+        asJsonString(status?['state']) ??
+        asJsonString(run['pullRequestState']) ??
+        '';
+    final url =
+        asJsonString(status?['url']) ?? asJsonString(run['pullRequestUrl']);
     final checksState = asJsonString(status?['checksState']) ?? 'none';
     final busy = _busyAction != null;
     final completed = asJsonString(run['status']) == 'completed';
@@ -401,7 +409,10 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: busy || checksState == 'failure' || checksState == 'pending'
+                      onPressed:
+                          busy ||
+                              checksState == 'failure' ||
+                              checksState == 'pending'
                           ? null
                           : _merge,
                       icon: _busyAction == 'merge'
@@ -409,7 +420,10 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
                               dimension: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(PhosphorIconsRegular.checkCircle, size: 18),
+                          : const Icon(
+                              PhosphorIconsRegular.checkCircle,
+                              size: 18,
+                            ),
                       label: const Text('Approve & merge'),
                     ),
                   ),
@@ -420,7 +434,8 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
                   ),
                 ],
               ),
-            if (state == 'open' && (checksState == 'failure' || checksState == 'pending'))
+            if (state == 'open' &&
+                (checksState == 'failure' || checksState == 'pending'))
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
@@ -435,7 +450,10 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
                   onPressed: () => unawaited(_openOnGitHub(url)),
-                  icon: const Icon(PhosphorIconsRegular.arrowSquareOut, size: 16),
+                  icon: const Icon(
+                    PhosphorIconsRegular.arrowSquareOut,
+                    size: 16,
+                  ),
                   label: const Text('View on GitHub'),
                 ),
               ),
@@ -469,7 +487,11 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
 
 /// Renders a unified diff with one collapsible block per file.
 class DiffView extends StatelessWidget {
-  const DiffView({required this.patch, this.protectedPaths = const {}, super.key});
+  const DiffView({
+    required this.patch,
+    this.protectedPaths = const {},
+    super.key,
+  });
 
   final String patch;
   final Set<String> protectedPaths;
@@ -542,7 +564,11 @@ class _FileDiff extends StatelessWidget {
       if (line.startsWith('-') && !line.startsWith('---')) removed++;
     }
     // Header lines (index, mode, ---/+++) are noise once the file name is shown.
-    final body = lines.skipWhile((line) => !line.startsWith('@@') && !line.startsWith('Binary')).toList();
+    final body = lines
+        .skipWhile(
+          (line) => !line.startsWith('@@') && !line.startsWith('Binary'),
+        )
+        .toList();
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: SurfaceCard(
@@ -593,20 +619,20 @@ class _FileDiff extends StatelessWidget {
                     ),
                     child: IntrinsicWidth(
                       child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (final line in body.take(600))
-                          _DiffLine(line: line),
-                        if (body.length > 600)
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Text(
-                              '… ${body.length - 600} more lines in the pull request',
-                              style: Theme.of(context).textTheme.bodySmall,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final line in body.take(600))
+                            _DiffLine(line: line),
+                          if (body.length > 600)
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Text(
+                                '… ${body.length - 600} more lines in the pull request',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
                             ),
-                          ),
-                      ],
-                    ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -627,7 +653,9 @@ class _DiffLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
-    final (Color? background, Color foreground) = switch (line.isEmpty ? ' ' : line[0]) {
+    final (Color? background, Color foreground) = switch (line.isEmpty
+        ? ' '
+        : line[0]) {
       '+' => (colors.successSoft, colors.ink),
       '-' => (colors.dangerSoft, colors.ink),
       '@' => (colors.infoSoft, colors.inkSoft),
