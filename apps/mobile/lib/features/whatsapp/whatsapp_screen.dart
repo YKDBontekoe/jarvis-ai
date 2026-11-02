@@ -54,9 +54,9 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
           .toList();
       // Prefer the personal account over a channel configured for automatic replies.
       accounts.sort(
-        (a, b) => jsonStrings(
-          a['allowedSenders'],
-        ).length.compareTo(jsonStrings(b['allowedSenders']).length),
+        (a, b) =>
+            jsonStrings(a['allowedSenders']).length
+                .compareTo(jsonStrings(b['allowedSenders']).length),
       );
       if (!mounted) return;
       setState(() {

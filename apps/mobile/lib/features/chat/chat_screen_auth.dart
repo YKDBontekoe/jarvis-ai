@@ -26,9 +26,8 @@ mixin _ChatScreenAuth on _ChatScreenController {
                               ? 'Create your account'
                               : 'Sign in to Jarvis',
                           textAlign: TextAlign.center,
-                          style: JarvisType.displayOf(
-                            context,
-                          ).copyWith(fontSize: 42),
+                          style: JarvisType.displayOf(context)
+                              .copyWith(fontSize: 42),
                         ),
                         const SizedBox(height: 10),
                         Text(

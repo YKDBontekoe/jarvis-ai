@@ -291,9 +291,9 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
     );
   }
 
-  void _show(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _show(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -331,8 +331,7 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.lightning,
         title: 'No automations yet.',
-        message:
-            'Let Jarvis act on a schedule or when a reminder fires. Create one here, or describe it in chat.',
+        message: 'Let Jarvis act on a schedule or when a reminder fires. Create one here, or describe it in chat.',
       ),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

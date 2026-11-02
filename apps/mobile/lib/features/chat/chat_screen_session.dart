@@ -81,7 +81,8 @@ mixin _ChatScreenSession on _ChatScreenController {
       reportError(error, stack, context: 'startup');
       if (mounted && generation == _initGeneration) {
         setState(() {
-          _error = 'Could not connect to Jarvis. Check your connection and retry.';
+          _error =
+              'Could not connect to Jarvis. Check your connection and retry.';
           _restoringSession = false;
         });
       }
@@ -371,7 +372,9 @@ mixin _ChatScreenSession on _ChatScreenController {
   Future<void> _loadOlderMessages() async {
     final conversationId = _conversationId;
     final cursor = _messageCursor;
-    if (conversationId == null || cursor == null || !_hasOlderMessages ||
+    if (conversationId == null ||
+        cursor == null ||
+        !_hasOlderMessages ||
         _loadingOlderMessages) {
       return;
     }
@@ -381,7 +384,8 @@ mixin _ChatScreenSession on _ChatScreenController {
         '/api/v1/conversations/$conversationId/messages',
         queryParameters: {'limit': 50, 'cursor': cursor},
       );
-      if (!mounted || _conversationId != conversationId ||
+      if (!mounted ||
+          _conversationId != conversationId ||
           _messageCursor != cursor) {
         return;
       }
@@ -396,8 +400,7 @@ mixin _ChatScreenSession on _ChatScreenController {
           .whereType<String>()
           .toSet();
       messages.removeWhere(
-        (message) =>
-            message.id != null && existingIds.contains(message.id),
+        (message) => message.id != null && existingIds.contains(message.id),
       );
       final beforeExtent = _scroll.hasClients
           ? _scroll.position.maxScrollExtent
@@ -411,9 +414,11 @@ mixin _ChatScreenSession on _ChatScreenController {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scroll.hasClients) return;
         final addedExtent = _scroll.position.maxScrollExtent - beforeExtent;
-        _scroll.jumpTo((_scroll.position.pixels + addedExtent)
-            .clamp(0.0, _scroll.position.maxScrollExtent)
-            .toDouble());
+        _scroll.jumpTo(
+          (_scroll.position.pixels + addedExtent)
+              .clamp(0.0, _scroll.position.maxScrollExtent)
+              .toDouble(),
+        );
       });
     } on DioException {
       // Keep the current page and allow a later scroll to retry.
@@ -469,7 +474,8 @@ mixin _ChatScreenSession on _ChatScreenController {
           if (!mounted) return;
           setState(() {
             _profileId = asJsonString(body?['profileId']) ?? id;
-            _profileName = asJsonString(body?['profileName']) ??
+            _profileName =
+                asJsonString(body?['profileName']) ??
                 asJsonString(selected['name']);
             _profileDeleted = asJsonBool(body?['profileDeleted']);
             _preferredProfileId = _profileId;
@@ -477,7 +483,9 @@ mixin _ChatScreenSession on _ChatScreenController {
           return;
         } on DioException catch (error) {
           if (error.response?.statusCode != 409 || confirm) rethrow;
-          final details = jsonStrings(jsonObject(error.response?.data)?['details']);
+          final details = jsonStrings(
+            jsonObject(error.response?.data)?['details'],
+          );
           final confirmed = await showJarvisConfirm(
             context,
             title: 'Switch profile?',
@@ -502,7 +510,8 @@ mixin _ChatScreenSession on _ChatScreenController {
   }
 
   MessageEntry? _messageEntryFromJson(Map<String, dynamic> message) {
-    if (message['role'] is! String || message['content'] is! String) return null;
+    if (message['role'] is! String || message['content'] is! String)
+      return null;
     return MessageEntry(
       role: message['role'] as String,
       content: message['content'] as String,

@@ -133,8 +133,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
         empty: EmptyState(
           icon: PhosphorIconsRegular.magicWand,
           title: 'No skills yet',
-          message:
-              'Jarvis writes a skill when it finishes a workflow you are likely to repeat, or when you teach it how you like something done. You can also add or import SKILL.md files.',
+          message: 'Jarvis writes a skill when it finishes a workflow you are likely to repeat, or when you teach it how you like something done. You can also add or import SKILL.md files.',
           action: FilledButton.icon(
             onPressed: () => unawaited(_create()),
             icon: const Icon(PhosphorIconsRegular.plus, size: 18),
@@ -152,8 +151,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
                   children: [
                     const InlineNotice(
                       tone: NoticeTone.info,
-                      message:
-                          'Skills are reusable procedures Jarvis loads only when relevant. Learned skills improve over time; skills you edit are locked so Jarvis never overwrites them.',
+                      message: 'Skills are reusable procedures Jarvis loads only when relevant. Learned skills improve over time; skills you edit are locked so Jarvis never overwrites them.',
                     ),
                     if (proposed.isNotEmpty)
                       _section('Needs your review', proposed),

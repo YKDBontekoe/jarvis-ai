@@ -64,9 +64,10 @@ class HabitView {
   factory HabitView.fromJson(Map<String, dynamic> json) {
     final stats = jsonObject(json['stats']) ?? const <String, dynamic>{};
     final today = parseHabitDate(stats['today']) ?? _localToday();
-    final dates = jsonStrings(
-      stats['recentDates'],
-    ).map(parseHabitDate).whereType<DateTime>().toSet();
+    final dates = jsonStrings(stats['recentDates'])
+        .map(parseHabitDate)
+        .whereType<DateTime>()
+        .toSet();
     return HabitView(
       id: asJsonString(json['id']) ?? '',
       name: asJsonString(json['name']) ?? 'Habit',

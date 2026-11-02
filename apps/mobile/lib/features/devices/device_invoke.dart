@@ -55,9 +55,8 @@ Future<({String? result, String? error})> performDeviceCapability({
             : 'Jarvis';
         final body = args is Map ? asJsonString(args['body']) ?? '' : '';
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('$title\n$body')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('$title\n$body')));
         }
         return (result: 'Shown on this device.', error: null);
       case 'battery':

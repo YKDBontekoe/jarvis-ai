@@ -46,7 +46,8 @@ class MeetingScreen extends StatefulWidget {
   State<MeetingScreen> createState() => _MeetingScreenState();
 }
 
-class _MeetingScreenState extends State<MeetingScreen> with PaletteContextMixin<MeetingScreen> {
+class _MeetingScreenState extends State<MeetingScreen>
+    with PaletteContextMixin<MeetingScreen> {
   @override
   String get paletteContextValue => 'meeting:${widget.meetingId}';
 

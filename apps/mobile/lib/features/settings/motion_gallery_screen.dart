@@ -157,9 +157,8 @@ class _MotionGalleryScreenState extends State<MotionGalleryScreen> {
                         BlurIn(
                           child: Text(
                             'Good evening',
-                            style: JarvisType.displayOf(
-                              context,
-                            ).copyWith(fontSize: 30),
+                            style: JarvisType.displayOf(context)
+                                .copyWith(fontSize: 30),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -235,9 +234,8 @@ class _MotionGalleryScreenState extends State<MotionGalleryScreen> {
                   Expanded(
                     child: RollingNumber(
                       _formatThousands(_number),
-                      style: JarvisType.displayOf(
-                        context,
-                      ).copyWith(fontSize: 34),
+                      style: JarvisType.displayOf(context)
+                          .copyWith(fontSize: 34),
                     ),
                   ),
                   TextButton(

@@ -142,9 +142,8 @@ class _ChannelAllowedSendersSheetState
             const SizedBox(height: 6),
             Text(
               'Add one international phone number per line. Only these numbers can message Jarvis. You can allow up to 20.${asJsonString(widget.channel['kind']) == 'whatsapp_linked' ? ' Leave this empty to use only read along, without automatic replies.' : ''}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: JarvisColors.of(context).inkSoft,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: JarvisColors.of(context).inkSoft),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -163,9 +162,8 @@ class _ChannelAllowedSendersSheetState
             const SizedBox(height: 8),
             Text(
               'If you remove the current notification number, notifications will go to the first number in this list.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: JarvisColors.of(context).muted,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: JarvisColors.of(context).muted),
             ),
             if (_error != null)
               InlineNotice(

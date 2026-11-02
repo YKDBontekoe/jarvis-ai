@@ -173,7 +173,8 @@ class MissionDetailData {
       summary: jsonString(map, 'summary'),
       failureReason: jsonString(map, 'failureReason'),
       steps: [
-        for (final step in jsonMaps(map['steps'])) ?MissionStepData.fromJson(step),
+        for (final step in jsonMaps(map['steps']))
+          ?MissionStepData.fromJson(step),
       ],
       notes: [
         for (final note in jsonMaps(map['notes']))

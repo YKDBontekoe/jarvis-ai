@@ -172,9 +172,8 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         final message = error.response?.statusCode == 409
             ? 'This approval was already decided.'
             : 'Jarvis could not process this decision.';
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
         await _load();
       }
     } catch (_) {
@@ -269,9 +268,8 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
           padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
           child: Text(
             'ALWAYS ALLOWED',
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(color: colors.muted),
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: colors.muted),
           ),
         ),
         for (final grant in _standing)
@@ -395,9 +393,8 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
           const SizedBox(height: 16),
           Text(
             'ARGUMENTS',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: JarvisColors.of(context).muted,
-            ),
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: JarvisColors.of(context).muted),
           ),
           const SizedBox(height: 8),
           _ArgumentsBlock(

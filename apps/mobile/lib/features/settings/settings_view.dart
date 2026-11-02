@@ -305,9 +305,8 @@ class SettingsView extends StatelessWidget {
             children: [
               Text(
                 'Your assistant',
-                style: JarvisType.displayOf(
-                  context,
-                ).copyWith(fontSize: 20, letterSpacing: -.4),
+                style: JarvisType.displayOf(context)
+                    .copyWith(fontSize: 20, letterSpacing: -.4),
               ),
               const SizedBox(height: 8),
               StatusChip(

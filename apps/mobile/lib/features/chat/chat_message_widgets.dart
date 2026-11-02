@@ -287,9 +287,8 @@ class _MessageBubbleState extends State<MessageBubble> {
                       ),
                       border: message.failed
                           ? Border.all(
-                              color: JarvisColors.of(
-                                context,
-                              ).danger.withValues(alpha: .35),
+                              color: JarvisColors.of(context).danger
+                                  .withValues(alpha: .35),
                             )
                           : null,
                     ),

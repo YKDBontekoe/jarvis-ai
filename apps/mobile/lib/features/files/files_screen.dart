@@ -167,7 +167,10 @@ class _FilesScreenState extends State<FilesScreen> {
       final body = jsonObject(response.data);
       conversationId = asJsonString(body?['conversationId']);
       final status = asJsonString(body?['status']);
-      if (mounted && status != null && status != 'ready' && status != 'indexed') {
+      if (mounted &&
+          status != null &&
+          status != 'ready' &&
+          status != 'indexed') {
         ScaffoldMessenger.maybeOf(context)
           ?..hideCurrentSnackBar()
           ..showSnackBar(
@@ -346,13 +349,19 @@ class _FilesScreenState extends State<FilesScreen> {
                 padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
                 child: Row(
                   children: [
-                    const IconBadge(icon: PhosphorIconsRegular.folders, size: 44),
+                    const IconBadge(
+                      icon: PhosphorIconsRegular.folders,
+                      size: 44,
+                    ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text(
+                            name,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                           Text(
                             '$count files',
                             style: TextStyle(
@@ -365,7 +374,9 @@ class _FilesScreenState extends State<FilesScreen> {
                     ),
                     IconButton(
                       tooltip: 'Delete collection',
-                      onPressed: _busy ? null : () => _deleteCollection(collection),
+                      onPressed: _busy
+                          ? null
+                          : () => _deleteCollection(collection),
                       icon: const Icon(PhosphorIconsRegular.trash),
                     ),
                   ],
@@ -394,7 +405,8 @@ class _FilesScreenState extends State<FilesScreen> {
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 15),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontSize: 15),
                         ),
                         const SizedBox(height: 6),
                         Wrap(

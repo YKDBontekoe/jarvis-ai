@@ -100,9 +100,8 @@ class _PersonPanelState extends State<PersonPanel> {
           const SizedBox(height: 10),
           Text(
             person.name,
-            style: JarvisType.displayOf(
-              context,
-            ).copyWith(fontSize: 26, fontWeight: FontWeight.w700),
+            style: JarvisType.displayOf(context)
+                .copyWith(fontSize: 26, fontWeight: FontWeight.w700),
           ),
           if (person.relationship case final relationship?) ...[
             const SizedBox(height: 4),

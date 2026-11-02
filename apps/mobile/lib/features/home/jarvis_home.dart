@@ -613,8 +613,10 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     if (change.action == 'open_skill') {
       await Navigator.of(context).push<void>(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              SkillDetailScreen(http: widget.source.http, skillId: change.target),
+          builder: (_) => SkillDetailScreen(
+            http: widget.source.http,
+            skillId: change.target,
+          ),
         ),
       );
       return;
@@ -633,7 +635,9 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
             },
           );
         default:
-          await http.post<dynamic>('/api/v1/improvements/${change.target}/undo');
+          await http.post<dynamic>(
+            '/api/v1/improvements/${change.target}/undo',
+          );
       }
     } catch (_) {
       ok = false;
@@ -660,7 +664,10 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
 
   /// Accepts or turns down a suggestion from Jarvis's improvement loop. Accepting a built app switches on exactly
   /// the draft that passed its test; the server refuses if the code changed. A failure brings the row back.
-  Future<void> _decideImprovement(NeedsYouItem item, {required bool accept}) async {
+  Future<void> _decideImprovement(
+    NeedsYouItem item, {
+    required bool accept,
+  }) async {
     final id = item.id;
     if (_pending.contains(id)) return;
     setState(() {

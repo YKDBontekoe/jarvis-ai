@@ -86,8 +86,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                         if (_available == false) ...[
                           const SizedBox(height: 12),
                           const InlineNotice(
-                            message:
-                                'Set up Face ID, Touch ID, or a passcode on this device to use the lock.',
+                            message: 'Set up Face ID, Touch ID, or a passcode on this device to use the lock.',
                           ),
                         ],
                         if (controller.enabled) ...[

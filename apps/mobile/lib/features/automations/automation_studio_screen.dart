@@ -43,11 +43,7 @@ class SimulatedStepData {
 }
 
 class SimulationData {
-  const SimulationData({
-    required this.trigger,
-    required this.steps,
-    this.note,
-  });
+  const SimulationData({required this.trigger, required this.steps, this.note});
 
   final String trigger;
   final String? note;
@@ -133,9 +129,9 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
     }
   }
 
-  void _toast(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _useTemplate(String id) async {
     try {
@@ -181,7 +177,8 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => unawaited(Clipboard.setData(ClipboardData(text: url))),
+              onPressed: () =>
+                  unawaited(Clipboard.setData(ClipboardData(text: url))),
               child: const Text('Copy'),
             ),
             FilledButton(
@@ -364,8 +361,7 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
                 key: Key('webhook-delete-${jsonId(hook)}'),
                 tooltip: 'Delete',
                 icon: const Icon(PhosphorIconsRegular.trash, size: 18),
-                onPressed: () =>
-                    unawaited(_deleteWebhook(jsonId(hook) ?? '')),
+                onPressed: () => unawaited(_deleteWebhook(jsonId(hook) ?? '')),
               ),
             ],
           ),

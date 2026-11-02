@@ -137,9 +137,8 @@ class _ConversationSummarySheetState extends State<ConversationSummarySheet> {
   Future<void> _copy(ConversationSummaryData summary) async {
     await Clipboard.setData(ClipboardData(text: summary.toMarkdown()));
     if (!mounted) return;
-    ScaffoldMessenger.maybeOf(
-      context,
-    )?.showSnackBar(const SnackBar(content: Text('Summary copied.')));
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(const SnackBar(content: Text('Summary copied.')));
   }
 
   @override

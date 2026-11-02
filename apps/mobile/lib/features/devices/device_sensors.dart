@@ -52,8 +52,7 @@ Future<({String? result, String? error})> readDeviceLocation() async {
         permission == LocationPermission.deniedForever ||
         permission == LocationPermission.unableToDetermine) {
       return (
-        result:
-            'Location permission was denied. Enable it in system settings, then try again.',
+        result: 'Location permission was denied. Enable it in system settings, then try again.',
         error: null,
       );
     }

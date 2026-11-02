@@ -32,7 +32,9 @@ mixin _ChatScreenSearch on _ChatScreenController {
     );
   }
 
-  Future<void> _openSearchRouteFromNotification(Map<String, dynamic> data) async {
+  Future<void> _openSearchRouteFromNotification(
+    Map<String, dynamic> data,
+  ) async {
     final route = searchRouteFromNotification(data);
     if (route == null || !mounted || _signedOut) return;
     await navigateSearchRoute(

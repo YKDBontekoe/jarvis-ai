@@ -214,9 +214,8 @@ class _EverythingScreenState extends State<EverythingScreen> {
                             padding: const EdgeInsets.fromLTRB(2, 26, 2, 12),
                             child: Text(
                               category.label,
-                              style: JarvisType.displayOf(
-                                context,
-                              ).copyWith(fontSize: 20, letterSpacing: -.4),
+                              style: JarvisType.displayOf(context)
+                                  .copyWith(fontSize: 20, letterSpacing: -.4),
                             ),
                           ),
                           SurfaceCard(
@@ -464,9 +463,8 @@ class _PreviewSheetState extends State<_PreviewSheet> {
                     children: [
                       Text(
                         spec.name,
-                        style: JarvisType.displayOf(
-                          context,
-                        ).copyWith(fontSize: 22),
+                        style: JarvisType.displayOf(context)
+                            .copyWith(fontSize: 22),
                       ),
                       Text(
                         spec.description,

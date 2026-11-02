@@ -7,16 +7,15 @@ mixin _ChatScreenVoice on _ChatScreenController {
   /// from the screen so it cannot be acted on again.
   Future<void> _voiceCardAction(String id, String action) async {
     try {
-      final response = await _http.post<dynamic>('/api/v1/voice/cards/$id/$action');
+      final response = await _http.post<dynamic>(
+        '/api/v1/voice/cards/$id/$action',
+      );
       final updated = jsonObject(response.data);
       if (!mounted || updated == null) return;
       setState(() {
         _voiceCards = [
           for (final card in _voiceCards)
-            if (card['id'] != id)
-              card
-            else if (action == 'save')
-              updated,
+            if (card['id'] != id) card else if (action == 'save') updated,
         ];
       });
     } on DioException catch (error) {
@@ -25,7 +24,9 @@ mixin _ChatScreenVoice on _ChatScreenController {
         ?..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text(firstProblemMessage(error.response?.data) ?? 'That did not work.'),
+            content: Text(
+              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+            ),
           ),
         );
     }
@@ -35,7 +36,9 @@ mixin _ChatScreenVoice on _ChatScreenController {
     final conversationId = _conversationId;
     if (conversationId == null) return;
     try {
-      final response = await _http.get<dynamic>('/api/v1/voice/$conversationId/recap');
+      final response = await _http.get<dynamic>(
+        '/api/v1/voice/$conversationId/recap',
+      );
       final recap = jsonObject(response.data);
       if (mounted && recap != null) await showVoiceRecap(context, recap);
     } on DioException {

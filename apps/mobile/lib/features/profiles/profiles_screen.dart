@@ -46,7 +46,9 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
       if (!mounted || revision != _requestRevision) return;
       setState(() {
         _loading = false;
-        _error = firstProblemMessage(error.response?.data) ?? 'Could not load profiles.';
+        _error =
+            firstProblemMessage(error.response?.data) ??
+            'Could not load profiles.';
       });
     } catch (_) {
       if (!mounted || revision != _requestRevision) return;
@@ -90,7 +92,8 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     } on DioException catch (error) {
       if (!mounted) return;
       setState(
-        () => _error = firstProblemMessage(error.response?.data) ??
+        () => _error =
+            firstProblemMessage(error.response?.data) ??
             'Jarvis could not delete this profile.',
       );
     }

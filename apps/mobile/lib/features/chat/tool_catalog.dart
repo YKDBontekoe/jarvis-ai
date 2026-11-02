@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../ui/phosphor_icons.dart';
 
 /// User-facing wording for Jarvis tools. Unknown tools (for example MCP tools)

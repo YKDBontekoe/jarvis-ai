@@ -249,9 +249,8 @@ mixin _ChatScreenPush on _ChatScreenController {
   }
 
   Future<void> _openPushedDetail(Widget page) async {
-    await Navigator.of(
-      context,
-    ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
+    await Navigator.of(context)
+        .push<void>(MaterialPageRoute<void>(builder: (_) => page));
     if (mounted && !_signedOut && !_signingOut) {
       setState(() => _homeRevision++);
     }

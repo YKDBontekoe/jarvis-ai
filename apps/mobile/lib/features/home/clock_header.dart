@@ -184,9 +184,8 @@ class ClockHeader extends StatelessWidget {
                                     : item.start.isAfter(now)
                                     ? 'Next up'
                                     : 'Happening now',
-                                style: JarvisType.sectionOf(
-                                  context,
-                                ).copyWith(color: colors.accentDeep),
+                                style: JarvisType.sectionOf(context)
+                                    .copyWith(color: colors.accentDeep),
                               ),
                             ),
                             if (onOpen != null)
@@ -204,17 +203,15 @@ class ClockHeader extends StatelessWidget {
                           Text(
                             'Nothing else today',
                             key: const Key('home-clock-title'),
-                            style: JarvisType.displayOf(
-                              context,
-                            ).copyWith(fontSize: 26),
+                            style: JarvisType.displayOf(context)
+                                .copyWith(fontSize: 26),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             clockTime(now),
                             key: const Key('home-clock-time'),
-                            style: JarvisType.clock(
-                              colors.inkSoft,
-                            ).copyWith(fontSize: 32, letterSpacing: -1),
+                            style: JarvisType.clock(colors.inkSoft)
+                                .copyWith(fontSize: 32, letterSpacing: -1),
                           ),
                         ],
                         const SizedBox(height: 12),
@@ -333,9 +330,8 @@ class _EventHeading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
-    final titleStyle = JarvisType.displayOf(
-      context,
-    ).copyWith(fontSize: 30, height: 1.15);
+    final titleStyle = JarvisType.displayOf(context)
+        .copyWith(fontSize: 30, height: 1.15);
     final timeStyle = TextStyle(
       fontFamily: 'Geist',
       fontSize: 26,

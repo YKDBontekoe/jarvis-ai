@@ -76,9 +76,8 @@ mixin _ChatScreenNav on _ChatScreenController {
         paneContext != null &&
         paneContext.mounted) {
       unawaited(
-        Navigator.of(
-          paneContext,
-        ).push<void>(MaterialPageRoute<void>(builder: (_) => page)),
+        Navigator.of(paneContext)
+            .push<void>(MaterialPageRoute<void>(builder: (_) => page)),
       );
       return;
     }
@@ -105,9 +104,9 @@ mixin _ChatScreenNav on _ChatScreenController {
     try {
       final response = await _http.get<dynamic>('/api/v1/notifications');
       if (!mounted) return;
-      final unread = jsonMaps(
-        response.data,
-      ).where((item) => item['readAt'] == null).length;
+      final unread = jsonMaps(response.data)
+          .where((item) => item['readAt'] == null)
+          .length;
       if (unread != _unreadNotifications) {
         setState(() => _unreadNotifications = unread);
       }
@@ -119,9 +118,8 @@ mixin _ChatScreenNav on _ChatScreenController {
   }
 
   Future<void> _openUtilityPage(String destination, Widget page) async {
-    await Navigator.of(
-      context,
-    ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
+    await Navigator.of(context)
+        .push<void>(MaterialPageRoute<void>(builder: (_) => page));
     await _afterUtility(destination);
   }
 
@@ -300,6 +298,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       await LearningSeenStore.clear();
       await _drafts.clear();
       await ComposerDrafts.clearAll();
+      await DraftStore.clearAll();
       _outboxTimer?.cancel();
       await _outbox.clear();
       await OfflineCache.instance.clear();
@@ -363,9 +362,10 @@ mixin _ChatScreenNav on _ChatScreenController {
         return;
       }
       setState(
-        () => _recent = jsonMaps(
-          response.data,
-        ).where((item) => item['id'] is String).toList(),
+        () =>
+            _recent = jsonMaps(response.data)
+                .where((item) => item['id'] is String)
+                .toList(),
       );
       _chatList.setConversations(_recent);
     } on DioException {
@@ -386,9 +386,10 @@ mixin _ChatScreenNav on _ChatScreenController {
         return;
       }
       setState(
-        () => _projects = jsonMaps(
-          response.data,
-        ).where((item) => item['id'] is String).toList(),
+        () =>
+            _projects = jsonMaps(response.data)
+                .where((item) => item['id'] is String)
+                .toList(),
       );
     } catch (_) {
       // Projects are a shortcut in the sidebar; keep the last known list.

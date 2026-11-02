@@ -389,10 +389,8 @@ String whatsAppConnectionMessage(String state) => switch (state) {
   'connecting' =>
     'WhatsApp is reconnecting. Saved messages are still available.',
   'paused' => 'This account is paused. New messages are not being collected.',
-  'none' || 'logged_out' || 'qr' =>
-    'This account needs to be linked again. Open account settings to reconnect.',
-  _ =>
-    'WhatsApp could not be reached. Showing saved messages; Jarvis will retry automatically.',
+  'none' || 'logged_out' || 'qr' => 'This account needs to be linked again. Open account settings to reconnect.',
+  _ => 'WhatsApp could not be reached. Showing saved messages; Jarvis will retry automatically.',
 };
 
 /// Path of one chat action. The chat id is passed separately as the `chatId`

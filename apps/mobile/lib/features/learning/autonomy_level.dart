@@ -18,8 +18,7 @@ const autonomyLevels = [
 
 String autonomyLevelExplanation(String level) => switch (level) {
   'ask_everything' => 'Every gated action shows you a card first.',
-  'standard' =>
-    'Looking things up runs on its own; every change asks first.',
+  'standard' => 'Looking things up runs on its own; every change asks first.',
   'autonomous' =>
     'Changes to your own Jarvis data run on their own, also in chat. In the '
         'background Jarvis may also act outside Jarvis, but only in the '
@@ -101,7 +100,9 @@ class _AutonomyLevelSectionState extends State<AutonomyLevelSection> {
     final colors = JarvisColors.of(context);
     final on = asJsonBool(widget.autonomy['enabled'], true);
     final level = asJsonString(widget.autonomy['level']) ?? 'full';
-    final allowed = jsonStrings(widget.autonomy['autonomousOutboundCategories']);
+    final allowed = jsonStrings(
+      widget.autonomy['autonomousOutboundCategories'],
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(

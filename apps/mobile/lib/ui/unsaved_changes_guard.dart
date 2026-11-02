@@ -15,6 +15,7 @@ class UnsavedChangesGuard extends StatefulWidget {
     required this.child,
     this.changes,
     this.enabled = true,
+    this.onDiscard,
     super.key,
   });
 
@@ -26,6 +27,9 @@ class UnsavedChangesGuard extends StatefulWidget {
 
   /// False while a save is running or after it finished.
   final bool enabled;
+
+  /// Called when the owner chooses Discard, just before the editor closes.
+  final Future<void> Function()? onDiscard;
   final Widget child;
 
   @override
@@ -47,7 +51,9 @@ class _UnsavedChangesGuardState extends State<UnsavedChangesGuard> {
       destructive: true,
       icon: PhosphorIconsRegular.trash,
     );
-    if (discard && mounted) Navigator.of(context).pop();
+    if (!discard) return;
+    await widget.onDiscard?.call();
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override

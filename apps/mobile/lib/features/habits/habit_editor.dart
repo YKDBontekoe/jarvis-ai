@@ -92,9 +92,8 @@ class _HabitEditorState extends State<_HabitEditor> {
         );
       }
       if (!mounted) return;
-      Navigator.of(
-        context,
-      ).pop(HabitView.fromJson(jsonObject(response.data) ?? const {}));
+      Navigator.of(context)
+          .pop(HabitView.fromJson(jsonObject(response.data) ?? const {}));
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -331,9 +330,8 @@ class _HabitSettingsSheetState extends State<_HabitSettingsSheet> {
         ).toJson(),
       );
       if (!mounted) return;
-      Navigator.of(
-        context,
-      ).pop(HabitSettingsView.fromJson(jsonObject(response.data)));
+      Navigator.of(context)
+          .pop(HabitSettingsView.fromJson(jsonObject(response.data)));
     } on DioException catch (error) {
       if (!mounted) return;
       setState(() {

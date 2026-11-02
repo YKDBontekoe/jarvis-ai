@@ -115,9 +115,9 @@ class _TransactionsTabState extends State<TransactionsTab>
     }
   }
 
-  void _toast(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _edit([TransactionData? existing]) async {
     final result = await showTransactionEditor(

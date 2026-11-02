@@ -25,7 +25,9 @@ String describeApiError(DioException error) {
     return 'A Jarvis service is temporarily unavailable. Please try again.';
   }
   if (status == 409) {
-    return legacyMessage ?? problem?.detail ?? 'Jarvis is busy with this conversation.';
+    return legacyMessage ??
+        problem?.detail ??
+        'Jarvis is busy with this conversation.';
   }
   final problemText = firstProblemMessage(response?.data);
   if (problemText != null && problemText.isNotEmpty) return problemText;
@@ -35,8 +37,9 @@ String describeApiError(DioException error) {
     DioExceptionType.sendTimeout ||
     DioExceptionType.receiveTimeout =>
       'Jarvis took too long to answer. It may be busy — try again in a moment.',
-    _ => 'Could not reach the Jarvis API at $apiBaseUrl. '
-        'Check that your server is running and this device can reach it.',
+    _ =>
+      'Could not reach the Jarvis API at $apiBaseUrl. '
+          'Check that your server is running and this device can reach it.',
   };
 }
 
@@ -47,7 +50,8 @@ String? _messageForCode(
 ) {
   switch (code) {
     case JarvisApiErrorCodes.authenticationRequired:
-      if (legacyMessage != null && legacyMessage.isNotEmpty) return legacyMessage;
+      if (legacyMessage != null && legacyMessage.isNotEmpty)
+        return legacyMessage;
       return 'Your sign-in has expired. Sign in again to continue.';
     case JarvisApiErrorCodes.authorizationForbidden:
       return legacyMessage ??
@@ -61,9 +65,12 @@ String? _messageForCode(
     case JarvisApiErrorCodes.resourceNotFound:
       return problem.detail ?? legacyMessage ?? 'That item could not be found.';
     case JarvisApiErrorCodes.conflict:
-      return legacyMessage ?? problem.detail ?? 'Jarvis is busy with this conversation.';
+      return legacyMessage ??
+          problem.detail ??
+          'Jarvis is busy with this conversation.';
     case JarvisApiErrorCodes.rateLimited:
-      return problem.detail ?? 'Too many requests. Wait a moment and try again.';
+      return problem.detail ??
+          'Too many requests. Wait a moment and try again.';
     case JarvisApiErrorCodes.dependencyUnavailable:
       return problem.detail ??
           'A Jarvis service is temporarily unavailable. Please try again.';

@@ -64,9 +64,8 @@ class ChannelNotificationCategoryPicker extends StatelessWidget {
               'Approvals from app chats, tasks, and automations can only be decided in the Jarvis app; '
               'Jarvis says so in the $label message.',
               key: const Key('channel-approvals-note'),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: muted),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: muted),
             ),
           ),
       ],

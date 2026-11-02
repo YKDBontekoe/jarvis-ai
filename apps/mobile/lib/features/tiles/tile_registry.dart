@@ -91,8 +91,7 @@ final List<TileSpec> tileSpecs = [
   ),
   const TileSpec(
     id: 'decisions',
-    description:
-        'Log a call with how sure you are, answer later, and see how well calibrated you are.',
+    description: 'Log a call with how sure you are, answer later, and see how well calibrated you are.',
     name: 'Decisions',
     icon: PhosphorIconsRegular.hourglassMedium,
     category: TileCategory.plan,
@@ -1296,9 +1295,8 @@ Future<TileData?> _activity(TileEnv env) async {
             null => null,
           },
           attention: asJsonString(event['kind']) == 'approval.requested',
-          target: EntityRef.tryParse(
-            asJsonString(event['subjectRef']),
-          )?.destination,
+          target: EntityRef.tryParse(asJsonString(event['subjectRef']))
+              ?.destination,
         ),
     ],
   );

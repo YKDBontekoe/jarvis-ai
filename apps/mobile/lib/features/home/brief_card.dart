@@ -76,9 +76,8 @@ class _BriefCardState extends State<BriefCard> {
                       'MORNING BRIEF',
                       if (at != null) clockTime(at),
                     ].join(' · '),
-                    style: JarvisType.capsOf(
-                      context,
-                    ).copyWith(color: colors.accentDeep),
+                    style: JarvisType.capsOf(context)
+                        .copyWith(color: colors.accentDeep),
                   ),
                 ),
                 IconButton(

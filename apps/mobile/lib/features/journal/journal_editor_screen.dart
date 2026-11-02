@@ -7,6 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../../storage/draft_store.dart';
 import '../../ui/unsaved_changes_guard.dart';
 import 'journal_format.dart';
 
@@ -46,10 +47,52 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
 
   bool get _editing => widget.entry != null;
 
+  late final FormDraft _draft = FormDraft(
+    key: DraftStore.keyFor(
+      widget.http.options.baseUrl,
+      'journal:${jsonId(widget.entry) ?? 'new'}',
+    ),
+    read: () => {
+      'content': _content.text,
+      'highlights': _highlights.text,
+      'gratitude': _gratitude.text,
+      'tags': _tags.text,
+      'date': journalDateKey(_date),
+      'rating': '${_rating ?? ''}',
+      'mood': '${_mood ?? ''}',
+      'energy': '${_energy ?? ''}',
+      'stress': '${_stress ?? ''}',
+    },
+    apply: (fields) {
+      _content.text = fields['content'] ?? '';
+      _highlights.text = fields['highlights'] ?? '';
+      _gratitude.text = fields['gratitude'] ?? '';
+      _tags.text = fields['tags'] ?? '';
+      _date = parseJournalDate(fields['date']) ?? _date;
+      _rating = int.tryParse(fields['rating'] ?? '');
+      _mood = int.tryParse(fields['mood'] ?? '');
+      _energy = int.tryParse(fields['energy'] ?? '');
+      _stress = int.tryParse(fields['stress'] ?? '');
+    },
+    onChanged: () {
+      if (mounted) setState(() {});
+    },
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_draft.attach());
+    for (final controller in [_content, _highlights, _gratitude, _tags]) {
+      controller.addListener(_draft.changed);
+    }
+  }
+
   static int? _intOrNull(Object? value) => value is int ? value : null;
 
   @override
   void dispose() {
+    _draft.dispose();
     _content.dispose();
     _highlights.dispose();
     _gratitude.dispose();
@@ -65,7 +108,10 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
       firstDate: DateTime(2000),
       lastDate: now,
     );
-    if (picked != null && mounted) setState(() => _date = picked);
+    if (picked != null && mounted) {
+      setState(() => _date = picked);
+      _draft.changed();
+    }
   }
 
   Future<void> _save() async {
@@ -111,6 +157,7 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
       } else {
         await widget.http.post<dynamic>('/api/v1/journal', data: body);
       }
+      await _draft.clear();
       if (mounted) Navigator.of(context).pop(true);
     } on DioException catch (error) {
       if (!mounted) return;
@@ -145,6 +192,7 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
     setState(() => _saving = true);
     try {
       await widget.http.delete<dynamic>('/api/v1/journal/$id');
+      await _draft.clear();
       if (mounted) Navigator.of(context).pop(true);
     } on DioException catch (error) {
       if (!mounted) return;
@@ -166,6 +214,7 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
   @override
   Widget build(BuildContext context) => UnsavedChangesGuard(
     enabled: !_saving,
+    onDiscard: _draft.clear,
     changes: Listenable.merge([_content, _highlights, _gratitude, _tags]),
     snapshot: () => [
       _content.text,
@@ -209,6 +258,7 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                DraftBanner(draft: _draft),
                 if (_error != null)
                   InlineNotice(
                     message: _error!,
@@ -280,7 +330,10 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
                   high: 'Great',
                   count: 10,
                   value: _rating,
-                  onChanged: (value) => setState(() => _rating = value),
+                  onChanged: (value) {
+                    setState(() => _rating = value);
+                    _draft.changed();
+                  },
                 ),
                 _RatingSelector(
                   idPrefix: 'mood',
@@ -290,7 +343,10 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
                   count: 5,
                   value: _mood,
                   faces: true,
-                  onChanged: (value) => setState(() => _mood = value),
+                  onChanged: (value) {
+                    setState(() => _mood = value);
+                    _draft.changed();
+                  },
                 ),
                 _RatingSelector(
                   idPrefix: 'energy',
@@ -299,7 +355,10 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
                   high: 'Energetic',
                   count: 5,
                   value: _energy,
-                  onChanged: (value) => setState(() => _energy = value),
+                  onChanged: (value) {
+                    setState(() => _energy = value);
+                    _draft.changed();
+                  },
                 ),
                 _RatingSelector(
                   idPrefix: 'stress',
@@ -308,7 +367,10 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
                   high: 'Very stressed',
                   count: 5,
                   value: _stress,
-                  onChanged: (value) => setState(() => _stress = value),
+                  onChanged: (value) {
+                    setState(() => _stress = value);
+                    _draft.changed();
+                  },
                 ),
               ],
             ),

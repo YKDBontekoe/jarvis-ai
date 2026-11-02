@@ -28,9 +28,7 @@ mixin _ChatScreenPhotos on _ChatScreenController {
               ListTile(
                 leading: const IconBadge(icon: PhosphorIconsRegular.image),
                 title: const Text('Choose from library'),
-                subtitle: Text(
-                  'Up to $maxPhotosPerMessage photos per message',
-                ),
+                subtitle: Text('Up to $maxPhotosPerMessage photos per message'),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   unawaited(_pickPhotos(ImageSource.gallery));

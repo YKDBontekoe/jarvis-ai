@@ -85,8 +85,7 @@ class _AuditScreenState extends State<AuditScreen> {
       empty: const EmptyState(
         icon: PhosphorIconsRegular.listChecks,
         title: 'Nothing logged yet',
-        message:
-            'Approvals, tasks, reminders, files, and memory changes are recorded here.',
+        message: 'Approvals, tasks, reminders, files, and memory changes are recorded here.',
       ),
       child: OrbRefresh(
         onRefresh: _load,

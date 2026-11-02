@@ -119,9 +119,9 @@ Future<ImageSource?> _pickSource(BuildContext context) =>
       ),
     );
 
-void _snack(BuildContext context, String message) => ScaffoldMessenger.of(
-  context,
-).showSnackBar(SnackBar(content: Text(message)));
+void _snack(BuildContext context, String message) =>
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
 
 /// Uploads the photo and asks the server to read it. Pops with the seed for
 /// the form, or null when the upload itself failed.

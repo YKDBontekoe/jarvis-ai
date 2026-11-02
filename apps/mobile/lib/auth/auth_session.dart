@@ -39,13 +39,12 @@ class AuthSession {
     if (existing != null && !forceRefresh) return existing;
     late final Future<String?> pending;
     pending =
-        _serialized(
-          () => _readOrRefreshAccessToken(forceRefresh: forceRefresh),
-        ).whenComplete(() {
-          if (identical(_accessTokenInFlight, pending)) {
-            _accessTokenInFlight = null;
-          }
-        });
+        _serialized(() => _readOrRefreshAccessToken(forceRefresh: forceRefresh))
+            .whenComplete(() {
+              if (identical(_accessTokenInFlight, pending)) {
+                _accessTokenInFlight = null;
+              }
+            });
     _accessTokenInFlight = pending;
     return pending;
   }

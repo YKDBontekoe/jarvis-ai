@@ -310,8 +310,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                       sliver: SliverToBoxAdapter(
                                         child: InlineNotice(
                                           key: Key('chats-whatsapp-error'),
-                                          message:
-                                              'WhatsApp is out of reach. These are the last chats it sent.',
+                                          message: 'WhatsApp is out of reach. These are the last chats it sent.',
                                         ),
                                       ),
                                     ),
@@ -1510,9 +1509,8 @@ class _ChatPreview extends StatelessWidget {
                                     const SizedBox(width: 8),
                                     Text(
                                       'WHAT YOU MISSED',
-                                      style: JarvisType.capsOf(
-                                        context,
-                                      ).copyWith(color: colors.accentDeep),
+                                      style: JarvisType.capsOf(context)
+                                          .copyWith(color: colors.accentDeep),
                                     ),
                                   ],
                                 ),
@@ -1562,10 +1560,10 @@ class _ChatPreview extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if ((http, onReply) case (
-                          final http?,
-                          final reply?,
-                        ) when !item.isJarvis && !item.group && item.unread > 0)
+                        if ((http, onReply) case (final http?, final reply?)
+                            when !item.isJarvis &&
+                                !item.group &&
+                                item.unread > 0)
                           QuickReplies(
                             http: http,
                             item: item,

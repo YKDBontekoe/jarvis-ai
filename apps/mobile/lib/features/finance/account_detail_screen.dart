@@ -68,9 +68,9 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
     }
   }
 
-  void _toast(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _toast(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   Future<void> _call(Future<void> Function() action) async {
     try {

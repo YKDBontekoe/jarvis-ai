@@ -38,7 +38,8 @@ class JarvisApiProblem {
     final fieldErrors = errors;
     if (fieldErrors == null) return null;
     for (final messages in fieldErrors.values) {
-      if (messages.isNotEmpty && messages.first.isNotEmpty) return messages.first;
+      if (messages.isNotEmpty && messages.first.isNotEmpty)
+        return messages.first;
     }
     return null;
   }
@@ -72,7 +73,9 @@ JarvisApiProblem? parseJarvisApiProblem(dynamic data) {
     apiErrorVersion: apiErrorVersion >= 0 ? apiErrorVersion : null,
     detail: asJsonString(map['detail']),
     title: asJsonString(map['title']),
-    status: map['status'] is int ? map['status'] as int : asJsonInt(map['status'], -1),
+    status: map['status'] is int
+        ? map['status'] as int
+        : asJsonInt(map['status'], -1),
     errors: errors,
   );
 }

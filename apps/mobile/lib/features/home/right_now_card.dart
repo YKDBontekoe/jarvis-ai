@@ -86,9 +86,8 @@ class RightNowCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           look.label.toUpperCase(),
-                          style: JarvisType.capsOf(
-                            context,
-                          ).copyWith(color: look.label2),
+                          style: JarvisType.capsOf(context)
+                              .copyWith(color: look.label2),
                         ),
                       ),
                       Semantics(
@@ -480,9 +479,8 @@ Future<WhyChoice?> showWhySheet(BuildContext context, HomeHero hero) {
               const SizedBox(height: 8),
               Text(
                 hero.title,
-                style: JarvisType.displayOf(
-                  sheet,
-                ).copyWith(fontSize: 24, fontWeight: FontWeight.w700),
+                style: JarvisType.displayOf(sheet)
+                    .copyWith(fontSize: 24, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 6),
               Text(
