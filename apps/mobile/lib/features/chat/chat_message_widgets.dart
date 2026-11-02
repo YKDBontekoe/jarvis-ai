@@ -244,7 +244,7 @@ class _MessageBubbleState extends State<MessageBubble> {
                         if (message.content.trim().isNotEmpty)
                           PopupMenuButton<String>(
                             key: const Key('message-more'),
-                            tooltip: 'More actions',
+                            tooltip: 'Message actions',
                             icon: Icon(
                               PhosphorIconsRegular.dotsThree,
                               size: 18,
