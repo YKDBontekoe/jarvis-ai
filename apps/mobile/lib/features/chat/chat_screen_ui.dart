@@ -644,7 +644,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                                                   alignment: _entryOrigin(
                                                     _entries[index],
                                                   ),
-                                                  child: _entryView(
+                                                  child: _anchored(
                                                     _entries[index],
                                                   ),
                                                 ),
@@ -683,12 +683,19 @@ mixin _ChatScreenUi on _ChatScreenController {
                                     child: ExcludeSemantics(
                                       excluding:
                                           _nearBottom || _showApprovalDock,
-                                      child: CircleIconButton(
-                                        icon: PhosphorIconsRegular.caretDown,
-                                        tooltip: 'Jump to latest',
-                                        size: 44,
+                                      child: FilledButton.tonalIcon(
+                                        key: const Key('jump-to-latest'),
                                         onPressed: () =>
                                             _scrollToBottom(force: true),
+                                        icon: const Icon(
+                                          PhosphorIconsRegular.caretDown,
+                                          size: 16,
+                                        ),
+                                        label: const Text('Latest'),
+                                        style: FilledButton.styleFrom(
+                                          minimumSize: const Size(44, 44),
+                                          shape: const StadiumBorder(),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -819,6 +826,15 @@ mixin _ChatScreenUi on _ChatScreenController {
       entry is MessageEntry && entry.isUser
       ? Alignment.bottomRight
       : Alignment.bottomLeft;
+
+  /// Messages with an id wear a key so the app can tell where the screen is.
+  Widget _anchored(ChatEntry entry) {
+    final view = _entryView(entry);
+    final id = entry is MessageEntry ? entry.id : null;
+    return id == null
+        ? view
+        : KeyedSubtree(key: _anchors.keyFor(id), child: view);
+  }
 
   Widget _entryView(ChatEntry entry) => switch (entry) {
     MessageEntry() => MessageBubble(

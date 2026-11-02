@@ -349,6 +349,9 @@ mixin _ChatScreenNav on _ChatScreenController {
       await _drafts.clear();
       await ComposerDrafts.clearAll();
       await DraftStore.clearAll();
+      await ReadingPositions.clearAll();
+      _readingPositions = ReadingPositions.memory();
+      _anchors.reset();
       await RecentFeatures.clearAll();
       _outboxTimer?.cancel();
       await _outbox.clear();

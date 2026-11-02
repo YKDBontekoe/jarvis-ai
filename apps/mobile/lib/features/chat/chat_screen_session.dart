@@ -148,6 +148,9 @@ mixin _ChatScreenSession on _ChatScreenController {
     await previous?.stop();
     if (!isCurrent() || !isLatestOpen()) return;
     _restoreDraft(_conversationId, conversationId);
+    // Leaving a chat midway keeps the place; a different chat starts with fresh message keys.
+    _saveReadingPosition();
+    if (_conversationId != conversationId) _anchors.reset();
     setState(() {
       _conversationId = conversationId;
       _profileId = asJsonString(body?['profileId']);
@@ -193,7 +196,7 @@ mixin _ChatScreenSession on _ChatScreenController {
       _error = null;
     });
     if (responding) unawaited(_catchUpRemoteQuery(conversationId));
-    _scrollToBottom(jump: true, force: true);
+    unawaited(_restoreReadingPosition(conversationId));
     unawaited(_loadRecent());
     unawaited(_loadConversationSources(conversationId));
     // An open question shows even when realtime cannot connect; the load
@@ -369,6 +372,62 @@ mixin _ChatScreenSession on _ChatScreenController {
       // Keep the current transcript if history cannot be refreshed.
     } catch (_) {
       // Keep the current transcript if history is malformed.
+    }
+  }
+
+  /// Remembers where the owner stopped reading, or forgets it when they were
+  /// at the latest messages.
+  void _saveReadingPosition() {
+    final id = _conversationId;
+    if (id == null || !_scroll.hasClients) return;
+    if (_nearBottom) {
+      _readingPositions.remove(id);
+    } else if (_anchors.anchor(_scroll) case final spot?) {
+      _readingPositions.write(id, spot);
+    }
+    unawaited(_readingPositions.flush());
+  }
+
+  /// Opens a conversation at the spot where reading stopped, loading older
+  /// messages until that one is there. Without a saved spot, or when it cannot
+  /// be found, the chat opens at the latest message as before.
+  Future<void> _restoreReadingPosition(String conversationId) async {
+    final spot = _readingPositions.read(conversationId);
+    bool loaded() => _entries.any(
+      (entry) => entry is MessageEntry && entry.id == spot?.messageId,
+    );
+    if (spot == null) {
+      _scrollToBottom(jump: true, force: true);
+      return;
+    }
+    var pages = 0;
+    while (!loaded() && _hasOlderMessages && pages++ < 6) {
+      await _loadOlderMessages();
+      if (!mounted || _conversationId != conversationId) return;
+    }
+    if (!loaded()) {
+      _readingPositions.remove(conversationId);
+      _scrollToBottom(jump: true, force: true);
+      return;
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || _conversationId != conversationId) return;
+    final index = _entries.indexWhere(
+      (entry) => entry is MessageEntry && entry.id == spot.messageId,
+    );
+    final placed =
+        _scroll.hasClients &&
+        await _anchors.reveal(
+          _scroll,
+          spot,
+          estimate: () => _entries.length < 2
+              ? 0
+              : _scroll.position.maxScrollExtent *
+                    index /
+                    (_entries.length - 1),
+        );
+    if (!placed && mounted && _conversationId == conversationId) {
+      _scrollToBottom(jump: true, force: true);
     }
   }
 

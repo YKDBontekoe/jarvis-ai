@@ -88,6 +88,11 @@ abstract class _ChatScreenController extends State<ChatScreen>
 
   /// Where each tab was left: list position, search and filter.
   final _tabMemory = TabMemory();
+
+  /// Where reading stopped in each long conversation, and the message keys
+  /// that tell where the screen is within the transcript.
+  ReadingPositions _readingPositions = ReadingPositions.memory();
+  final _anchors = TranscriptAnchors();
   final _tiles = TileLayoutController.device();
   late final _tileSource = TileDataSource(_http, ensureMorningBriefing: true);
   Timer? _chatsTimer;
@@ -141,6 +146,12 @@ abstract class _ChatScreenController extends State<ChatScreen>
   /// The docked card the owner chose to answer by typing: its options fold
   /// into a bar and the composer comes back.
   String? _typingOverSurfaceId;
+
+  Future<void> _openReadingPositions() async {
+    final stored = await ReadingPositions.open();
+    if (!mounted || _signedOut) return;
+    _readingPositions = stored;
+  }
 
   Future<void> _openDrafts() async {
     final stored = await ComposerDrafts.open();

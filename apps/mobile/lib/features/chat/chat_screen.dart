@@ -72,6 +72,7 @@ import 'chat_entries.dart';
 import 'chat_widgets.dart';
 import '../../api/waiting_changes.dart';
 import 'composer_drafts.dart';
+import 'reading_position.dart';
 import 'message_actions.dart';
 import 'conversation_summary.dart';
 import 'image_paste_stub.dart'
@@ -140,6 +141,7 @@ class _ChatScreenState extends _ChatScreenController
     _scroll.addListener(_handleTranscriptScroll);
     _input.addListener(_rememberDraft);
     unawaited(_openDrafts());
+    unawaited(_openReadingPositions());
     _registerWaitingChanges();
     unawaited(_openOutbox());
     unawaited(_tiles.open());
@@ -325,6 +327,7 @@ class _ChatScreenState extends _ChatScreenController
         state == AppLifecycleState.detached;
     if (backgrounded) {
       unawaited(_drafts.flush());
+      _saveReadingPosition();
       if (_sending || _busy) _remoteQuery = true;
       return;
     }
