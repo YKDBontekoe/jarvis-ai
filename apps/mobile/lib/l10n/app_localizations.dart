@@ -349,6 +349,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Few prompts are reused from cache, so each reply costs more time.'**
   String get turnQualityFlagLowCache;
+
+  /// No description provided for @capturesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Captures'**
+  String get capturesTitle;
+
+  /// No description provided for @capturesEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing shared yet'**
+  String get capturesEmptyTitle;
+
+  /// No description provided for @capturesEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Share in another app and choose Jarvis. What you share waits here until you decide what to do with it.'**
+  String get capturesEmptyMessage;
+
+  /// No description provided for @capturesDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this capture?'**
+  String get capturesDiscardTitle;
+
+  /// No description provided for @capturesDiscardMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'It will be removed from this phone. Nothing is sent anywhere.'**
+  String get capturesDiscardMessage;
+
+  /// No description provided for @capturesKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep'**
+  String get capturesKeep;
+
+  /// No description provided for @capturesDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get capturesDiscard;
+
+  /// No description provided for @capturesLinkNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a note about this link (optional)'**
+  String get capturesLinkNote;
+
+  /// No description provided for @capturesEditFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit before you decide'**
+  String get capturesEditFirst;
+
+  /// No description provided for @capturesSaveToFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Files'**
+  String get capturesSaveToFiles;
+
+  /// No description provided for @capturesSaveToLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Library'**
+  String get capturesSaveToLibrary;
+
+  /// No description provided for @capturesAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask Jarvis'**
+  String get capturesAsk;
+
+  /// No description provided for @capturesRemind.
+  ///
+  /// In en, this message translates to:
+  /// **'Create reminder'**
+  String get capturesRemind;
+
+  /// No description provided for @hideInSwitcherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide in app switcher'**
+  String get hideInSwitcherTitle;
+
+  /// No description provided for @hideInSwitcherSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blur Jarvis when you swipe up or switch apps'**
+  String get hideInSwitcherSubtitle;
 }
 
 class _AppLocalizationsDelegate

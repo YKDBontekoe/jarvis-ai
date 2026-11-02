@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app_lock.dart';
+import '../../l10n/l10n.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
@@ -92,10 +93,8 @@ class _AppLockScreenState extends State<AppLockScreen> {
                               icon: PhosphorIconsRegular.eyeSlash,
                               size: 34,
                             ),
-                            title: const Text('Hide in app switcher'),
-                            subtitle: const Text(
-                              'Blur Jarvis when you swipe up or switch apps',
-                            ),
+                            title: Text(context.l10n.hideInSwitcherTitle),
+                            subtitle: Text(context.l10n.hideInSwitcherSubtitle),
                             value:
                                 controller.enabled ||
                                 controller.coverInSwitcher,

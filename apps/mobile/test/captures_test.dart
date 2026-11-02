@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/captures/capture_models.dart';
 import 'package:jarvis_mobile/features/captures/capture_store.dart';
 import 'package:jarvis_mobile/features/captures/captures_screen.dart';
+import 'package:jarvis_mobile/l10n/l10n.dart';
 import 'package:jarvis_mobile/theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -205,7 +206,11 @@ void main() {
       asked = [];
     });
 
-    Future<void> show(WidgetTester tester, List<CaptureItem> items) async {
+    Future<void> show(
+      WidgetTester tester,
+      List<CaptureItem> items, {
+      Locale? locale,
+    }) async {
       backend.index = indexOf(items);
       await tester.runAsync(() => store.bind('srv'));
       tester.view.physicalSize = const Size(800, 2600);
@@ -214,6 +219,9 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
         MaterialApp(
+          locale: locale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: buildJarvisTheme(),
           home: CapturesScreen(
             http: http.client(),
@@ -347,6 +355,14 @@ void main() {
     testWidgets('an empty inbox explains how captures arrive', (tester) async {
       await show(tester, const []);
       expect(find.text('Nothing shared yet'), findsOneWidget);
+    });
+
+    testWidgets('speaks Dutch when the app is Dutch', (tester) async {
+      await show(tester, [text('a', 'Melk kopen')], locale: const Locale('nl'));
+      expect(find.text('Vastgelegd'), findsOneWidget);
+      expect(find.text('Vraag het Jarvis'), findsOneWidget);
+      expect(find.text('Weggooien'), findsOneWidget);
+      expect(find.text('Ask Jarvis'), findsNothing);
     });
   });
 }

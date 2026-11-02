@@ -38,6 +38,8 @@ const destinations = [
   'home-routine:focus',
   'trip:t1',
   'queued-changes',
+  'captures',
+  'widget-privacy',
   'mission-starter',
   'mission-result:m1',
   'notification-settings',

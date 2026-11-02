@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/api_errors.dart';
 import '../../json_maps.dart';
+import '../../l10n/l10n.dart';
 import '../../theme.dart';
 import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
@@ -238,10 +239,10 @@ class _CapturesScreenState extends State<CapturesScreen> {
   Future<void> _discard(CaptureItem item) async {
     final confirmed = await showJarvisConfirm(
       context,
-      title: 'Discard this capture?',
-      message: 'It will be removed from this phone. Nothing is sent anywhere.',
-      cancelLabel: 'Keep',
-      confirmLabel: 'Discard',
+      title: context.l10n.capturesDiscardTitle,
+      message: context.l10n.capturesDiscardMessage,
+      cancelLabel: context.l10n.capturesKeep,
+      confirmLabel: context.l10n.capturesDiscard,
       destructive: true,
       icon: PhosphorIconsRegular.trash,
     );
@@ -250,16 +251,16 @@ class _CapturesScreenState extends State<CapturesScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const PageTitle('Captures')),
+    appBar: AppBar(title: PageTitle(context.l10n.capturesTitle)),
     body: ListenableBuilder(
       listenable: _store,
       builder: (context, _) {
         final items = _store.items;
         if (items.isEmpty && _handled.isEmpty) {
-          return const EmptyState(
+          return EmptyState(
             icon: PhosphorIconsRegular.tray,
-            title: 'Nothing shared yet',
-            message: 'Use Share in another app and choose Jarvis. What you share waits here until you decide what to do with it.',
+            title: context.l10n.capturesEmptyTitle,
+            message: context.l10n.capturesEmptyMessage,
           );
         }
         return ListView(
@@ -370,8 +371,8 @@ class _CapturesScreenState extends State<CapturesScreen> {
                   enabled: !busy,
                   decoration: InputDecoration(
                     labelText: item.kind == CaptureKind.link
-                        ? 'Add a note about this link (optional)'
-                        : 'Edit before you decide',
+                        ? context.l10n.capturesLinkNote
+                        : context.l10n.capturesEditFirst,
                     alignLabelWithHint: true,
                   ),
                 ),
@@ -401,8 +402,8 @@ class _CapturesScreenState extends State<CapturesScreen> {
                     primary: true,
                     icon: PhosphorIconsRegular.bookmarkSimple,
                     label: item.kind == CaptureKind.file
-                        ? 'Save to Files'
-                        : 'Save to Library',
+                        ? context.l10n.capturesSaveToFiles
+                        : context.l10n.capturesSaveToLibrary,
                     onPressed: busy
                         ? null
                         : () => unawaited(_saveToLibrary(item)),
@@ -411,21 +412,21 @@ class _CapturesScreenState extends State<CapturesScreen> {
                     key: Key('capture-ask-${item.id}'),
                     compact: true,
                     icon: PhosphorIconsRegular.chatCircle,
-                    label: 'Ask Jarvis',
+                    label: context.l10n.capturesAsk,
                     onPressed: busy ? null : () => unawaited(_ask(item)),
                   ),
                   PillAction(
                     key: Key('capture-remind-${item.id}'),
                     compact: true,
                     icon: PhosphorIconsRegular.alarm,
-                    label: 'Create reminder',
+                    label: context.l10n.capturesRemind,
                     onPressed: busy ? null : () => unawaited(_remind(item)),
                   ),
                 ],
                 PillAction(
                   key: Key('capture-discard-${item.id}'),
                   compact: true,
-                  label: 'Discard',
+                  label: context.l10n.capturesDiscard,
                   onPressed: busy ? null : () => unawaited(_discard(item)),
                 ),
               ],

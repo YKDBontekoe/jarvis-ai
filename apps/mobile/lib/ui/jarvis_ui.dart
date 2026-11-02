@@ -956,43 +956,49 @@ class InlineNotice extends StatelessWidget {
         color: JarvisColors.of(context).ink,
       ),
     );
+    // Failures and confirmations that appear after an action are read out by
+    // VoiceOver without the person having to hunt for them.
     return Padding(
       padding: margin,
-      child: Container(
-        padding: EdgeInsets.fromLTRB(14, 12, actions.isEmpty ? 14 : 6, 12),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(JarvisRadii.md),
-          border: tone == NoticeTone.danger
-              ? Border.all(color: fg.withValues(alpha: .15))
-              : null,
+      child: Semantics(
+        container: true,
+        liveRegion: tone == NoticeTone.danger || tone == NoticeTone.success,
+        child: Container(
+          padding: EdgeInsets.fromLTRB(14, 12, actions.isEmpty ? 14 : 6, 12),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(JarvisRadii.md),
+            border: tone == NoticeTone.danger
+                ? Border.all(color: fg.withValues(alpha: .15))
+                : null,
+          ),
+          child: stacked
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(icon, size: 20, color: fg),
+                        const SizedBox(width: 10),
+                        Expanded(child: text),
+                      ],
+                    ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Wrap(children: actions),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Icon(icon, size: 20, color: fg),
+                    const SizedBox(width: 10),
+                    Expanded(child: text),
+                    ...actions,
+                  ],
+                ),
         ),
-        child: stacked
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(icon, size: 20, color: fg),
-                      const SizedBox(width: 10),
-                      Expanded(child: text),
-                    ],
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Wrap(children: actions),
-                  ),
-                ],
-              )
-            : Row(
-                children: [
-                  Icon(icon, size: 20, color: fg),
-                  const SizedBox(width: 10),
-                  Expanded(child: text),
-                  ...actions,
-                ],
-              ),
       ),
     );
   }

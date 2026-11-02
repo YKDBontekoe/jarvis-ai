@@ -180,4 +180,53 @@ class AppLocalizationsNl extends AppLocalizations {
   @override
   String get turnQualityFlagLowCache =>
       'Weinig prompts komen uit de cache, dus elk antwoord kost meer tijd.';
+
+  @override
+  String get capturesTitle => 'Vastgelegd';
+
+  @override
+  String get capturesEmptyTitle => 'Nog niets gedeeld';
+
+  @override
+  String get capturesEmptyMessage =>
+      'Gebruik Deel in een andere app en kies Jarvis. Wat je deelt wacht hier tot jij beslist wat ermee gebeurt.';
+
+  @override
+  String get capturesDiscardTitle => 'Dit weggooien?';
+
+  @override
+  String get capturesDiscardMessage =>
+      'Het wordt van deze telefoon verwijderd. Er wordt niets verstuurd.';
+
+  @override
+  String get capturesKeep => 'Bewaren';
+
+  @override
+  String get capturesDiscard => 'Weggooien';
+
+  @override
+  String get capturesLinkNote =>
+      'Voeg een notitie bij deze link toe (optioneel)';
+
+  @override
+  String get capturesEditFirst => 'Pas aan voordat je beslist';
+
+  @override
+  String get capturesSaveToFiles => 'Bewaar in Bestanden';
+
+  @override
+  String get capturesSaveToLibrary => 'Bewaar in Bibliotheek';
+
+  @override
+  String get capturesAsk => 'Vraag het Jarvis';
+
+  @override
+  String get capturesRemind => 'Herinnering maken';
+
+  @override
+  String get hideInSwitcherTitle => 'Verberg in appkiezer';
+
+  @override
+  String get hideInSwitcherSubtitle =>
+      'Maak Jarvis onscherp als je omhoog veegt of van app wisselt';
 }
