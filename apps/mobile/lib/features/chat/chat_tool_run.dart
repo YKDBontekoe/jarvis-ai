@@ -21,6 +21,21 @@ class ToolRunView extends StatelessWidget {
   /// Opens a thing a step made or changed, from its result card.
   final ValueChanged<EntityRef>? onOpenEntity;
 
+  Widget _stepChip(int index, ToolStep step) => PopIn(
+    key: ValueKey(index),
+    from: .7,
+    alignment: Alignment.centerLeft,
+    child: _ToolChip(
+      step: step,
+      onTap:
+          step.tool == 'CreateTask' &&
+              step.status == ToolStepStatus.completed &&
+              step.refs.isEmpty
+          ? onOpenTasks
+          : null,
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final made = [
@@ -37,22 +52,17 @@ class ToolRunView extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: [
-              // Each step pops in as Jarvis starts it.
-              for (final (index, step) in run.steps.indexed)
-                PopIn(
-                  key: ValueKey(index),
-                  from: .7,
-                  alignment: Alignment.centerLeft,
-                  child: _ToolChip(
-                    step: step,
-                    onTap:
-                        step.tool == 'CreateTask' &&
-                            step.status == ToolStepStatus.completed &&
-                            step.refs.isEmpty
-                        ? onOpenTasks
-                        : null,
+              // Each step pops in as Jarvis starts it. A long run of finished
+              // steps folds into one summary; running and failed ones stay out.
+              for (final segment in foldToolSteps(run.steps))
+                if (segment.steps.length == 1 && !segment.folded)
+                  _stepChip(segment.start, segment.steps.single)
+                else
+                  _FoldedSteps(
+                    key: ValueKey('fold-${segment.start}'),
+                    segment: segment,
+                    chipFor: _stepChip,
                   ),
-                ),
             ],
           ),
           if (AppBuildProgress.of(run) case final progress?) ...[
@@ -411,6 +421,144 @@ class _ToolChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
         child: chip,
+      ),
+    );
+  }
+}
+
+/// How many finished steps in a row it takes before they fold into a summary.
+const toolFoldThreshold = 3;
+
+/// A stretch of steps shown as one piece: a single step, or a run of finished
+/// ones folded together. [start] is the index of its first step in the run.
+class ToolSegment {
+  const ToolSegment(this.start, this.steps, {this.folded = false});
+
+  final int start;
+  final List<ToolStep> steps;
+  final bool folded;
+}
+
+/// Splits [steps] into what the transcript shows: running and failed steps stay
+/// on their own, and [toolFoldThreshold] or more finished steps in a row fold.
+List<ToolSegment> foldToolSteps(List<ToolStep> steps) {
+  final segments = <ToolSegment>[];
+  var i = 0;
+  while (i < steps.length) {
+    if (steps[i].status != ToolStepStatus.completed) {
+      segments.add(ToolSegment(i, [steps[i]]));
+      i++;
+      continue;
+    }
+    var end = i;
+    while (end < steps.length &&
+        steps[end].status == ToolStepStatus.completed) {
+      end++;
+    }
+    final run = steps.sublist(i, end);
+    if (run.length >= toolFoldThreshold) {
+      segments.add(ToolSegment(i, run, folded: true));
+    } else {
+      for (var k = 0; k < run.length; k++) {
+        segments.add(ToolSegment(i + k, [run[k]]));
+      }
+    }
+    i = end;
+  }
+  return segments;
+}
+
+/// "4 steps done" or "4 steps done · made 2 things": the outcome of a folded run.
+String foldedStepsSummary(List<ToolStep> steps) {
+  final made = steps.fold<int>(0, (sum, step) => sum + step.refs.length);
+  final base = '${steps.length} steps done';
+  return made == 0
+      ? base
+      : '$base · made $made ${made == 1 ? 'thing' : 'things'}';
+}
+
+/// A run of finished steps: one summary chip that opens to every step.
+class _FoldedSteps extends StatefulWidget {
+  const _FoldedSteps({required this.segment, required this.chipFor, super.key});
+
+  final ToolSegment segment;
+  final Widget Function(int index, ToolStep step) chipFor;
+
+  @override
+  State<_FoldedSteps> createState() => _FoldedStepsState();
+}
+
+class _FoldedStepsState extends State<_FoldedSteps> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    final steps = widget.segment.steps;
+    final summary = foldedStepsSummary(steps);
+    if (_open) {
+      return Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final (offset, step) in steps.indexed)
+            widget.chipFor(widget.segment.start + offset, step),
+          Semantics(
+            button: true,
+            label: 'Fold $summary',
+            excludeSemantics: true,
+            child: InkWell(
+              key: const Key('tool-fold-collapse'),
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => setState(() => _open = false),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Text(
+                  'Fold',
+                  style: TextStyle(fontSize: 12.5, color: colors.inkSoft),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return Semantics(
+      button: true,
+      label: '$summary. Show each step',
+      excludeSemantics: true,
+      child: InkWell(
+        key: const Key('tool-fold-expand'),
+        borderRadius: BorderRadius.circular(999),
+        onTap: () => setState(() => _open = true),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: colors.surfaceMuted,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                PhosphorIconsRegular.checkCircle,
+                size: 14,
+                color: colors.success,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                summary,
+                style: TextStyle(fontSize: 12.5, color: colors.inkSoft),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                PhosphorIconsRegular.caretDown,
+                size: 12,
+                color: colors.muted,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
