@@ -38,8 +38,9 @@ class JarvisApiProblem {
     final fieldErrors = errors;
     if (fieldErrors == null) return null;
     for (final messages in fieldErrors.values) {
-      if (messages.isNotEmpty && messages.first.isNotEmpty)
+      if (messages.isNotEmpty && messages.first.isNotEmpty) {
         return messages.first;
+      }
     }
     return null;
   }

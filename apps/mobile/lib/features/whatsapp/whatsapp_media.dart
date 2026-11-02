@@ -188,8 +188,9 @@ class _Element extends StatelessWidget {
     try {
       final bytes = await WhatsAppMediaCache.load(http, channelId, messageId);
       if (bytes == null) {
-        if (context.mounted)
+        if (context.mounted) {
           _note(context, 'This file is no longer available.');
+        }
         return;
       }
       final name = media.fileName ?? _fileName(media, messageId);

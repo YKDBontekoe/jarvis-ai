@@ -106,8 +106,9 @@ class _CapturesScreenState extends State<CapturesScreen> {
         );
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Jarvis could not do that. Try again.');
+      }
     } finally {
       if (mounted) setState(() => _busy.remove(item.id));
     }

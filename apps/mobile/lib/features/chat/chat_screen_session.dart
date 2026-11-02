@@ -574,8 +574,9 @@ mixin _ChatScreenSession on _ChatScreenController {
   }
 
   MessageEntry? _messageEntryFromJson(Map<String, dynamic> message) {
-    if (message['role'] is! String || message['content'] is! String)
+    if (message['role'] is! String || message['content'] is! String) {
       return null;
+    }
     return MessageEntry(
       role: message['role'] as String,
       content: message['content'] as String,

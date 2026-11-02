@@ -122,6 +122,8 @@ class FormDraft with WidgetsBindingObserver {
     required this.onChanged,
     this.saveDelay = const Duration(milliseconds: 600),
     DraftStore? store,
+    // The public name is `store`; the field is private and set after open().
+    // ignore: prefer_initializing_formals
   }) : _store = store;
 
   final String key;

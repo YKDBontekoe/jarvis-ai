@@ -127,8 +127,9 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
         );
       }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() => _actionError = 'That did not work. Try again.');
+      }
     } finally {
       if (mounted) setState(() => _busyAction = null);
     }
