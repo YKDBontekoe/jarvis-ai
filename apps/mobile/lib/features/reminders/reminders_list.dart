@@ -269,10 +269,8 @@ class _RemindersScreenState extends _RemindersController {
                   denied
                       ? 'Place reminders need location access. Turn it on in Settings.'
                       : 'Set location to Always in Settings so place reminders also work when the app is closed.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.inkSoft,
-                    height: 1.35,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: colors.inkSoft, height: 1.35),
                 ),
                 const SizedBox(height: 6),
                 TextButton(
@@ -282,9 +280,8 @@ class _RemindersScreenState extends _RemindersController {
                     minimumSize: const Size(0, 32),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     foregroundColor: colors.ink,
-                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    textStyle: Theme.of(context).textTheme.labelLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   child: const Text('Open Settings'),
                 ),
@@ -405,18 +402,16 @@ class _RemindersScreenState extends _RemindersController {
                         ),
                     ],
                   ),
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: colors.inkSoft),
                 ),
                 if (otherZone)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
                       'Runs on ${zone.replaceAll('_', ' ')} time',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: colors.inkSoft),
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: colors.inkSoft),
                     ),
                   ),
               ],

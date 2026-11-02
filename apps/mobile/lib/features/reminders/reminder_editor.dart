@@ -105,7 +105,11 @@ class _NewReminderDialog extends StatefulWidget {
     required this.timeZone,
     this.places = const [],
     this.locate = readDeviceLocationSnapshot,
+    required this.onSubmit,
   });
+
+  /// Saves the reminder; null on success, otherwise the message to show here.
+  final Future<String?> Function(_NewReminder reminder) onSubmit;
 
   /// Resolves to the zone the reminder will be saved in, shown under the time.
   final Future<String> timeZone;
@@ -122,7 +126,8 @@ class _NewReminderDialog extends StatefulWidget {
   State<_NewReminderDialog> createState() => _NewReminderDialogState();
 }
 
-class _NewReminderDialogState extends State<_NewReminderDialog> {
+class _NewReminderDialogState extends State<_NewReminderDialog>
+    with SubmitState {
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
   DateTime _date = DateTime.now().add(const Duration(days: 1));
@@ -158,8 +163,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     setState(() {
       _locating = false;
       if (fix.latitude == null || fix.longitude == null) {
-        _placeError =
-            'Jarvis could not read your location. Allow location for Jarvis in Settings, then try again.';
+        _placeError = 'Jarvis could not read your location. Allow location for Jarvis in Settings, then try again.';
         return;
       }
       _spot = (
@@ -192,16 +196,15 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     _placeError = null;
   });
 
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  Future<void> _save() async {
+    if (submitting || !(_formKey.currentState?.validate() ?? false)) return;
     if (_atPlace) {
       final spot = _spot;
       if (spot == null) {
         setState(() => _placeError = 'Choose where this reminder should fire.');
         return;
       }
-      Navigator.pop(
-        context,
+      await _send(
         _NewReminder(
           title: _title.text.trim(),
           date: _date,
@@ -226,8 +229,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
       );
       return;
     }
-    Navigator.pop(
-      context,
+    await _send(
       _NewReminder(
         title: _title.text.trim(),
         date: _date,
@@ -236,6 +238,12 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
         weekdays: _weekdays,
       ),
     );
+  }
+
+  Future<void> _send(_NewReminder reminder) async {
+    if (await submit(() => widget.onSubmit(reminder)) && mounted) {
+      Navigator.pop(context, true);
+    }
   }
 
   @override
@@ -291,6 +299,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
                 alignment: Alignment.topCenter,
                 child: _atPlace ? _placeFields(context) : _timeFields(context),
               ),
+              submitErrorNotice(),
             ],
           ),
         ),
@@ -298,10 +307,10 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
     ),
     actions: [
       TextButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: submitting ? null : () => Navigator.pop(context),
         child: const Text('Cancel'),
       ),
-      FilledButton(onPressed: _save, child: const Text('Save')),
+      SubmitButton(label: 'Save', busy: submitting, onPressed: _save),
     ],
   );
 
@@ -552,9 +561,8 @@ class _NewReminderDialogState extends State<_NewReminderDialog> {
             snapshot.hasData
                 ? 'Time zone: ${snapshot.data!.replaceAll('_', ' ')}'
                 : ' ',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: JarvisColors.of(context).muted,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: JarvisColors.of(context).muted),
           ),
         ),
       ),

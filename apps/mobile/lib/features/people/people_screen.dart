@@ -188,52 +188,65 @@ class _PeopleScreenState extends State<PeopleScreen>
     if (mounted) unawaited(_load());
   }
 
+  Map<String, Object?> _draftBody(PersonDraft draft) => {
+    'name': draft.name,
+    'relationship': draft.relationship,
+    'birthdayMonth': draft.birthdayMonth,
+    'birthdayDay': draft.birthdayDay,
+    'birthYear': draft.birthYear,
+    'contactEveryDays': draft.contactEveryDays,
+    'notes': draft.notes,
+  };
+
   Future<void> _add() async {
-    final draft = await showPersonEditor(context);
+    PersonData? created;
+    // The sheet saves the person itself, so a failure keeps it open.
+    final draft = await showPersonEditor(
+      context,
+      onSubmit: (draft) async {
+        final result = await _create(_draftBody(draft));
+        created = result.person;
+        return result.error;
+      },
+    );
     if (draft == null || !mounted) return;
-    await _create({
-      'name': draft.name,
-      'relationship': draft.relationship,
-      'birthdayMonth': draft.birthdayMonth,
-      'birthdayDay': draft.birthdayDay,
-      'birthYear': draft.birthYear,
-      'contactEveryDays': draft.contactEveryDays,
-      'notes': draft.notes,
-    });
+    unawaited(_load());
+    if (created != null) await _open(created!);
   }
 
   Future<void> _addSuggestion(PersonSuggestionData suggestion) async {
     setState(() => _busy.add(suggestion.graphEntityId));
-    await _create({
+    final result = await _create({
       'name': suggestion.name,
       'relationship': suggestion.relationship,
       'birthdayMonth': suggestion.birthdayMonth,
       'birthdayDay': suggestion.birthdayDay,
       'birthYear': suggestion.birthYear,
       'graphEntityId': suggestion.graphEntityId,
-    }, openAfter: false);
-    if (mounted) setState(() => _busy.remove(suggestion.graphEntityId));
+    });
+    if (!mounted) return;
+    setState(() => _busy.remove(suggestion.graphEntityId));
+    if (result.error != null) {
+      _toast(result.error!);
+    } else {
+      unawaited(_load());
+    }
   }
 
-  Future<void> _create(
-    Map<String, Object?> body, {
-    bool openAfter = true,
-  }) async {
+  Future<({PersonData? person, String? error})> _create(
+    Map<String, Object?> body,
+  ) async {
     try {
       final response = await widget.http.post<dynamic>(
         '/api/v1/people',
         data: body,
       );
-      final person = PersonData.fromJson(response.data);
-      if (!mounted) return;
-      if (person == null || !openAfter) {
-        unawaited(_load());
-        return;
-      }
-      await _open(person);
+      return (person: PersonData.fromJson(response.data), error: null);
     } on DioException catch (error) {
-      _toast(
-        firstProblemMessage(error.response?.data) ??
+      return (
+        person: null,
+        error:
+            firstProblemMessage(error.response?.data) ??
             'Could not add that person.',
       );
     }
@@ -265,9 +278,8 @@ class _PeopleScreenState extends State<PeopleScreen>
 
   void _toast(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

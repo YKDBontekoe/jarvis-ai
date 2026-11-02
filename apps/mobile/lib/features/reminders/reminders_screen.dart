@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../ui/phosphor_icons.dart';
+import '../../ui/submit_state.dart';
 
 import '../approvals/approvals_screen.dart';
 import '../chat/tool_catalog.dart';
@@ -235,32 +236,34 @@ abstract class _RemindersController extends State<RemindersScreen>
   }
 
   /// The "new reminder" editor opened straight from chat: hands control back
-  /// once it is saved or cancelled, and stays here if saving failed.
+  /// once it is saved or cancelled. A failed save keeps the editor open.
   Future<void> _quickCreate() async {
     final created = await _createReminder();
-    if (created == false || !mounted) return;
+    if (!mounted) return;
     widget.onCreateDone?.call(created == true ? 'Reminder set' : null);
   }
 
-  /// Returns true when saved, null when cancelled, false when it failed
-  /// (the editor's caller stays put so nothing typed is lost).
+  /// Returns true when saved, null when cancelled. Saving happens inside the
+  /// editor, so a failure never closes it or loses what was typed.
   Future<bool?> _createReminder() async {
     final zoneLookup = _reminderTimeZone();
-    final created = await showJarvisDialog<_NewReminder>(
+    final created = await showJarvisDialog<bool>(
       context: context,
       builder: (_) => _NewReminderDialog(
         timeZone: zoneLookup,
         places: savedPlaces(_reminders),
         locate: () => widget.locate(requestPermission: true),
+        onSubmit: (reminder) async => _saveReminder(reminder, await zoneLookup),
       ),
     );
-    if (created == null || !mounted) return null;
-    final timeZoneId = await zoneLookup;
-    if (!mounted) return null;
+    return created == true ? true : null;
+  }
+
+  /// Saves a reminder; returns null on success or a message for the editor.
+  Future<String?> _saveReminder(_NewReminder created, String timeZoneId) async {
     if (created.place case final place?) {
       return _createPlaceReminder(created.title, place, timeZoneId);
     }
-
     final localDueAt = DateTime(
       created.date.year,
       created.date.month,
@@ -269,8 +272,7 @@ abstract class _RemindersController extends State<RemindersScreen>
       created.time.minute,
     );
     if (!localDueAt.isAfter(DateTime.now()) && created.recurrence == 'once') {
-      _showError('Choose a time in the future.');
-      return false;
+      return 'Choose a time in the future.';
     }
     final localTime =
         '${created.time.hour.toString().padLeft(2, '0')}:${created.time.minute.toString().padLeft(2, '0')}:00';
@@ -287,25 +289,22 @@ abstract class _RemindersController extends State<RemindersScreen>
         },
       );
       await _seedOwnerZone(timeZoneId);
-      await _load();
-      if (mounted) _showMessage('Reminder set.');
-      return true;
-    } on DioException catch (error) {
       if (mounted) {
-        final message = error.response?.statusCode == 503
-            ? 'The reminder service is unavailable. Try again shortly.'
-            : firstProblemMessage(error.response?.data) ??
-                  'Jarvis could not create that reminder.';
-        _showError(message);
+        unawaited(_load());
+        _showMessage('Reminder set.');
       }
-      return false;
+      return null;
+    } on DioException catch (error) {
+      return error.response?.statusCode == 503
+          ? 'The reminder service is unavailable. Try again shortly.'
+          : firstProblemMessage(error.response?.data) ??
+                'Jarvis could not create that reminder.';
     } catch (_) {
-      if (mounted) _showError('Jarvis could not create that reminder.');
-      return false;
+      return 'Jarvis could not create that reminder.';
     }
   }
 
-  Future<bool> _createPlaceReminder(
+  Future<String?> _createPlaceReminder(
     String title,
     ReminderPlace place,
     String timeZoneId,
@@ -336,25 +335,20 @@ abstract class _RemindersController extends State<RemindersScreen>
           'place': place.toJson(),
         },
       );
-      await _load();
-      if (!mounted) return true;
-      _showMessage(
-        here.latitude == null
-            ? 'Reminder set. Allow location for Jarvis so it can fire.'
-            : '${place.label}, Jarvis will remind you.',
-      );
-      return true;
-    } on DioException catch (error) {
       if (mounted) {
-        _showError(
-          firstProblemMessage(error.response?.data) ??
-              'Jarvis could not create that reminder.',
+        unawaited(_load());
+        _showMessage(
+          here.latitude == null
+              ? 'Reminder set. Allow location for Jarvis so it can fire.'
+              : '${place.label}, Jarvis will remind you.',
         );
       }
-      return false;
+      return null;
+    } on DioException catch (error) {
+      return firstProblemMessage(error.response?.data) ??
+          'Jarvis could not create that reminder.';
     } catch (_) {
-      if (mounted) _showError('Jarvis could not create that reminder.');
-      return false;
+      return 'Jarvis could not create that reminder.';
     }
   }
 
@@ -402,8 +396,7 @@ abstract class _RemindersController extends State<RemindersScreen>
         );
         if (mounted) {
           _showMessage(
-            queued.problem ??
-                'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not done yet.',
+            queued.problem ?? 'No connection. This is saved on your phone and will be sent when Jarvis is back. It is not done yet.',
           );
         }
         return;
@@ -721,9 +714,8 @@ abstract class _RemindersController extends State<RemindersScreen>
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showMessage(String message) => _showError(message);
