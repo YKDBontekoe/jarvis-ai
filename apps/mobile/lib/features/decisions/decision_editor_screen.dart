@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../../ui/unsaved_changes_guard.dart';
 import '../journal/journal_format.dart';
 import 'decision_format.dart';
 
@@ -116,123 +117,138 @@ class _DecisionEditorScreenState extends State<DecisionEditorScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: PageTitle(_editing ? 'Edit decision' : 'Log a decision'),
-      actions: [
-        HeaderAction(
-          key: const Key('decision-save'),
-          label: 'Save',
-          icon: PhosphorIconsRegular.check,
-          busy: _saving,
-          onPressed: _saving ? null : () => unawaited(_save()),
-        ),
-      ],
-    ),
-    body: ListView(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        32 + MediaQuery.paddingOf(context).bottom,
+  Widget build(BuildContext context) => UnsavedChangesGuard(
+    enabled: !_saving,
+    changes: Listenable.merge([_title, _prediction, _context]),
+    snapshot: () => [
+      _title.text,
+      _prediction.text,
+      _context.text,
+      _percent,
+      journalDateKey(_reviewOn),
+    ].join('\u0001'),
+    child: Scaffold(
+      appBar: AppBar(
+        title: PageTitle(_editing ? 'Edit decision' : 'Log a decision'),
+        actions: [
+          HeaderAction(
+            key: const Key('decision-save'),
+            label: 'Save',
+            icon: PhosphorIconsRegular.check,
+            busy: _saving,
+            onPressed: _saving ? null : () => unawaited(_save()),
+          ),
+        ],
       ),
-      children: [
-        ContentWidth(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_error != null)
-                InlineNotice(
-                  message: _error!,
-                  tone: NoticeTone.danger,
-                  margin: const EdgeInsets.only(bottom: 12),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          32 + MediaQuery.paddingOf(context).bottom,
+        ),
+        children: [
+          ContentWidth(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_error != null)
+                  InlineNotice(
+                    message: _error!,
+                    tone: NoticeTone.danger,
+                    margin: const EdgeInsets.only(bottom: 12),
+                  ),
+                TextField(
+                  key: const Key('decision-title'),
+                  controller: _title,
+                  maxLength: 200,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'What are you deciding?',
+                    hintText: 'Take the new job',
+                  ),
                 ),
-              TextField(
-                key: const Key('decision-title'),
-                controller: _title,
-                maxLength: 200,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'What are you deciding?',
-                  hintText: 'Take the new job',
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('decision-prediction'),
+                  controller: _prediction,
+                  minLines: 1,
+                  maxLines: 3,
+                  maxLength: 500,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'What do you expect to happen?',
+                    hintText: 'I will still enjoy it a year from now',
+                    helperText: 'A statement that will turn out true or false.',
+                    alignLabelWithHint: true,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('decision-prediction'),
-                controller: _prediction,
-                minLines: 1,
-                maxLines: 3,
-                maxLength: 500,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'What do you expect to happen?',
-                  hintText: 'I will still enjoy it a year from now',
-                  helperText: 'A statement that will turn out true or false.',
-                  alignLabelWithHint: true,
+                const SizedBox(height: 20),
+                Text(
+                  'How sure are you? $_percent%',
+                  key: const Key('decision-percent'),
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'How sure are you? $_percent%',
-                key: const Key('decision-percent'),
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              Slider(
-                key: const Key('decision-slider'),
-                value: _percent.toDouble(),
-                min: 1,
-                max: 99,
-                divisions: 98,
-                label: '$_percent%',
-                onChanged: (value) => setState(() => _percent = value.round()),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'When should Jarvis ask how it went?',
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final (label, days) in reviewShortcuts)
-                    ActionChip(
-                      key: Key('decision-in-$days'),
-                      label: Text(label),
-                      onPressed: () => setState(
-                        () => _reviewOn = DateTime.now().add(
-                          Duration(days: days),
+                Slider(
+                  key: const Key('decision-slider'),
+                  value: _percent.toDouble(),
+                  min: 1,
+                  max: 99,
+                  divisions: 98,
+                  label: '$_percent%',
+                  onChanged: (value) =>
+                      setState(() => _percent = value.round()),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'When should Jarvis ask how it went?',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final (label, days) in reviewShortcuts)
+                      ActionChip(
+                        key: Key('decision-in-$days'),
+                        label: Text(label),
+                        onPressed: () => setState(
+                          () => _reviewOn = DateTime.now().add(
+                            Duration(days: days),
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                key: const Key('decision-date'),
-                onPressed: _pickDate,
-                icon: const Icon(PhosphorIconsRegular.calendarBlank, size: 18),
-                label: Text(formatJournalDate(_reviewOn)),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                key: const Key('decision-context'),
-                controller: _context,
-                minLines: 2,
-                maxLines: 8,
-                maxLength: 2000,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Why? (optional)',
-                  alignLabelWithHint: true,
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const Key('decision-date'),
+                  onPressed: _pickDate,
+                  icon: const Icon(
+                    PhosphorIconsRegular.calendarBlank,
+                    size: 18,
+                  ),
+                  label: Text(formatJournalDate(_reviewOn)),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const Key('decision-context'),
+                  controller: _context,
+                  minLines: 2,
+                  maxLines: 8,
+                  maxLength: 2000,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Why? (optional)',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }

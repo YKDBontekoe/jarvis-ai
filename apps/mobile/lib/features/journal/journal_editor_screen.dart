@@ -7,6 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../../ui/unsaved_changes_guard.dart';
 import 'journal_format.dart';
 
 /// Writes a new journal entry or edits an existing one. Pops `true` after a
@@ -163,139 +164,157 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: PageTitle(_editing ? 'Edit entry' : 'New entry'),
-      actions: [
-        if (_editing)
-          IconButton(
-            tooltip: 'Delete entry',
-            onPressed: _saving ? null : () => unawaited(_delete()),
-            icon: const Icon(PhosphorIconsRegular.trash),
+  Widget build(BuildContext context) => UnsavedChangesGuard(
+    enabled: !_saving,
+    changes: Listenable.merge([_content, _highlights, _gratitude, _tags]),
+    snapshot: () => [
+      _content.text,
+      _highlights.text,
+      _gratitude.text,
+      _tags.text,
+      journalDateKey(_date),
+      _rating,
+      _mood,
+      _energy,
+      _stress,
+    ].join('\u0001'),
+    child: Scaffold(
+      appBar: AppBar(
+        title: PageTitle(_editing ? 'Edit entry' : 'New entry'),
+        actions: [
+          if (_editing)
+            IconButton(
+              tooltip: 'Delete entry',
+              onPressed: _saving ? null : () => unawaited(_delete()),
+              icon: const Icon(PhosphorIconsRegular.trash),
+            ),
+          HeaderAction(
+            key: const Key('journal-save'),
+            label: 'Save',
+            icon: PhosphorIconsRegular.check,
+            busy: _saving,
+            onPressed: _saving ? null : () => unawaited(_save()),
           ),
-        HeaderAction(
-          key: const Key('journal-save'),
-          label: 'Save',
-          icon: PhosphorIconsRegular.check,
-          busy: _saving,
-          onPressed: _saving ? null : () => unawaited(_save()),
-        ),
-      ],
-    ),
-    body: ListView(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        8,
-        16,
-        32 + MediaQuery.paddingOf(context).bottom,
+        ],
       ),
-      children: [
-        ContentWidth(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_error != null)
-                InlineNotice(
-                  message: _error!,
-                  tone: NoticeTone.danger,
-                  margin: const EdgeInsets.only(bottom: 12),
-                ),
-              OutlinedButton.icon(
-                key: const Key('journal-date'),
-                onPressed: _pickDate,
-                icon: const Icon(PhosphorIconsRegular.calendarBlank, size: 18),
-                label: Text(formatJournalDate(_date)),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                key: const Key('journal-content'),
-                controller: _content,
-                minLines: 6,
-                maxLines: 14,
-                maxLength: 6000,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'How was your day?',
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('journal-highlights'),
-                controller: _highlights,
-                minLines: 1,
-                maxLines: 3,
-                maxLength: 1000,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Highlights',
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('journal-gratitude'),
-                controller: _gratitude,
-                minLines: 1,
-                maxLines: 3,
-                maxLength: 1000,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Grateful for',
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                key: const Key('journal-tags'),
-                controller: _tags,
-                decoration: const InputDecoration(
-                  labelText: 'Tags',
-                  hintText: 'work, family, health',
-                ),
-              ),
-              const SizedBox(height: 20),
-              _RatingSelector(
-                idPrefix: 'day',
-                label: 'Rate your day',
-                low: 'Awful',
-                high: 'Great',
-                count: 10,
-                value: _rating,
-                onChanged: (value) => setState(() => _rating = value),
-              ),
-              _RatingSelector(
-                idPrefix: 'mood',
-                label: 'Mood',
-                low: 'Low',
-                high: 'Great',
-                count: 5,
-                value: _mood,
-                faces: true,
-                onChanged: (value) => setState(() => _mood = value),
-              ),
-              _RatingSelector(
-                idPrefix: 'energy',
-                label: 'Energy',
-                low: 'Drained',
-                high: 'Energetic',
-                count: 5,
-                value: _energy,
-                onChanged: (value) => setState(() => _energy = value),
-              ),
-              _RatingSelector(
-                idPrefix: 'stress',
-                label: 'Stress',
-                low: 'Calm',
-                high: 'Very stressed',
-                count: 5,
-                value: _stress,
-                onChanged: (value) => setState(() => _stress = value),
-              ),
-            ],
-          ),
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          32 + MediaQuery.paddingOf(context).bottom,
         ),
-      ],
+        children: [
+          ContentWidth(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (_error != null)
+                  InlineNotice(
+                    message: _error!,
+                    tone: NoticeTone.danger,
+                    margin: const EdgeInsets.only(bottom: 12),
+                  ),
+                OutlinedButton.icon(
+                  key: const Key('journal-date'),
+                  onPressed: _pickDate,
+                  icon: const Icon(
+                    PhosphorIconsRegular.calendarBlank,
+                    size: 18,
+                  ),
+                  label: Text(formatJournalDate(_date)),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  key: const Key('journal-content'),
+                  controller: _content,
+                  minLines: 6,
+                  maxLines: 14,
+                  maxLength: 6000,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'How was your day?',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('journal-highlights'),
+                  controller: _highlights,
+                  minLines: 1,
+                  maxLines: 3,
+                  maxLength: 1000,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Highlights',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('journal-gratitude'),
+                  controller: _gratitude,
+                  minLines: 1,
+                  maxLines: 3,
+                  maxLength: 1000,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Grateful for',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('journal-tags'),
+                  controller: _tags,
+                  decoration: const InputDecoration(
+                    labelText: 'Tags',
+                    hintText: 'work, family, health',
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _RatingSelector(
+                  idPrefix: 'day',
+                  label: 'Rate your day',
+                  low: 'Awful',
+                  high: 'Great',
+                  count: 10,
+                  value: _rating,
+                  onChanged: (value) => setState(() => _rating = value),
+                ),
+                _RatingSelector(
+                  idPrefix: 'mood',
+                  label: 'Mood',
+                  low: 'Low',
+                  high: 'Great',
+                  count: 5,
+                  value: _mood,
+                  faces: true,
+                  onChanged: (value) => setState(() => _mood = value),
+                ),
+                _RatingSelector(
+                  idPrefix: 'energy',
+                  label: 'Energy',
+                  low: 'Drained',
+                  high: 'Energetic',
+                  count: 5,
+                  value: _energy,
+                  onChanged: (value) => setState(() => _energy = value),
+                ),
+                _RatingSelector(
+                  idPrefix: 'stress',
+                  label: 'Stress',
+                  low: 'Calm',
+                  high: 'Very stressed',
+                  count: 5,
+                  value: _stress,
+                  onChanged: (value) => setState(() => _stress = value),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

@@ -45,9 +45,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       final response = await widget.http.get<dynamic>('/api/v1/projects');
       if (!mounted || revision != _requestRevision) return;
       setState(() {
-        _projects = jsonMaps(
-          response.data,
-        ).where((item) => jsonString(item, 'id') != null).toList();
+        _projects = jsonMaps(response.data)
+            .where((item) => jsonString(item, 'id') != null)
+            .toList();
         _loading = false;
         _error = null;
       });
@@ -162,9 +162,8 @@ class ProjectCard extends StatelessWidget {
                   asJsonString(project['name']) ?? 'Untitled project',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontSize: 15.5),
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(fontSize: 15.5),
                 ),
                 if (description != null && description.isNotEmpty) ...[
                   const SizedBox(height: 2),

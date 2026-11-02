@@ -21,9 +21,9 @@ Future<bool> showMoveToProjectSheet(
   final List<Map<String, dynamic>> projects;
   try {
     final response = await http.get<dynamic>('/api/v1/projects');
-    projects = jsonMaps(
-      response.data,
-    ).where((item) => jsonString(item, 'id') != null).toList();
+    projects = jsonMaps(response.data)
+        .where((item) => jsonString(item, 'id') != null)
+        .toList();
   } catch (_) {
     if (context.mounted) {
       _snack(context, 'Jarvis could not load your projects.');

@@ -267,9 +267,8 @@ mixin _KnowledgeGraphAsk on _KnowledgeGraphController {
             ],
             if (answer.facts.isNotEmpty)
               Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(dividerColor: Colors.transparent),
+                data: Theme.of(context)
+                    .copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
                   key: const Key('graph-answer-facts'),
                   tilePadding: EdgeInsets.zero,

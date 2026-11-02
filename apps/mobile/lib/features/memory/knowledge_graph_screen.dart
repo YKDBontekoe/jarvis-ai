@@ -625,8 +625,7 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
       empty: const EmptyState(
         icon: PhosphorIconsRegular.graph,
         title: 'No connections yet',
-        message:
-            'As you tell Jarvis about people, places, and projects, it links them here and keeps track of how facts change over time.',
+        message: 'As you tell Jarvis about people, places, and projects, it links them here and keeps track of how facts change over time.',
       ),
       child: _body(),
     ),

@@ -153,9 +153,9 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
     }
   }
 
-  void _show(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _show(String message) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
 
   List<Map<String, dynamic>> _withStatus(String status) => [
     for (final d in _decisions)
@@ -405,9 +405,9 @@ class _DecisionSheetState extends State<_DecisionSheet> {
                   Expanded(
                     child: FilledButton.icon(
                       key: const Key('decision-happened'),
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).pop(_Resolve(true, _note.text.trim())),
+                      onPressed: () =>
+                          Navigator.of(context)
+                              .pop(_Resolve(true, _note.text.trim())),
                       icon: const Icon(
                         PhosphorIconsRegular.checkCircle,
                         size: 18,
@@ -419,9 +419,9 @@ class _DecisionSheetState extends State<_DecisionSheet> {
                   Expanded(
                     child: OutlinedButton.icon(
                       key: const Key('decision-did-not-happen'),
-                      onPressed: () => Navigator.of(
-                        context,
-                      ).pop(_Resolve(false, _note.text.trim())),
+                      onPressed: () =>
+                          Navigator.of(context)
+                              .pop(_Resolve(false, _note.text.trim())),
                       icon: const Icon(PhosphorIconsRegular.xCircle, size: 18),
                       label: const Text('It did not'),
                     ),

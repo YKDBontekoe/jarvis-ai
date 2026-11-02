@@ -7,6 +7,7 @@ import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
+import '../../ui/unsaved_changes_guard.dart';
 import 'project_style.dart';
 
 /// Creates a project, or edits one when [project] is given. Pops with the
@@ -99,107 +100,117 @@ class _ProjectEditorScreenState extends State<ProjectEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: PageTitle(_editing ? 'Edit project' : 'New project'),
-        actions: [
-          HeaderAction(
-            label: _editing ? 'Save' : 'Create',
-            icon: PhosphorIconsRegular.check,
-            busy: _saving,
-            onPressed: () => unawaited(_save()),
-          ),
-        ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-          children: [
-            ContentWidth(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 180),
-                      child: ProjectBadge(
-                        key: ValueKey(_color),
-                        color: _color,
-                        size: 64,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _ColorPicker(
-                    selected: _color,
-                    onChanged: (value) => setState(() => _color = value),
-                  ),
-                  const SizedBox(height: 24),
-                  if (_error != null) ...[
-                    InlineNotice(message: _error!, tone: NoticeTone.danger),
-                    const SizedBox(height: 16),
-                  ],
-                  TextFormField(
-                    controller: _name,
-                    autofocus: !_editing,
-                    maxLength: _maxName,
-                    textCapitalization: TextCapitalization.sentences,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      hintText: 'Kitchen renovation',
-                    ),
-                    validator: (value) => (value ?? '').trim().isEmpty
-                        ? 'Give the project a name.'
-                        : null,
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _description,
-                    maxLength: _maxDescription,
-                    minLines: 1,
-                    maxLines: 3,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(
-                      labelText: 'Description',
-                      hintText: 'What is this project about?',
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Instructions',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Jarvis follows these in every chat and task in this project. '
-                    'Describe the goal, the tone, or facts to keep in mind.',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      height: 1.4,
-                      color: colors.inkSoft,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _instructions,
-                    maxLength: _maxInstructions,
-                    minLines: 6,
-                    maxLines: 16,
-                    textCapitalization: TextCapitalization.sentences,
-                    keyboardType: TextInputType.multiline,
-                    decoration: const InputDecoration(
-                      hintText:
-                          'For example: Our budget is 15,000 euros. Compare at '
-                          'least three quotes and answer in Dutch.',
-                      alignLabelWithHint: true,
-                    ),
-                  ),
-                ],
-              ),
+    return UnsavedChangesGuard(
+      enabled: !_saving,
+      changes: Listenable.merge([_name, _description, _instructions]),
+      snapshot: () => [
+        _name.text,
+        _description.text,
+        _instructions.text,
+        _color,
+      ].join('\u0001'),
+      child: Scaffold(
+        appBar: AppBar(
+          title: PageTitle(_editing ? 'Edit project' : 'New project'),
+          actions: [
+            HeaderAction(
+              label: _editing ? 'Save' : 'Create',
+              icon: PhosphorIconsRegular.check,
+              busy: _saving,
+              onPressed: () => unawaited(_save()),
             ),
           ],
+        ),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+            children: [
+              ContentWidth(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: ProjectBadge(
+                          key: ValueKey(_color),
+                          color: _color,
+                          size: 64,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _ColorPicker(
+                      selected: _color,
+                      onChanged: (value) => setState(() => _color = value),
+                    ),
+                    const SizedBox(height: 24),
+                    if (_error != null) ...[
+                      InlineNotice(message: _error!, tone: NoticeTone.danger),
+                      const SizedBox(height: 16),
+                    ],
+                    TextFormField(
+                      controller: _name,
+                      autofocus: !_editing,
+                      maxLength: _maxName,
+                      textCapitalization: TextCapitalization.sentences,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        hintText: 'Kitchen renovation',
+                      ),
+                      validator: (value) => (value ?? '').trim().isEmpty
+                          ? 'Give the project a name.'
+                          : null,
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _description,
+                      maxLength: _maxDescription,
+                      minLines: 1,
+                      maxLines: 3,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        hintText: 'What is this project about?',
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Instructions',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Jarvis follows these in every chat and task in this project. '
+                      'Describe the goal, the tone, or facts to keep in mind.',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.4,
+                        color: colors.inkSoft,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _instructions,
+                      maxLength: _maxInstructions,
+                      minLines: 6,
+                      maxLines: 16,
+                      textCapitalization: TextCapitalization.sentences,
+                      keyboardType: TextInputType.multiline,
+                      decoration: const InputDecoration(
+                        hintText:
+                            'For example: Our budget is 15,000 euros. Compare at '
+                            'least three quotes and answer in Dutch.',
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

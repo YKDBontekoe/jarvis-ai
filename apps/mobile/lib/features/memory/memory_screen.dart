@@ -10,6 +10,7 @@ import 'memory_review_screen.dart';
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../../ui/unsaved_changes_guard.dart';
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
 
@@ -133,8 +134,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
     } catch (_) {
       if (mounted && revision == _requestRevision) {
         setState(
-          () => _error =
-              'Jarvis could not load memory. Check the API connection and try again.',
+          () => _error = 'Jarvis could not load memory. Check the API connection and try again.',
         );
       }
     } finally {
@@ -264,9 +264,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -438,7 +437,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
         children: [
           Row(
             children: [
-              Flexible(child: _KindTag(label: kind, icon: _kindIcon(kind))),
+              Flexible(
+                child: _KindTag(label: kind, icon: _kindIcon(kind)),
+              ),
               if (isSuperseded) ...[
                 const SizedBox(width: 6),
                 StatusPill(
