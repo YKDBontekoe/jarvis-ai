@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
@@ -76,22 +78,41 @@ DateTime? _day(dynamic value) {
       : DateTime(parsed.year, parsed.month, parsed.day);
 }
 
-/// "€1,234.50", "$12.00", or "12.00 CHF". Amounts are positive.
-String formatMoney(double amount, String currency, {bool cents = true}) {
-  final fixed = amount.abs().toStringAsFixed(cents ? 2 : 0);
-  final parts = fixed.split('.');
-  final whole = parts[0].replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (_) => ',',
-  );
-  final number = parts.length > 1 ? '$whole.${parts[1]}' : whole;
-  return switch (currency) {
-    'EUR' => '€$number',
-    'USD' => '\$$number',
-    'GBP' => '£$number',
-    _ => '$number $currency',
+/// The language money is written in ("1,234.50" in English, "1.234,50" in Dutch).
+/// The app sets this from the language the owner chose in Appearance.
+String moneyLocale = 'en';
+
+/// "€1,234.50", "$12.00", or "12.00 CHF" in English; "€ 1.234,50" in Dutch.
+/// Amounts are positive; see [formatSigned] for balances.
+///
+/// With [code] the ISO code is written out in front ("EUR 1,234.50") for
+/// screens where amounts in different currencies sit side by side, so a symbol
+/// or a number is never mistaken for another currency.
+String formatMoney(
+  double amount,
+  String currency, {
+  bool cents = true,
+  bool code = false,
+}) {
+  final number = NumberFormat.decimalPatternDigits(
+    locale: moneyLocale,
+    decimalDigits: cents ? 2 : 0,
+  ).format(amount.abs());
+  if (code) return '$currency $number';
+  final symbol = switch (currency) {
+    'EUR' => '€',
+    'USD' => '\$',
+    'GBP' => '£',
+    _ => null,
   };
+  if (symbol == null) return '$number $currency';
+  // Dutch puts a space between the symbol and the number.
+  return moneyLocale == 'nl' ? '$symbol $number' : '$symbol$number';
 }
+
+/// True when [currencies] holds more than one distinct currency.
+bool hasMixedCurrencies(Iterable<String> currencies) =>
+    currencies.toSet().length > 1;
 
 const _monthNames = [
   'January',

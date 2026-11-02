@@ -8,7 +8,12 @@ import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../expenses/expense_models.dart'
-    show dayLabel, expenseCategoryIcon, expenseCategoryLabel, formatMoney;
+    show
+        dayLabel,
+        expenseCategoryIcon,
+        expenseCategoryLabel,
+        formatMoney,
+        hasMixedCurrencies;
 import 'transaction_editor.dart';
 import 'wealth_models.dart';
 
@@ -43,6 +48,9 @@ class _TransactionsTabState extends State<TransactionsTab>
 
   final _search = TextEditingController();
   final List<TransactionData> _items = [];
+
+  /// True when the loaded transactions are in more than one currency.
+  bool get _mixed => hasMixedCurrencies([for (final i in _items) i.currency]);
   List<AccountData> _accounts = const [];
   String? _kind;
   String? _accountId;
@@ -337,8 +345,13 @@ class _TransactionsTabState extends State<TransactionsTab>
           const SizedBox(width: 8),
           Text(
             item.isTransfer
-                ? formatMoney(item.amount, item.currency)
-                : formatSigned(item.signed, item.currency, plus: true),
+                ? formatMoney(item.amount, item.currency, code: _mixed)
+                : formatSigned(
+                    item.signed,
+                    item.currency,
+                    plus: true,
+                    code: _mixed,
+                  ),
             style: TextStyle(
               fontWeight: FontWeight.w600,
               color: item.isIncome ? colors.success : null,

@@ -317,6 +317,10 @@ class _ExpensesScreenState extends State<ExpensesScreen>
               now: _now,
               expenses: expenses,
               onTap: _edit,
+              showCode: hasMixedCurrencies([
+                for (final group in days.values)
+                  for (final expense in group) expense.currency,
+              ]),
             ),
           ),
       ],
@@ -894,8 +898,11 @@ class _DayGroup extends StatelessWidget {
     required this.now,
     required this.expenses,
     required this.onTap,
+    this.showCode = false,
   });
 
+  /// Write the currency code beside each amount, because the list mixes currencies.
+  final bool showCode;
   final DateTime day;
   final DateTime now;
   final List<ExpenseData> expenses;
@@ -941,7 +948,11 @@ class _DayGroup extends StatelessWidget {
                 for (final (index, expense) in expenses.indexed) ...[
                   if (index > 0)
                     Divider(height: 1, indent: 62, color: colors.outline),
-                  _ExpenseRow(expense: expense, onTap: () => onTap(expense)),
+                  _ExpenseRow(
+                    expense: expense,
+                    onTap: () => onTap(expense),
+                    showCode: showCode,
+                  ),
                 ],
               ],
             ),
@@ -953,8 +964,13 @@ class _DayGroup extends StatelessWidget {
 }
 
 class _ExpenseRow extends StatelessWidget {
-  const _ExpenseRow({required this.expense, required this.onTap});
+  const _ExpenseRow({
+    required this.expense,
+    required this.onTap,
+    this.showCode = false,
+  });
 
+  final bool showCode;
   final ExpenseData expense;
   final VoidCallback onTap;
 
@@ -1013,7 +1029,7 @@ class _ExpenseRow extends StatelessWidget {
               const SizedBox(width: 8),
             ],
             Text(
-              formatMoney(expense.amount, expense.currency),
+              formatMoney(expense.amount, expense.currency, code: showCode),
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,

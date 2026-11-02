@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
+import '../expenses/expense_models.dart' show hasMixedCurrencies;
 import '../../ui/phosphor_icons.dart';
 import 'account_detail_screen.dart';
 import 'wealth_models.dart';
@@ -30,6 +31,10 @@ class AccountsTab extends StatefulWidget {
 class _AccountsTabState extends State<AccountsTab>
     with AutomaticKeepAliveClientMixin {
   List<AccountData> _accounts = const [];
+
+  /// True when the accounts are in more than one currency.
+  bool get _mixed =>
+      hasMixedCurrencies([for (final a in _accounts) a.currency]);
   bool _loading = true;
   String? _error;
 
@@ -166,7 +171,11 @@ class _AccountsTabState extends State<AccountsTab>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        formatSigned(account.balance, account.currency),
+                        formatSigned(
+                          account.balance,
+                          account.currency,
+                          code: _mixed,
+                        ),
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
@@ -174,7 +183,7 @@ class _AccountsTabState extends State<AccountsTab>
                         ),
                       ),
                       Text(
-                        '${formatSigned(account.monthIn - account.monthOut, account.currency, plus: true)} this month',
+                        '${formatSigned(account.monthIn - account.monthOut, account.currency, plus: true, code: _mixed)} this month',
                         style: TextStyle(color: colors.muted, fontSize: 12.5),
                       ),
                     ],
