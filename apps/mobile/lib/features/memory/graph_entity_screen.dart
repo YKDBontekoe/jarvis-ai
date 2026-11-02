@@ -272,10 +272,7 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
       body: details == null
           ? (_error == null
                 ? const SkeletonList(shape: SkeletonShape.detail)
-                : ErrorState(
-                    message: _error!,
-                    onRetry: _load,
-                  ))
+                : ErrorState(message: _error!, onRetry: _load))
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [

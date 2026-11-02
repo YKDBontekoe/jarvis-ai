@@ -555,16 +555,49 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
       ),
       FutureBuilder<String>(
         future: widget.timeZone,
-        builder: (context, snapshot) => Padding(
-          padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-          child: Text(
-            snapshot.hasData
-                ? 'Time zone: ${snapshot.data!.replaceAll('_', ' ')}'
-                : ' ',
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: JarvisColors.of(context).muted),
-          ),
-        ),
+        builder: (context, snapshot) {
+          final zone = snapshot.data;
+          final style = Theme.of(context).textTheme.bodySmall
+              ?.copyWith(color: JarvisColors.of(context).muted);
+          // The exact moment this will fire, on the reminder's clock and the phone's.
+          String? when;
+          String? phone;
+          if (zone != null && _recurrence == 'once') {
+            final picked = DateTime(
+              _date.year,
+              _date.month,
+              _date.day,
+              _time.hour,
+              _time.minute,
+            );
+            final instant = instantInZone(picked, zone) ?? picked.toUtc();
+            final described = describeScheduledInstant(context, instant, zone);
+            when = 'Reminds you ${described.primary}';
+            phone = described.other;
+          }
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  zone != null
+                      ? 'Time zone: ${zone.replaceAll('_', ' ')}'
+                      : ' ',
+                  style: style,
+                ),
+                if (when != null)
+                  Text(when, key: const Key('reminder-when'), style: style),
+                if (phone != null)
+                  Text(
+                    phone,
+                    key: const Key('reminder-when-phone'),
+                    style: style,
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     ],
   );

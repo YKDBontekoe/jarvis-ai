@@ -338,12 +338,10 @@ class _RemindersScreenState extends _RemindersController {
     final outcome = _outcome(reminder);
     final place = ReminderPlace.fromJson(reminder['place']);
     final zone = asJsonString(reminder['timeZoneId']);
-    final otherZone =
-        place == null &&
-        pending &&
-        zone != null &&
-        _deviceZone != null &&
-        zone != _deviceZone;
+    // The reminder's own clock, only when it reads differently from the phone.
+    final zoneLine = place == null && pending && due != null
+        ? zoneEquivalentLine(context, due, zone)
+        : null;
 
     final String primary;
     if (pending && place != null) {
@@ -405,11 +403,12 @@ class _RemindersScreenState extends _RemindersController {
                   style: Theme.of(context).textTheme.bodySmall
                       ?.copyWith(color: colors.inkSoft),
                 ),
-                if (otherZone)
+                if (zoneLine != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      'Runs on ${zone.replaceAll('_', ' ')} time',
+                      key: const Key('reminder-zone-line'),
+                      'That is $zoneLine',
                       style: Theme.of(context).textTheme.bodySmall
                           ?.copyWith(color: colors.inkSoft),
                     ),

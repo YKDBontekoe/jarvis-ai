@@ -105,16 +105,12 @@ abstract class _RemindersController extends State<RemindersScreen>
   int _requestRevision = 0;
   bool _showAllFinished = false;
   LocationPermission? _locationAccess;
-  String? _deviceZone;
 
   @override
   void initState() {
     super.initState();
     _load();
     if (widget.startCreating) afterRouteSettles(this, _quickCreate);
-    deviceTimeZoneLookup().then((zone) {
-      if (mounted && zone != null) setState(() => _deviceZone = zone);
-    });
   }
 
   Future<void> _load() async {
@@ -264,13 +260,16 @@ abstract class _RemindersController extends State<RemindersScreen>
     if (created.place case final place?) {
       return _createPlaceReminder(created.title, place, timeZoneId);
     }
-    final localDueAt = DateTime(
+    // The picked date and time are on the clock of the reminder's own zone,
+    // which is the phone's zone whenever the phone can tell it.
+    final picked = DateTime(
       created.date.year,
       created.date.month,
       created.date.day,
       created.time.hour,
       created.time.minute,
     );
+    final localDueAt = instantInZone(picked, timeZoneId)?.toLocal() ?? picked;
     if (!localDueAt.isAfter(DateTime.now()) && created.recurrence == 'once') {
       return 'Choose a time in the future.';
     }
@@ -352,6 +351,13 @@ abstract class _RemindersController extends State<RemindersScreen>
     }
   }
 
+  String? _zoneOfReminder(String id) {
+    for (final reminder in _reminders) {
+      if (jsonId(reminder) == id) return asJsonString(reminder['timeZoneId']);
+    }
+    return null;
+  }
+
   Future<void> _snooze(String? id, Duration by, {DateTime? until}) async {
     if (id == null) return;
     try {
@@ -364,7 +370,13 @@ abstract class _RemindersController extends State<RemindersScreen>
       final dueAt = jsonDate(jsonObject(response.data)?['dueAt'], local: true);
       await _load();
       if (mounted && dueAt != null) {
-        _showMessage('Snoozed until ${friendlyWhen(context, dueAt)}.');
+        final zone =
+            asJsonString(jsonObject(response.data)?['timeZoneId']) ??
+            _zoneOfReminder(id);
+        final when = describeScheduledInstant(context, dueAt, zone);
+        _showMessage(
+          'Snoozed until ${when.primary}${when.other == null ? '' : ' (${when.other})'}.',
+        );
       }
     } on DioException catch (error) {
       if (mounted) {

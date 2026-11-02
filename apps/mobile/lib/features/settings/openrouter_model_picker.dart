@@ -121,10 +121,7 @@ class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
             child: _loading && _models.isEmpty
                 ? const LoadingState()
                 : _error != null && _models.isEmpty
-                ? ErrorState(
-                    message: _error!,
-                    onRetry: _load,
-                  )
+                ? ErrorState(message: _error!, onRetry: _load)
                 : ListView.separated(
                     itemCount: _models.length,
                     separatorBuilder: (_, _) => const Divider(indent: 20),

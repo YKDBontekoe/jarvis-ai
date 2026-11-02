@@ -733,10 +733,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
               child: _loading
                   ? const SkeletonList(rows: 7, shape: SkeletonShape.chat)
                   : _error != null && _messages.isEmpty
-                  ? ErrorState(
-                      message: _error!,
-                      onRetry: _load,
-                    )
+                  ? ErrorState(message: _error!, onRetry: _load)
                   : _messages.isEmpty
                   ? EmptyState(
                       icon: PhosphorIconsRegular.chatsCircle,

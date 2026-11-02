@@ -188,10 +188,7 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
       body: run == null
           ? (_error == null
                 ? const SkeletonList(shape: SkeletonShape.detail)
-                : ErrorState(
-                    message: _error!,
-                    onRetry: _load,
-                  ))
+                : ErrorState(message: _error!, onRetry: _load))
           : _body(run),
     );
   }

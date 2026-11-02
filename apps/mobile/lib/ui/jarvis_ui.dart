@@ -579,6 +579,7 @@ class ListScreenBody extends StatelessWidget {
     required this.child,
     required this.onRetry,
     this.onRefresh,
+    this.emptyScrolls = false,
     super.key,
   });
 
@@ -587,6 +588,10 @@ class ListScreenBody extends StatelessWidget {
   final bool isEmpty;
   final Widget empty;
   final Widget child;
+
+  /// True when [empty] is already a scrollable list (for example one that
+  /// keeps its filters visible); it is pulled directly instead of being wrapped.
+  final bool emptyScrolls;
 
   /// Reloads the list. Return the request's future so a pull-to-refresh lasts
   /// exactly as long as the request does.
@@ -617,7 +622,18 @@ class ListScreenBody extends StatelessWidget {
     if (error != null && isEmpty) {
       return _pullable(ErrorState(message: error!, onRetry: onRetry));
     }
-    if (isEmpty) return _pullable(empty);
+    if (isEmpty) {
+      return emptyScrolls
+          ? OrbRefresh(
+              onRefresh: _refresh,
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context)
+                    .copyWith(physics: const AlwaysScrollableScrollPhysics()),
+                child: empty,
+              ),
+            )
+          : _pullable(empty);
+    }
     return Column(
       children: [
         if (error != null)

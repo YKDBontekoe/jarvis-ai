@@ -134,6 +134,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
           error: _error,
           isEmpty: data == null || data.days.isEmpty,
           onRetry: _load,
+          emptyScrolls: true,
           empty: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
