@@ -60,6 +60,7 @@ import '../search/search_navigation.dart';
 import '../search/find_in_chat_screen.dart';
 import '../search/search_screen.dart';
 import '../projects/project_style.dart';
+import '../shell/dock_strip.dart';
 import '../shell/jarvis_tab_bar.dart';
 import '../shell/tab_memory.dart';
 import '../shell/utility_pages.dart';
@@ -142,6 +143,8 @@ class _ChatScreenState extends _ChatScreenController
     _input.addListener(_rememberDraft);
     unawaited(_openDrafts());
     unawaited(_openReadingPositions());
+    // The dock strip follows who is waiting and who is replying.
+    _chatList.addListener(_onChatListChanged);
     _registerWaitingChanges();
     unawaited(_openOutbox());
     unawaited(_tiles.open());
@@ -229,10 +232,14 @@ class _ChatScreenState extends _ChatScreenController
                           Expanded(
                             child: PageSwitcher(
                               index: _tab.index,
-                              child: KeyedSubtree(
-                                key: ValueKey('page-${_tab.name}'),
-                                child: _tabPage(),
-                              ),
+                              child:
+                                  NotificationListener<UserScrollNotification>(
+                                    onNotification: _foldDockOnScroll,
+                                    child: KeyedSubtree(
+                                      key: ValueKey('page-${_tab.name}'),
+                                      child: _tabPage(),
+                                    ),
+                                  ),
                             ),
                           ),
                         ],
@@ -252,6 +259,12 @@ class _ChatScreenState extends _ChatScreenController
                   chatsAttention: chatsAttention,
                   jarvisBusy: _busy,
                   orbKey: _tabOrbKey,
+                  compact: _dockCompact,
+                  onUnfold: () => setState(() => _dockCompact = false),
+                  strip: switch (_dockStrip()) {
+                    final data? => DockStrip(data: data),
+                    null => null,
+                  },
                 )
               : null,
           body: wide
@@ -318,6 +331,10 @@ class _ChatScreenState extends _ChatScreenController
     );
   }
 
+  void _onChatListChanged() {
+    if (mounted && !_inChat) setState(() {});
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final backgrounded =
@@ -358,6 +375,7 @@ class _ChatScreenState extends _ChatScreenController
   @override
   void dispose() {
     WaitingChanges.instance.reset();
+    _chatList.removeListener(_onChatListChanged);
     OfflineCache.instance.state.removeListener(_syncQueuedChanges);
     WidgetsBinding.instance.removeObserver(this);
     unawaited(PlaceReminderTracker.instance.detach());

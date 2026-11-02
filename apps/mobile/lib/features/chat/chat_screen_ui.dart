@@ -73,6 +73,23 @@ mixin _ChatScreenUi on _ChatScreenController {
     }
   }
 
+  /// Scrolling a list down folds the dock to the open tab; scrolling back up,
+  /// or reaching the top, unfolds it.
+  bool _foldDockOnScroll(UserScrollNotification notification) {
+    if (notification.depth != 0 || notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+    final compact = dockCompactAfterScroll(
+      direction: notification.direction,
+      pixels: notification.metrics.pixels,
+      current: _dockCompact,
+    );
+    if (compact != _dockCompact && mounted) {
+      setState(() => _dockCompact = compact);
+    }
+    return false;
+  }
+
   void _selectTab(JarvisTab tab) => _fromShell(() {
     // The tab you are already on: tapping it again goes back to the top.
     if (tab == _tab && !_inChat && _selectedDestination == 0) {
@@ -83,6 +100,7 @@ mixin _ChatScreenUi on _ChatScreenController {
     setState(() {
       _tab = tab;
       _inChat = false;
+      _dockCompact = false;
     });
     if (tab == JarvisTab.chats) unawaited(_refreshChats());
   });
@@ -93,6 +111,7 @@ mixin _ChatScreenUi on _ChatScreenController {
   }
 
   void _presentChat() {
+    _unreadReply = null;
     if (!_inChat && mounted) setState(() => _inChat = true);
   }
 
@@ -222,6 +241,84 @@ mixin _ChatScreenUi on _ChatScreenController {
           ),
         ],
       ),
+    );
+  }
+
+  /// The one line above the dock, or none: Jarvis writing, a reply that
+  /// finished while away, or the most pressing thing that needs the owner.
+  DockStripData? _dockStrip() {
+    if (_signedOut || _signingOut) return null;
+    DockStripData? writing;
+    final replying = _chatList.all.where((item) => item.responding).firstOrNull;
+    if (_busy || replying != null) {
+      final id = replying?.conversationId ?? _conversationId;
+      writing = DockStripData(
+        kind: DockStripKind.writing,
+        key: 'writing:${id ?? ''}',
+        title: 'Jarvis is writing…',
+        detail: replying?.title,
+        action: 'Open',
+        onTap: () =>
+            id == null ? _openJarvis() : unawaited(_presentConversation(id)),
+      );
+    }
+    DockStripData? replied;
+    if (_unreadReply case final reply?) {
+      replied = DockStripData(
+        kind: DockStripKind.replied,
+        key: 'reply:${reply.conversationId}:${reply.serial}',
+        title: reply.preview,
+        detail: 'Jarvis replied',
+        action: 'Read',
+        onTap: () {
+          _unreadReply = null;
+          unawaited(_presentConversation(reply.conversationId));
+        },
+        onDismiss: () => setState(() {
+          _dismissedStrips.add('reply:${reply.conversationId}:${reply.serial}');
+        }),
+      );
+    }
+    DockStripData? needs;
+    // Home already shows what needs you, so the strip covers the other tabs.
+    if (_tab != JarvisTab.home) {
+      if (_hasPendingApproval && _conversationId != null) {
+        needs = DockStripData(
+          kind: DockStripKind.needsYou,
+          key: 'approval:$_conversationId',
+          title: 'Jarvis needs your OK',
+          detail: 'An action is waiting for approval',
+          action: 'Review',
+          onTap: () => unawaited(_presentConversation(_conversationId!)),
+          onDismiss: () =>
+              setState(() => _dismissedStrips.add('approval:$_conversationId')),
+        );
+      } else {
+        final waiting = _chatList
+            .grouped(ChatFilter.forYou)
+            .where((group) => group.section == ChatSection.waiting)
+            .expand((group) => group.items)
+            .firstOrNull;
+        if (waiting != null) {
+          final key =
+              'waiting:${waiting.key}:${waiting.time?.millisecondsSinceEpoch}';
+          needs = DockStripData(
+            kind: DockStripKind.needsYou,
+            key: key,
+            title: '${waiting.title} is waiting',
+            detail: waiting.preview,
+            action: 'Reply',
+            onTap: () => _openChatItem(waiting),
+            onDismiss: () => setState(() => _dismissedStrips.add(key)),
+          );
+        }
+      }
+    }
+    return chooseDockStrip(
+      writing: writing,
+      replied: replied,
+      needsYou: needs,
+      dismissed: _dismissedStrips,
     );
   }
 

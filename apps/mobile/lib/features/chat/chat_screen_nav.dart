@@ -361,6 +361,8 @@ mixin _ChatScreenNav on _ChatScreenController {
       await OutboxStore.clearAll();
       _chatList.clear();
       _tabMemory.clear();
+      _unreadReply = null;
+      _dismissedStrips.clear();
       _tileSource.reset();
       _tiles.reset();
       await hub?.stop();

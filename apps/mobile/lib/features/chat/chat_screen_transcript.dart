@@ -79,11 +79,26 @@ mixin _ChatScreenTranscript on _ChatScreenController {
 
   void _appendDelta(String delta) => appendAssistantDelta(_entries, delta);
 
+  /// A reply finished while a tab is showing instead of the chat: the dock
+  /// strip offers it until the owner opens that chat.
+  void _noteReplyWhileAway(String content) {
+    final id = _conversationId;
+    if (id == null || _inChat || content.trim().isEmpty) return;
+    final preview = suggestedNoteTitle(content, max: 90);
+    if (preview.isEmpty) return;
+    _unreadReply = (
+      conversationId: id,
+      preview: preview,
+      serial: ++_replySerial,
+    );
+  }
+
   void _completeAssistant(
     String content, {
     String? id,
     List<MessageCitation>? citations,
   }) {
+    _noteReplyWhileAway(content);
     final index = _entries.lastIndexWhere(
       (entry) => entry is MessageEntry && !entry.isUser && entry.pending,
     );

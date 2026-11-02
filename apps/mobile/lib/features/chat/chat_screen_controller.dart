@@ -89,6 +89,17 @@ abstract class _ChatScreenController extends State<ChatScreen>
   /// Where each tab was left: list position, search and filter.
   final _tabMemory = TabMemory();
 
+  /// The tab capsule folds to the open tab while a list is scrolled down.
+  bool _dockCompact = false;
+
+  /// A reply that finished while the owner was on a tab instead of in the chat:
+  /// its conversation and first line. Cleared when that chat is opened.
+  ({String conversationId, String preview, int serial})? _unreadReply;
+  int _replySerial = 0;
+
+  /// Strips the owner hid; each stays hidden until something newer replaces it.
+  final Set<String> _dismissedStrips = {};
+
   /// Where reading stopped in each long conversation, and the message keys
   /// that tell where the screen is within the transcript.
   ReadingPositions _readingPositions = ReadingPositions.memory();
