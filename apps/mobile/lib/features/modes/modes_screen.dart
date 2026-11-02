@@ -268,7 +268,7 @@ class _ModesScreenState extends State<ModesScreen> {
           loading: _loading,
           error: _error,
           isEmpty: state == null,
-          onRetry: () => unawaited(_load()),
+          onRetry: _load,
           empty: const SizedBox.shrink(),
           child: state == null
               ? const SizedBox.shrink()

@@ -266,7 +266,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
         loading: _loading,
         error: _error,
         isEmpty: today == null,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         onRefresh: _load,
         empty: const SizedBox.shrink(),
         child: today == null ? const SizedBox.shrink() : _content(today),

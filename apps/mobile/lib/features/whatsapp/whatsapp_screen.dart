@@ -178,7 +178,7 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
         loading: _loading,
         error: _error,
         isEmpty: true,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         empty: EmptyState(
           icon: PhosphorIconsRegular.whatsappLogo,
           title: 'Your WhatsApp, with Jarvis',

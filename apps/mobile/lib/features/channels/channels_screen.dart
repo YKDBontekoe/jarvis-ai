@@ -193,7 +193,7 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
         loading: _loading,
         error: _error,
         isEmpty: false,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         empty: const SizedBox.shrink(),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

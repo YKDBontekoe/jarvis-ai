@@ -142,7 +142,7 @@ class _PortfolioTabState extends State<PortfolioTab>
       loading: _loading,
       error: _error,
       isEmpty: data == null || data.holdings.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       onRefresh: _load,
       empty: EmptyState(
         icon: PhosphorIconsRegular.chartLine,

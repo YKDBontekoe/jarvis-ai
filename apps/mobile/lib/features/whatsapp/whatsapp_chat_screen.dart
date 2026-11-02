@@ -735,7 +735,7 @@ class _WhatsAppChatScreenState extends State<WhatsAppChatScreen> {
                   : _error != null && _messages.isEmpty
                   ? ErrorState(
                       message: _error!,
-                      onRetry: () => unawaited(_load()),
+                      onRetry: _load,
                     )
                   : _messages.isEmpty
                   ? EmptyState(

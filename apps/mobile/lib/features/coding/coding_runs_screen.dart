@@ -89,7 +89,7 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
       loading: _loading,
       error: _error,
       isEmpty: _runs.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.code,
         title: 'No coding runs yet',

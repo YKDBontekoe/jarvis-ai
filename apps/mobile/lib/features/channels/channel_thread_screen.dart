@@ -64,7 +64,7 @@ class _ChannelThreadScreenState extends State<ChannelThreadScreen> {
       loading: _loading,
       error: _error,
       isEmpty: _messages.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.chatCircle,
         title: 'No messages yet',

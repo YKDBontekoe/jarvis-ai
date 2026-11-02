@@ -317,7 +317,7 @@ class _PeopleScreenState extends State<PeopleScreen>
         loading: _loading,
         error: _error,
         isEmpty: _people.isEmpty,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         onRefresh: _load,
         empty: _empty(),
         child: ListView(

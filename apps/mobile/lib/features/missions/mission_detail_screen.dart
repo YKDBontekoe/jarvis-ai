@@ -115,7 +115,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           loading: _loading,
           error: _error,
           isEmpty: mission == null,
-          onRetry: () => unawaited(_load()),
+          onRetry: _load,
           empty: const SizedBox.shrink(),
           child: mission == null
               ? const SizedBox.shrink()

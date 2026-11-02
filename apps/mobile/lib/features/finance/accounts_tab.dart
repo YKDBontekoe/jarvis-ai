@@ -106,7 +106,7 @@ class _AccountsTabState extends State<AccountsTab>
       loading: _loading,
       error: _error,
       isEmpty: _accounts.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       onRefresh: _load,
       empty: EmptyState(
         icon: PhosphorIconsRegular.wallet,

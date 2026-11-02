@@ -140,7 +140,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
               loading: _loading,
               error: _error,
               isEmpty: _missions.isEmpty,
-              onRetry: () => unawaited(_load()),
+              onRetry: _load,
               empty: const EmptyState(
                 icon: PhosphorIconsRegular.flowArrow,
                 title: 'No missions yet',

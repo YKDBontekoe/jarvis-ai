@@ -129,7 +129,7 @@ class _SkillsScreenState extends State<SkillsScreen> {
         loading: _loading,
         error: _error,
         isEmpty: _skills.isEmpty,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         empty: EmptyState(
           icon: PhosphorIconsRegular.magicWand,
           title: 'No skills yet',

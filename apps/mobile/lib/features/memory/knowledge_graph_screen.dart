@@ -621,7 +621,7 @@ class _KnowledgeGraphScreenState extends _KnowledgeGraphController
       loading: _loading,
       error: _error,
       isEmpty: _all.nodes.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.graph,
         title: 'No connections yet',

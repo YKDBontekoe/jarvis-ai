@@ -567,6 +567,9 @@ class ErrorState extends StatelessWidget {
 }
 
 /// Loading, empty, full-page error, or a list that keeps rows visible when a refresh fails.
+///
+/// Pulling down refreshes in every state, including an empty list and a failed
+/// first load, and the indicator stays until the request has actually finished.
 class ListScreenBody extends StatelessWidget {
   const ListScreenBody({
     required this.loading,
@@ -584,19 +587,37 @@ class ListScreenBody extends StatelessWidget {
   final bool isEmpty;
   final Widget empty;
   final Widget child;
-  final VoidCallback onRetry;
 
-  /// Pull-to-refresh; when null the pull triggers [onRetry] and shows the
-  /// indicator briefly.
+  /// Reloads the list. Return the request's future so a pull-to-refresh lasts
+  /// exactly as long as the request does.
+  final FutureOr<void> Function() onRetry;
+
+  /// Pull-to-refresh; when null the pull awaits [onRetry].
   final Future<void> Function()? onRefresh;
+
+  Future<void> _refresh() async => await (onRefresh ?? onRetry)();
+
+  /// Lets a short or empty page be pulled down to refresh.
+  Widget _pullable(Widget page) => OrbRefresh(
+    onRefresh: _refresh,
+    child: LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(child: page),
+        ),
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     if (loading && isEmpty) return const SkeletonList();
     if (error != null && isEmpty) {
-      return ErrorState(message: error!, onRetry: onRetry);
+      return _pullable(ErrorState(message: error!, onRetry: onRetry));
     }
-    if (isEmpty) return empty;
+    if (isEmpty) return _pullable(empty);
     return Column(
       children: [
         if (error != null)
@@ -612,12 +633,7 @@ class ListScreenBody extends StatelessWidget {
           ),
         Expanded(
           child: OrbRefresh(
-            onRefresh:
-                onRefresh ??
-                () async {
-                  onRetry();
-                  await Future<void>.delayed(const Duration(milliseconds: 700));
-                },
+            onRefresh: _refresh,
             // Short lists must still be pullable.
             child: ScrollConfiguration(
               behavior: ScrollConfiguration.of(context)

@@ -186,7 +186,7 @@ class _HoldingDetailScreenState extends State<HoldingDetailScreen> {
             : holding == null
             ? ErrorState(
                 message: _error ?? 'Could not load this holding.',
-                onRetry: () => unawaited(_load()),
+                onRetry: _load,
               )
             : ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),

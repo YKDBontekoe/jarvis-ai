@@ -169,7 +169,7 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
                 ? const SkeletonList(shape: SkeletonShape.detail)
                 : ErrorState(
                     message: _error!,
-                    onRetry: () => unawaited(_load()),
+                    onRetry: _load,
                   ))
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),

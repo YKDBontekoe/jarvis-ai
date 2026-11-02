@@ -123,7 +123,7 @@ class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
                 : _error != null && _models.isEmpty
                 ? ErrorState(
                     message: _error!,
-                    onRetry: () => unawaited(_load()),
+                    onRetry: _load,
                   )
                 : ListView.separated(
                     itemCount: _models.length,

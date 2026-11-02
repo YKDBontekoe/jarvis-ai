@@ -254,7 +254,7 @@ class _TransactionsTabState extends State<TransactionsTab>
             loading: _loading,
             error: _error,
             isEmpty: _items.isEmpty,
-            onRetry: () => unawaited(_load()),
+            onRetry: _load,
             onRefresh: _load,
             empty: EmptyState(
               icon: PhosphorIconsRegular.receipt,

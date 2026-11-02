@@ -199,7 +199,7 @@ class _ExpensesScreenState extends State<ExpensesScreen>
               loading: _loading,
               error: _error,
               isEmpty: data == null || data.isEmpty,
-              onRetry: () => unawaited(_load()),
+              onRetry: _load,
               onRefresh: _load,
               empty: EmptyState(
                 icon: PhosphorIconsRegular.wallet,

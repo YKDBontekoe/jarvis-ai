@@ -229,7 +229,7 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
             : account == null
             ? ErrorState(
                 message: _error ?? 'Could not load this account.',
-                onRetry: () => unawaited(_load()),
+                onRetry: _load,
               )
             : Column(
                 children: [

@@ -340,7 +340,7 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
         loading: _loading,
         error: _error,
         isEmpty: false,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         empty: const SizedBox.shrink(),
         child: OrbRefresh(
           onRefresh: _load,

@@ -293,7 +293,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       loading: _loading,
       error: _error,
       isEmpty: _items.isEmpty && _search.text.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.bookOpen,
         title: 'Your library is empty',

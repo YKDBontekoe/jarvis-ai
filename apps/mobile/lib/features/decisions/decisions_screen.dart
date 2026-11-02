@@ -183,7 +183,7 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
         loading: _loading,
         error: _error,
         isEmpty: _decisions.isEmpty,
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
         empty: EmptyState(
           icon: PhosphorIconsRegular.hourglassMedium,
           title: 'No decisions logged',

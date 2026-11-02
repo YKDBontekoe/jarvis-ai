@@ -218,7 +218,7 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen> {
     if (_overview == null) {
       return ErrorState(
         message: _error ?? 'Could not load your weekly review.',
-        onRetry: () => unawaited(_load()),
+        onRetry: _load,
       );
     }
     final reviews = _reviews;

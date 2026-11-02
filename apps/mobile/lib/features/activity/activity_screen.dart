@@ -129,7 +129,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   loading: _loading,
                   error: _error,
                   isEmpty: _events.isEmpty,
-                  onRetry: () => unawaited(_load()),
+                  onRetry: _load,
                   onRefresh: _load,
                   empty: EmptyState(
                     icon: PhosphorIconsRegular.pulse,

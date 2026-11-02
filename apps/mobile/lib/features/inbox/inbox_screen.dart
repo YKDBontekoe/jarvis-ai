@@ -239,7 +239,7 @@ class _InboxScreenState extends State<InboxScreen> {
       loading: _loading,
       error: _error,
       isEmpty: inbox == null || inbox.threads.isEmpty,
-      onRetry: () => unawaited(_load()),
+      onRetry: _load,
       empty: const EmptyState(
         icon: PhosphorIconsRegular.chatsCircle,
         title: 'Your inbox is clear',
@@ -405,7 +405,7 @@ class _InboxScreenState extends State<InboxScreen> {
           loading: _loading,
           error: _error,
           isEmpty: _commitments.isEmpty,
-          onRetry: () => unawaited(_load()),
+          onRetry: _load,
           empty: const EmptyState(
             icon: PhosphorIconsRegular.checkCircle,
             title: 'No open promises',
