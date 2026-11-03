@@ -78,7 +78,7 @@ assert.equal(again.data.libraryItemId, saved.data.libraryItemId, 'saving twice d
 const full = await request('GET', `/stories/${story.id}/export`);
 assert.equal(full.status, 200);
 assert.ok(full.text.includes(`We chose the ${tag} supplier`));
-assert.ok(!full.text.includes('felt calm'), 'a removed moment is in no copy');
+assert.ok(!full.text.includes(`canal ${tag}`), 'a removed moment is in no copy');
 const shared = await request('GET', `/stories/${story.id}/export?redact=journal,people`);
 assert.equal(shared.status, 200);
 assert.ok(shared.text.includes('left out'), shared.text);

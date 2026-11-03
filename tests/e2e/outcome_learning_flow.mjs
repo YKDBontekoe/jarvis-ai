@@ -3,13 +3,25 @@
 // labelled example; nothing applies by itself; applying changes the style note and undo reverses it; a rejected
 // change is never offered again; a profile kept out of learning stores nothing; bad input is refused.
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 
 const api = `${process.env.JARVIS_BASE_URL ?? 'http://localhost:5082'}/api/v1`;
+
+// Each run signs up a fresh account, so what an earlier run learned (lessons, rejected changes) does not carry over.
+async function freshAccount(apiBase) {
+  const response = await fetch(apiBase + '/auth/register', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: `e2e-${randomUUID()}@example.invalid`, password: `${randomUUID()}Aa1!` }),
+  });
+  assert.equal(response.status, 200, `register: ${response.status} ${await response.clone().text()}`);
+  return `Bearer ${(await response.json()).accessToken}`;
+}
+const authorization = await freshAccount(api);
 
 async function request(method, path, body) {
   const response = await fetch(`${api}${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: { Authorization: authorization, ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await response.text();
