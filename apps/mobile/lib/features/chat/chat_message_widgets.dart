@@ -462,10 +462,10 @@ class _MessageBubbleState extends State<MessageBubble> {
 
 /// Compact square hit area shared by the reply actions so they sit in a
 /// tight, even row under the text.
-// 44pt hit areas (playbook §9); the icons stay small.
+// 48dp hit areas (playbook §9); the icons stay small.
 final _actionStyle = IconButton.styleFrom(
-  minimumSize: const Size(44, 44),
-  fixedSize: const Size(44, 44),
+  minimumSize: const Size(48, 48),
+  fixedSize: const Size(48, 48),
   padding: EdgeInsets.zero,
   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
@@ -557,7 +557,7 @@ class _CopyButton extends StatelessWidget {
         foregroundColor: copied
             ? JarvisColors.of(context).success
             : JarvisColors.of(context).muted,
-        minimumSize: const Size(44, 44),
+        minimumSize: const Size(48, 48),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),

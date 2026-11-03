@@ -325,7 +325,7 @@ class _HeroButton extends StatelessWidget {
           onHighlightChanged: highlight,
           borderRadius: BorderRadius.circular(14),
           child: SizedBox(
-            height: 46,
+            height: 48,
             child: Center(
               child: Text(
                 label,

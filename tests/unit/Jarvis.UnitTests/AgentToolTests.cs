@@ -218,7 +218,7 @@ public sealed class AgentToolTests
         var clock = new FixedClock(new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero));
         var briefings = new FakeBriefingRepository(new DailyBriefingPreferenceRecord(OwnerId, false,
             new TimeOnly(8, 0), "America/New_York", "wf", null, null));
-        var provider = new ClockContextProvider(briefings, OwnerId, clock);
+        var provider = new ClockContextProvider(null, briefings, OwnerId, clock);
         var agent = new ChatClientAgent(new EchoContextClient(), new ChatClientAgentOptions
         {
             AIContextProviders = [provider]
@@ -230,6 +230,48 @@ public sealed class AgentToolTests
         // Minute precision keeps the per-turn context identical within a minute, so the prompt cache can hit.
         Assert.Contains("2030-01-01T07:00-05:00", response.Text);
         Assert.DoesNotContain("07:00:00", response.Text);
+    }
+
+    [Fact]
+    public async Task Clock_context_prefers_the_home_zone_chosen_in_settings()
+    {
+        // The home zone used to be ignored here: an owner who chose one in Settings but had no briefing zone was
+        // told it was not configured, and Jarvis asked for it before setting a local-time reminder.
+        var clock = new FixedClock(new DateTimeOffset(2030, 1, 1, 12, 0, 0, TimeSpan.Zero));
+        var settings = new InMemorySettingsStore();
+        await settings.SaveAsync(OwnerId, Jarvis.Application.Preferences.HomeZoneSettings.Section,
+            new Jarvis.Application.Preferences.HomeZoneSettings("Europe/Amsterdam"), CancellationToken.None);
+        var briefings = new FakeBriefingRepository(new DailyBriefingPreferenceRecord(OwnerId, false,
+            new TimeOnly(8, 0), "America/New_York", "wf", null, null));
+
+        var chosen = await RunClockAsync(new ClockContextProvider(settings, briefings, OwnerId, clock));
+        var noBrief = await RunClockAsync(new ClockContextProvider(settings, new FakeBriefingRepository(null),
+            OwnerId, clock));
+
+        Assert.Contains("Europe/Amsterdam", chosen);
+        Assert.DoesNotContain("America/New_York", chosen);
+        Assert.Contains("Europe/Amsterdam", noBrief);
+        Assert.DoesNotContain("not configured", noBrief);
+    }
+
+    private static async Task<string> RunClockAsync(ClockContextProvider provider) =>
+        (await new ChatClientAgent(new EchoContextClient(), new ChatClientAgentOptions
+        {
+            AIContextProviders = [provider]
+        }).RunAsync("What time is it?")).Text;
+
+    [Fact]
+    public void Watch_comparison_tells_the_model_that_above_and_below_are_inclusive()
+    {
+        // "above" means >=. Described only as "below or above", a model turned "3 or more" into above 2,
+        // which fires at 2.
+        var parameter = typeof(ConditionWatchAgentTools).GetMethod(nameof(ConditionWatchAgentTools.CreateConditionWatchAsync))!
+            .GetParameters().Single(p => p.Name == "comparison");
+        var description = parameter.GetCustomAttributes(typeof(System.ComponentModel.DescriptionAttribute), false)
+            .Cast<System.ComponentModel.DescriptionAttribute>().Single().Description;
+
+        Assert.Contains("(>=)", description, StringComparison.Ordinal);
+        Assert.Contains("\"3 or more\" is above 3", description, StringComparison.Ordinal);
     }
 
     [Fact]

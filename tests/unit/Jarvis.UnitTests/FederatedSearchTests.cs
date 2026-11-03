@@ -1,5 +1,6 @@
 using Jarvis.Application.Search;
 using Jarvis.Infrastructure.Search;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -126,6 +127,41 @@ public sealed class FederatedSearchTests
     }
 
     [Fact]
+    public async Task A_burst_of_searches_waits_for_slots_instead_of_timing_providers_out()
+    {
+        // Stands in for the database connection pool: 8 connections, 40 ms per query. Before provider queries
+        // were capped, 40 searches started 160 timers at once and those queued longest timed out.
+        var pool = new SemaphoreSlim(8, 8);
+        IFederatedSearchProvider Pooled(string id) => new PooledProvider(id, pool);
+        var service = CreateServiceWithOptions([Pooled("a"), Pooled("b"), Pooled("c"), Pooled("d")],
+            new FederatedSearchOptions { ProviderTimeout = TimeSpan.FromMilliseconds(500) });
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 40)
+            .Select(_ => service.SearchAsync(Owner, "ship", null, TestContext.Current.CancellationToken)));
+
+        Assert.All(responses, response => Assert.All(response.Providers, status => Assert.True(status.Succeeded,
+            $"{status.ProviderId}: {status.Error}")));
+        Assert.All(responses, response => Assert.NotEmpty(response.Results));
+    }
+
+    [Fact]
+    public void A_registered_provider_is_built_alone_from_its_scope()
+    {
+        var services = new ServiceCollection();
+        var built = 0;
+        services.AddScoped(_ => { built++; return new ThrowingProvider("files"); });
+        services.AddScoped<IFederatedSearchProvider>(provider =>
+            provider.GetRequiredService<ThrowingProvider>());
+        services.AddScoped<IFederatedSearchProvider>(_ => { built += 100; return new SlowProvider(TimeSpan.Zero); });
+        using var root = services.BuildServiceProvider();
+
+        var isolated = FederatedSearchService.Isolate<IFederatedSearchProvider>(root, new ThrowingProvider("files"));
+
+        Assert.Equal("files", isolated.ProviderId);
+        Assert.Equal(1, built);
+    }
+
+    [Fact]
     public async Task Kind_filter_limits_providers()
     {
         var memory = Result(SearchResultKinds.Memory, "m1", "Pinned habit", 0.9, pinned: true);
@@ -221,6 +257,22 @@ public sealed class FederatedSearchTests
         public Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("database connection string password=secret");
+    }
+
+    /// <summary>Waits for a shared "connection" like a database query would, honouring the timeout.</summary>
+    private sealed class PooledProvider(string providerId, SemaphoreSlim pool) : IFederatedSearchProvider
+    {
+        public string ProviderId => providerId;
+        public IReadOnlySet<string> ResultKinds { get; } = new HashSet<string> { SearchResultKinds.Task };
+
+        public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+            CancellationToken cancellationToken)
+        {
+            await pool.WaitAsync(cancellationToken);
+            try { await Task.Delay(40, cancellationToken); }
+            finally { pool.Release(); }
+            return [Result(SearchResultKinds.Task, providerId, "Ship " + providerId, 0.5)];
+        }
     }
 
     private sealed class SlowProvider(TimeSpan delay) : IFederatedSearchProvider

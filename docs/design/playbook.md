@@ -179,7 +179,7 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 - Every custom tappable has a `Semantics` label (and `button: true`), and decorative children use `excludeSemantics`.
 - Give buttons with a long visible text and subtitle a short label too. The web recorder (`tool/record_web.mjs`) taps by accessible name, so use unique names.
 - Check contrast in both themes. Never put information in colour alone; pair it with text or an icon.
-- 44pt targets, and the text-scale rules in §4.
+- 48dp targets (Android's minimum; iOS asks 44pt) and the text-scale rules in §4. `test/accessibility_guidelines_test.dart` checks contrast, both target sizes and labels on the main screens in both themes; keyboard focus order and activation are in `test/keyboard_navigation_test.dart`.
 - **Announce what changed.** `InlineNotice` with the `danger` or `success` tone is a live region, so VoiceOver reads a save failure or confirmation as it appears. Use those tones for results of an action, `info`/`warning` for standing state (they stay quiet).
 - **Privacy cover.** Jarvis is blurred in the app switcher by default, with or without the Face ID lock (More → Face ID lock → Hide in app switcher). The cover never asks for Face ID; only the lock does.
 - **Pinned primary controls.** On full-screen sessions (voice) the End and Mute buttons sit outside the scroll area, so growing captions, cards or 3× text never push them off screen. Captions can be hidden mid-call.

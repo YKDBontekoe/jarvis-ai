@@ -1603,8 +1603,8 @@ class StatusChip extends StatelessWidget {
         customBorder: const StadiumBorder(),
         onTap: onAction,
         child: ConstrainedBox(
-          // With an action the chip is a 44pt target (playbook §9).
-          constraints: BoxConstraints(minHeight: onAction == null ? 0 : 44),
+          // With an action the chip is a 48dp target (playbook §9).
+          constraints: BoxConstraints(minHeight: onAction == null ? 0 : 48),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 6, 12, 6),
             child: Row(

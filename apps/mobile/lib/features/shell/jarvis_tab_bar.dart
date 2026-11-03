@@ -82,8 +82,8 @@ class JarvisTabBar extends StatelessWidget {
   /// One contextual line above the dock, or nothing.
   final Widget? strip;
 
-  /// Space a tab needs to be comfortable to hit.
-  static const minTarget = 44.0;
+  /// Space a tab needs to be comfortable to hit: 48, Android's minimum (iOS asks 44).
+  static const minTarget = 48.0;
 
   @override
   Widget build(BuildContext context) {

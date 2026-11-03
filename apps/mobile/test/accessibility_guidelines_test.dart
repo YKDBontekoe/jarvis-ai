@@ -7,9 +7,8 @@ import 'screenshots/fixtures.dart';
 import 'screenshots/harness.dart';
 
 /// Runs Flutter's accessibility guidelines on the main screens with sample
-/// data, in light and dark: text contrast (WCAG AA), 44pt tap targets (the
-/// playbook's size; the dock tabs are 44 wide, under Android's 48dp) and
-/// labelled tap targets for screen readers.
+/// data, in light and dark: text contrast (WCAG AA), tap targets (48dp on
+/// Android, 44pt on iOS) and labelled tap targets for screen readers.
 /// Part of the normal `flutter test` run.
 void main() {
   setUpAll(loadAppFonts);
@@ -27,6 +26,7 @@ void main() {
 
   const guidelines = <String, AccessibilityGuideline>{
     'contrast': textContrastGuideline,
+    'android tap target': androidTapTargetGuideline,
     'ios tap target': iOSTapTargetGuideline,
     'labelled tap target': labeledTapTargetGuideline,
   };

@@ -12,6 +12,12 @@ public sealed class FederatedSearchService(
     ILogger<FederatedSearchService> logger,
     IServiceScopeFactory? scopeFactory = null) : IFederatedSearchService
 {
+    // Caps provider queries across all searches in this process. Each one holds a database connection, and a burst
+    // of searches used to queue on the pool until providers hit their timeout and dropped out of the results.
+    // The timeout now starts when a provider gets a slot, so waiting for a slot does not count against it.
+    private static readonly SemaphoreSlim ProviderSlots = new(MaxConcurrentProviderQueries, MaxConcurrentProviderQueries);
+    public const int MaxConcurrentProviderQueries = 32;
+
     private readonly FederatedSearchOptions _options = options.Value;
     private readonly IFederatedSearchProvider[] _providers = providers.ToArray();
 
@@ -59,9 +65,7 @@ public sealed class FederatedSearchService(
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeout.CancelAfter(_options.ProviderTimeout);
                 await using var scope = scopeFactory?.CreateAsyncScope();
-                var isolated = scope?.ServiceProvider.GetServices<IFederatedSearchProvider>()
-                    .OfType<IConversationScopedSearchProvider>()
-                    .FirstOrDefault(candidate => candidate.ProviderId == provider.ProviderId) ?? provider;
+                var isolated = scope is { } owned ? Isolate(owned.ServiceProvider, provider) : provider;
                 results.AddRange(await isolated.SearchInConversationAsync(ownerId, conversationId, query,
                     _options.MaxInConversation, timeout.Token));
                 statuses.Add(new SearchProviderStatus(provider.ProviderId, true, null));
@@ -92,14 +96,14 @@ public sealed class FederatedSearchService(
         using var activity = SearchDiagnostics.ActivitySource.StartActivity("search.provider");
         activity?.SetTag("search.provider", provider.ProviderId);
         var stopwatch = Stopwatch.StartNew();
+        await ProviderSlots.WaitAsync(cancellationToken);
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(_options.ProviderTimeout);
             // Providers run concurrently, and a DbContext is not thread-safe, so each one gets its own scope.
             await using var scope = scopeFactory?.CreateAsyncScope();
-            var isolated = scope?.ServiceProvider.GetServices<IFederatedSearchProvider>()
-                .FirstOrDefault(candidate => candidate.ProviderId == provider.ProviderId) ?? provider;
+            var isolated = scope is { } owned ? Isolate(owned.ServiceProvider, provider) : provider;
             var results = await isolated.SearchAsync(ownerId, query, _options.MaxPerProvider, timeout.Token);
             if (kindsFilter is { Count: > 0 })
                 results = results.Where(hit => kindsFilter.Contains(hit.Kind)).ToArray();
@@ -129,7 +133,21 @@ public sealed class FederatedSearchService(
                 new KeyValuePair<string, object?>("provider", provider.ProviderId));
             return (new SearchProviderStatus(provider.ProviderId, false, "Search provider unavailable."), []);
         }
+        finally
+        {
+            ProviderSlots.Release();
+        }
     }
+
+    /// <summary>
+    /// <paramref name="provider"/>'s own registration in the scope. Resolving every provider and picking one built
+    /// all of them for each provider: about 25 × 25 objects per search. Unregistered types (tests) are looked up.
+    /// </summary>
+    public static T Isolate<T>(IServiceProvider services, T provider) where T : IFederatedSearchProvider =>
+        services.GetService(provider.GetType()) is T registered
+            ? registered
+            : services.GetServices<IFederatedSearchProvider>().OfType<T>()
+                .FirstOrDefault(candidate => candidate.ProviderId == provider.ProviderId) ?? provider;
 
     private List<FederatedSearchResult> RankAndCap(IReadOnlyList<FederatedSearchResult> results, string query)
     {

@@ -15,7 +15,7 @@ internal sealed class ConditionWatchAgentTools(IConditionWatchService watches, I
         [Description("public_json, authenticated_json, device_battery, device_location, or calendar.")] string? kind = null,
         [Description("An HTTPS JSON URL for JSON watches. Omit for device and calendar watches.")] string? url = null,
         [Description("Dot-separated numeric JSON path for JSON watches.")] string? jsonPath = null,
-        [Description("below or above.")] string comparison = "below",
+        [Description("below or above, both inclusive: above fires when the value is at or above the threshold (>=), below when at or below (<=). \"3 or more\" is above 3; \"under 20\" is below 19.99. For device_location, above means farther than the radius.")] string comparison = "below",
         [Description("Numeric trigger: JSON value, battery percent, or location radius meters when radiusMeters is omitted.")] double threshold = 0,
         [Description("Minutes between checks, 5 through 1440.")] int intervalMinutes = 15,
         [Description("Integration provider slug for authenticated_json, such as github.")] string? credentialProvider = null,
