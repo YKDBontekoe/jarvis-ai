@@ -174,12 +174,16 @@ internal static class LocalDevelopment
         }
         if (features.Verification)
         {
-            // Local e2e fixtures (docs/operations/testing.md): a fake Codex app server and a fake MCP server.
+            // Local e2e fixtures (docs/operations/testing.md): a fake Codex app server and a fake MCP server, plus a
+            // second coding repository for tests/e2e/extended_flow.mjs, which creates that Git checkout itself.
             var fixtures = Path.Combine(workspaceRoot, "tests", "e2e");
             var fakeCodex = Path.Combine(fixtures, "fake_codex_app_server.mjs");
+            var codingFixture = Path.Combine(workspaceRoot, "artifacts", "verification", "coding", "fixture");
             foreach (var host in new IResourceBuilder<ProjectResource>[] { api, worker })
                 host.WithEnvironment("Codex__ExecutablePath", fakeCodex)
                     .WithEnvironment("Codex__EnableWebSearch", "false")
+                    .WithEnvironment("Coding__Repositories__1__Name", "verification")
+                    .WithEnvironment("Coding__Repositories__1__Path", codingFixture)
                     .WithEnvironment(JarvisMcpServers.Verification(Path.Combine(fixtures, "fake_mcp.mjs")));
         }
     }

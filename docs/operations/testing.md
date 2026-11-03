@@ -48,6 +48,7 @@ Fixtures under `tests/e2e/`:
 | Script | Covers |
 |--------|--------|
 | `local_fixture_flow.mjs` | Streaming, tools, approvals, memory, reminders, Temporal task |
+| `extended_flow.mjs` | Bearer-authenticated SignalR and owner isolation, an MCP write from a background task held for approval, MCP add/rename/remove by the agent, an approved coding task in an isolated snapshot, a condition watch delivered through Temporal, antivirus rejection on upload |
 | `channels_flow.mjs` | WhatsApp Cloud/Signal with `fake_channels.mjs` (QR linking is covered by unit and widget tests) |
 | `platform_flow.mjs` | A2A, devices, voice options; `JARVIS_PLATFORM_CHAT=1` for `RenderUi` |
 
@@ -55,6 +56,15 @@ Quickest path (also in cloud sessions): `scripts/dev/smoke.sh` starts the AppHos
 `/health`, and runs `local_fixture_flow.mjs` (`up`, `test [flow.mjs …]` and `down` run the steps separately; logs in
 `artifacts/smoke/`). In Claude Code cloud sessions it skips the WhatsApp bridge image, whose `npm ci` cannot run inside
 `docker build` behind the sandbox proxy.
+
+`scripts/dev/smoke.sh test extended_flow.mjs` needs nothing else set up. It registers two throwaway accounts on each
+run and sends bearer tokens: the stack runs in Development, where an anonymous request is the development owner. It
+reads the fake MCP server's call log from `/tmp/jarvis-verification-mcp-calls.jsonl` (override with
+`JARVIS_VERIFICATION_MCP_CALLS`). It also creates the Git checkout `artifacts/verification/coding/fixture`, which the
+`verification` feature registers as the coding repository `verification`; coding snapshots land in
+`artifacts/verification/coding/.jarvis-worktrees/`. The watch check uses a device battery watch, because JSON watches
+only fetch public HTTPS hosts. To run only some checks, set `JARVIS_EXTENDED_CASES` to a comma-separated list of check
+names.
 
 With Aspire, turn on the `verification` feature to run the whole stack on the fake Codex app server and fake MCP
 server, then run the scripts against `http://localhost:5082`:

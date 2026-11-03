@@ -4,6 +4,8 @@
 // same JSON-RPC subset as CodexCliChatClient, streams structured output in small deltas, and
 // plans multi-step Jarvis tool calls from the prompt text. It never contacts a network service.
 import readline from 'node:readline';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { extractGraph, reflect } from './fake_reflection.mjs';
 
 const MODEL = 'jarvis-fixture';
@@ -43,6 +45,19 @@ const CONTEXT_PREFIXES = [
 
 // "Jarvis tool result: …" or, with the tool's name, "Jarvis tool result (CreateReminder): …".
 const TOOL_RESULT = /^Jarvis tool result(?: \([^)]*\))?:/;
+
+// `codex exec … -C <worktree> --output-last-message <file> -` is how RunCodingTask drives Codex: the task arrives on
+// stdin and the edit happens in the isolated worktree. The fixture only understands "Create a file X containing
+// exactly Y", which is what extended_flow.mjs asks for.
+if (process.argv.includes('exec')) {
+  const argument = name => process.argv[process.argv.indexOf(name) + 1];
+  const task = readFileSync(0, 'utf8');
+  const file = task.match(/create a file ([\w.-]+) containing exactly (\S+?)\.?(?:\s|$)/i);
+  if (file) writeFileSync(join(argument('-C'), file[1]), file[2] + '\n');
+  writeFileSync(argument('--output-last-message'),
+    file ? `Created ${file[1]} and left it uncommitted.` : 'The fixture model made no changes.');
+  process.exit(0);
+}
 
 const send = message => process.stdout.write(JSON.stringify(message) + '\n');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -157,6 +172,49 @@ function plan(prompt) {
 
   if (results.length > 0 && /rejected/i.test(last))
     return text("Understood — I didn't do that. Let me know if you'd like a different approach.");
+
+  // extended_flow.mjs: an MCP write from a background task (approved later), MCP self-management and coding.
+  if (/\bcreate a github issue titled\b/.test(lower) && prompt.includes('github_create_issue')) {
+    if (results.length === 0)
+      return call('github_create_issue', { title: request.match(/titled '([^']+)'/i)?.[1] ?? 'Untitled' });
+    // MCP results arrive as a content block ({"text":"<the tool's JSON>"}), possibly encoded once more.
+    let issue = last;
+    for (let depth = 0; depth < 3 && typeof issue === 'string'; depth++)
+      try { issue = JSON.parse(issue); issue = issue?.text ?? issue; } catch { break; }
+    if (typeof issue !== 'object' || issue === null) issue = {};
+    return text(`Created issue #${issue.number ?? '?'} in ${issue.repository ?? 'the repository'}: ${issue.url ?? last}`);
+  }
+
+  const registerMcp = request.match(/^register the mcp server (.+?) at (https:\/\/\S+) with only (\S+) enabled/i);
+  if (registerMcp) {
+    if (results.length === 0)
+      return call('AddMcpServer', { name: registerMcp[1], endpoint: registerMcp[2], allowedTools: registerMcp[3] });
+    return text(last);
+  }
+
+  const renameMcp = request.match(/^rename the mcp server (.+?) to (.+?)\.?$/i);
+  const removeMcp = request.match(/^remove the mcp server (.+?)\.?$/i);
+  if (renameMcp || removeMcp) {
+    if (results.length === 0) return call('ListMcpServers', {});
+    if (results.length === 1) {
+      const name = (renameMcp ?? removeMcp)[1];
+      let servers = [];
+      try { servers = JSON.parse(results[0]); } catch { /* not a server list */ }
+      const server = servers.find(item => item.name === name);
+      if (!server) return text(`I couldn't find an MCP server named ${name}.`);
+      return renameMcp
+        ? call('UpdateMcpServer', { id: server.id, name: renameMcp[2], endpoint: server.endpoint,
+            allowedTools: server.allowedTools.join(',') })
+        : call('RemoveMcpServer', { id: server.id });
+    }
+    return text(last);
+  }
+
+  const codingRepository = request.match(/^use the configured coding repository named ([\w.-]+)\./i);
+  if (codingRepository) {
+    if (results.length === 0) return call('RunCodingTask', { repositoryName: codingRepository[1], task: request });
+    return text(`The coding task finished. ${last}`);
+  }
 
   if (/\bremind me\b/.test(lower) && has('CreateReminder')) {
     if (results.length === 0) {
