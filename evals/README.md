@@ -1,5 +1,9 @@
 # Jarvis behavior evaluations
 
+The deterministic [proactive scenario evaluation](../tests/eval/Jarvis.ProactiveEval/README.md) covers intervention,
+preparation, interruption and false-completion policy. It complements the live-model dataset below and never reports
+synthetic scenario success as explicit owner usefulness.
+
 `jarvis-core-v1.jsonl` is the source controlled behavioral evaluation set for the production architecture plan. Each line is an independent scenario. `expected` describes observable properties, not exact prose, so model wording can change without making the evaluation brittle.
 
 The cases cover the plan's memory recall and correction handling, tool choice and arguments (including recurring weekday reminders), unsafe action refusal, approval generation, research honesty, and durable work. They also cover Jarvis-managed MCP discovery, tool selection, invocation, and registration under the Codex CLI plus ChatGPT OAuth model path. The research case uses Codex CLI's native live web search and checks its privacy-safe `jarvis.codex.web_search.actions` metric; it does not use a separate search provider.

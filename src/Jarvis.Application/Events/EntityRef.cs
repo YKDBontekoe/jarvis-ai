@@ -24,11 +24,16 @@ public static class EntityTypes
     public const string Automation = "automation";
     public const string Habit = "habit";
     public const string Library = "library";
+    public const string Meeting = "meeting";
+    public const string Goal = "goal";
+    public const string Trip = "trip";
+    public const string Document = "document";
+    public const string Message = "message";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
         Task, Reminder, Watch, Memory, Journal, Expense, Project, Conversation, Approval, Notification, Person,
-        Decision, Mission, File, Commitment, InboxThread, Automation, Habit, Library
+        Decision, Mission, File, Commitment, InboxThread, Automation, Habit, Library, Meeting, Goal, Trip, Document, Message
     };
 
     public static bool IsValid([NotNullWhen(true)] string? type) => type is not null && All.Contains(type);

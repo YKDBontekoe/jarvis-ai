@@ -149,5 +149,396 @@
   "capturesAsk": "Ask Jarvis",
   "capturesRemind": "Create reminder",
   "hideInSwitcherTitle": "Hide in app switcher",
-  "hideInSwitcherSubtitle": "Blur Jarvis when you swipe up or switch apps"
+  "hideInSwitcherSubtitle": "Blur Jarvis when you swipe up or switch apps",
+  "proactiveTitle": "Ongoing work",
+  "@proactiveTitle": {
+    "description": "Proactive work: Title"
+  },
+  "proactiveNew": "New responsibility",
+  "@proactiveNew": {
+    "description": "Proactive work: New"
+  },
+  "proactiveDescription": "The things you asked Jarvis to keep moving. Every change has a reason and a history.",
+  "@proactiveDescription": {
+    "description": "Proactive work: Description"
+  },
+  "proactiveEmpty": "Nothing tracked yet",
+  "@proactiveEmpty": {
+    "description": "Proactive work: Empty"
+  },
+  "proactiveConfirm": "Update this responsibility?",
+  "@proactiveConfirm": {
+    "description": "Proactive work: Confirm"
+  },
+  "proactiveConfirmBody": "Your choice is kept in the history. Resolving or stopping ends ongoing checks.",
+  "@proactiveConfirmBody": {
+    "description": "Proactive work: ConfirmBody"
+  },
+  "proactiveContinue": "Continue",
+  "@proactiveContinue": {
+    "description": "Proactive work: Continue"
+  },
+  "proactiveEdit": "Edit responsibility",
+  "@proactiveEdit": {
+    "description": "Proactive work: Edit"
+  },
+  "proactiveOpen": "Open",
+  "@proactiveOpen": {
+    "description": "Proactive work: Open"
+  },
+  "proactiveSuggested": "Suggested · checks off",
+  "@proactiveSuggested": {
+    "description": "Proactive work: Suggested"
+  },
+  "proactivePaused": "Paused",
+  "@proactivePaused": {
+    "description": "Proactive work: Paused"
+  },
+  "proactiveResolved": "Resolved",
+  "@proactiveResolved": {
+    "description": "Proactive work: Resolved"
+  },
+  "proactiveStopped": "Stopped",
+  "@proactiveStopped": {
+    "description": "Proactive work: Stopped"
+  },
+  "proactiveNeedsInput": "Needs you",
+  "@proactiveNeedsInput": {
+    "description": "Proactive work: NeedsInput"
+  },
+  "proactiveChecking": "Ongoing checks enabled",
+  "@proactiveChecking": {
+    "description": "Proactive work: Checking"
+  },
+  "proactiveTracked": "Tracked · checks off",
+  "@proactiveTracked": {
+    "description": "Proactive work: Tracked"
+  },
+  "proactiveStopWhen": "Stop when",
+  "@proactiveStopWhen": {
+    "description": "Proactive work: StopWhen"
+  },
+  "proactiveAccept": "Accept",
+  "@proactiveAccept": {
+    "description": "Proactive work: Accept"
+  },
+  "proactivePause": "Pause",
+  "@proactivePause": {
+    "description": "Proactive work: Pause"
+  },
+  "proactiveEnable": "Enable checks",
+  "@proactiveEnable": {
+    "description": "Proactive work: Enable"
+  },
+  "proactiveResolve": "Mark resolved",
+  "@proactiveResolve": {
+    "description": "Proactive work: Resolve"
+  },
+  "proactiveStop": "Stop",
+  "@proactiveStop": {
+    "description": "Proactive work: Stop"
+  },
+  "proactiveEvidence": "Evidence",
+  "@proactiveEvidence": {
+    "description": "Proactive work: Evidence"
+  },
+  "proactiveSteps": "Next steps",
+  "@proactiveSteps": {
+    "description": "Proactive work: Steps"
+  },
+  "proactiveDone": "Done",
+  "@proactiveDone": {
+    "description": "Proactive work: Done"
+  },
+  "proactiveSources": "Sources",
+  "@proactiveSources": {
+    "description": "Proactive work: Sources"
+  },
+  "proactiveHistory": "What Jarvis did",
+  "@proactiveHistory": {
+    "description": "Proactive work: History"
+  },
+  "proactiveUndo": "Undo",
+  "@proactiveUndo": {
+    "description": "Proactive work: Undo"
+  },
+  "proactiveFeedback": "Did this help?",
+  "@proactiveFeedback": {
+    "description": "Proactive work: Feedback"
+  },
+  "proactiveUseful": "Useful",
+  "@proactiveUseful": {
+    "description": "Proactive work: Useful"
+  },
+  "proactiveNotUseful": "Not useful",
+  "@proactiveNotUseful": {
+    "description": "Proactive work: NotUseful"
+  },
+  "proactiveTooEarly": "Too early",
+  "@proactiveTooEarly": {
+    "description": "Proactive work: TooEarly"
+  },
+  "proactiveTooMuch": "Too much effort",
+  "@proactiveTooMuch": {
+    "description": "Proactive work: TooMuch"
+  },
+  "proactiveSave": "Save",
+  "@proactiveSave": {
+    "description": "Proactive work: Save"
+  },
+  "proactiveName": "Name",
+  "@proactiveName": {
+    "description": "Proactive work: Name"
+  },
+  "proactiveRequired": "Fill this in",
+  "@proactiveRequired": {
+    "description": "Proactive work: Required"
+  },
+  "proactiveObjective": "What should Jarvis keep moving?",
+  "@proactiveObjective": {
+    "description": "Proactive work: Objective"
+  },
+  "proactiveKind": "Kind of work",
+  "@proactiveKind": {
+    "description": "Proactive work: Kind"
+  },
+  "proactiveKindIntention": "Unfinished intention",
+  "@proactiveKindIntention": {
+    "description": "Proactive work: KindIntention"
+  },
+  "proactiveKindProject": "Project follow-through",
+  "@proactiveKindProject": {
+    "description": "Proactive work: KindProject"
+  },
+  "proactiveKindFollow": "Waiting for a reply",
+  "@proactiveKindFollow": {
+    "description": "Proactive work: KindFollow"
+  },
+  "proactiveKindContext": "Keep context current",
+  "@proactiveKindContext": {
+    "description": "Proactive work: KindContext"
+  },
+  "proactiveKindReturn": "Return",
+  "@proactiveKindReturn": {
+    "description": "Proactive work: KindReturn"
+  },
+  "proactiveKindRefund": "Refund",
+  "@proactiveKindRefund": {
+    "description": "Proactive work: KindRefund"
+  },
+  "proactiveKindRepair": "Repair",
+  "@proactiveKindRepair": {
+    "description": "Proactive work: KindRepair"
+  },
+  "proactiveEnableExplanation": "Saving tracks this work. Enable ongoing checks separately when you are ready. Existing permissions still apply.",
+  "@proactiveEnableExplanation": {
+    "description": "Proactive work: EnableExplanation"
+  },
+  "proactiveLastCheck": "Last checked",
+  "@proactiveLastCheck": {
+    "description": "Proactive work: LastCheck"
+  },
+  "proactiveNextCheck": "Next check",
+  "@proactiveNextCheck": {
+    "description": "Proactive work: NextCheck"
+  },
+  "proactivePreparation": "Prepared for you",
+  "@proactivePreparation": {
+    "description": "Proactive work: Preparation"
+  },
+  "proactiveCapacity": "Time available, in minutes",
+  "@proactiveCapacity": {
+    "description": "Proactive work: Capacity"
+  },
+  "proactiveValidMinutes": "Enter a valid number of minutes",
+  "@proactiveValidMinutes": {
+    "description": "Proactive work: ValidMinutes"
+  },
+  "proactiveDeadline": "Choose a deadline",
+  "@proactiveDeadline": {
+    "description": "Proactive work: Deadline"
+  },
+  "proactiveClearDeadline": "Clear deadline",
+  "@proactiveClearDeadline": {
+    "description": "Proactive work: ClearDeadline"
+  },
+  "proactiveRemove": "Remove",
+  "@proactiveRemove": {
+    "description": "Proactive work: Remove"
+  },
+  "proactiveAddStep": "Add a step",
+  "@proactiveAddStep": {
+    "description": "Proactive work: AddStep"
+  },
+  "proactiveEffort": "Estimated minutes, if known",
+  "@proactiveEffort": {
+    "description": "Proactive work: Effort"
+  },
+  "proactiveCompletion": "How will you know it is done?",
+  "@proactiveCompletion": {
+    "description": "Proactive work: Completion"
+  },
+  "proactiveSource": "Linked source, optional",
+  "@proactiveSource": {
+    "description": "Proactive work: Source"
+  },
+  "proactiveDependsOn": "Waits for these steps",
+  "@proactiveDependsOn": {
+    "description": "Proactive work: DependsOn"
+  },
+  "proactiveCancel": "Cancel",
+  "@proactiveCancel": {
+    "description": "Proactive work: Cancel"
+  },
+  "proactiveKindDeadline": "Deadline risk",
+  "@proactiveKindDeadline": {
+    "description": "Proactive work: KindDeadline"
+  },
+  "proactiveKindDay": "Adaptive day plan",
+  "@proactiveKindDay": {
+    "description": "Proactive work: KindDay"
+  },
+  "proactiveKindMeeting": "Meeting continuity",
+  "@proactiveKindMeeting": {
+    "description": "Proactive work: KindMeeting"
+  },
+  "proactiveKindCapacity": "Shared goal capacity",
+  "@proactiveKindCapacity": {
+    "description": "Proactive work: KindCapacity"
+  },
+  "proactiveKindTrip": "Trip monitoring",
+  "@proactiveKindTrip": {
+    "description": "Proactive work: KindTrip"
+  },
+  "proactiveKindConsistency": "Related changes",
+  "@proactiveKindConsistency": {
+    "description": "Proactive work: KindConsistency"
+  },
+  "proactiveKindDecision": "Decision assumptions",
+  "@proactiveKindDecision": {
+    "description": "Proactive work: KindDecision"
+  },
+  "proactiveKindResearch": "Research updates",
+  "@proactiveKindResearch": {
+    "description": "Proactive work: KindResearch"
+  },
+  "proactiveKindMemory": "Memory comparison",
+  "@proactiveKindMemory": {
+    "description": "Proactive work: KindMemory"
+  },
+  "proactiveKindTrial": "Routine observation",
+  "@proactiveKindTrial": {
+    "description": "Proactive work: KindTrial"
+  },
+  "proactivePin": "Keep this block in place",
+  "@proactivePin": {
+    "description": "Proactive work: Pin"
+  },
+  "proactiveUnpin": "Allow this block to move",
+  "@proactiveUnpin": {
+    "description": "Proactive work: Unpin"
+  },
+  "proactiveDraftStale": "Supporting information changed. Review the affected sections or rebuild them from sources. Your wording has been kept.",
+  "@proactiveDraftStale": {
+    "description": "A document has changed source facts; owner edits were preserved."
+  },
+  "proactiveReviewMemories": "Review these memories",
+  "@proactiveReviewMemories": {
+    "description": "Proactive memory comparison: proactiveReviewMemories"
+  },
+  "proactiveKeepFirst": "Keep first value",
+  "@proactiveKeepFirst": {
+    "description": "Proactive memory comparison: proactiveKeepFirst"
+  },
+  "proactiveKeepSecond": "Keep second value",
+  "@proactiveKeepSecond": {
+    "description": "Proactive memory comparison: proactiveKeepSecond"
+  },
+  "proactiveKeepBoth": "Keep both with context",
+  "@proactiveKeepBoth": {
+    "description": "Proactive memory comparison: proactiveKeepBoth"
+  },
+  "proactiveFirstContext": "When does the first apply?",
+  "@proactiveFirstContext": {
+    "description": "Proactive memory comparison: proactiveFirstContext"
+  },
+  "proactiveSecondContext": "When does the second apply?",
+  "@proactiveSecondContext": {
+    "description": "Proactive memory comparison: proactiveSecondContext"
+  },
+  "proactiveMemoryHistory": "This is your choice. Earlier versions stay in Memory history. Pinned memories must be edited in Memory.",
+  "@proactiveMemoryHistory": {
+    "description": "Proactive memory comparison: proactiveMemoryHistory"
+  },
+  "proactiveAssumptions": "Assumptions to revisit",
+  "@proactiveAssumptions": {
+    "description": "Proactive assumption monitoring: proactiveAssumptions"
+  },
+  "proactiveAddAssumption": "Add an assumption",
+  "@proactiveAddAssumption": {
+    "description": "Proactive assumption monitoring: proactiveAddAssumption"
+  },
+  "proactiveAssumptionHelp": "Choose a source first. A numeric condition needs a watch with a current observation. Nothing resolves the decision for you.",
+  "@proactiveAssumptionHelp": {
+    "description": "Proactive assumption monitoring: proactiveAssumptionHelp"
+  },
+  "proactiveAssumptionStatement": "What should Jarvis flag?",
+  "@proactiveAssumptionStatement": {
+    "description": "Proactive assumption monitoring: proactiveAssumptionStatement"
+  },
+  "proactiveReviewWhen": "Revisit when",
+  "@proactiveReviewWhen": {
+    "description": "Proactive assumption monitoring: proactiveReviewWhen"
+  },
+  "proactiveSourceChanges": "The source changes",
+  "@proactiveSourceChanges": {
+    "description": "Proactive assumption monitoring: proactiveSourceChanges"
+  },
+  "proactiveAbove": "The observed value rises above",
+  "@proactiveAbove": {
+    "description": "Proactive assumption monitoring: proactiveAbove"
+  },
+  "proactiveBelow": "The observed value falls below",
+  "@proactiveBelow": {
+    "description": "Proactive assumption monitoring: proactiveBelow"
+  },
+  "proactiveThreshold": "Threshold",
+  "@proactiveThreshold": {
+    "description": "Proactive assumption monitoring: proactiveThreshold"
+  },
+  "proactivePreviousPreparation": "Previous preparation",
+  "proactivePreparationChanges": "Changes since the previous preparation",
+  "proactiveCalendarCapacity": "Include this week's calendar availability",
+  "proactiveTripChanges": "Monitored trip changes",
+  "proactiveImportantClaims": "Important claims",
+  "proactiveAddClaim": "Track an important claim",
+  "proactiveClaimStatement": "Claim to keep checking",
+  "proactiveClaimHelp": "Select a saved public web source first. Jarvis compares this explicit claim with that source's current evidence, cites a verified quotation and keeps ambiguous or unavailable evidence unknown. It never changes your original claim or resolves an outcome automatically.",
+  "proactiveAddTripMonitor": "Watch a trip change",
+  "proactiveShiftByDelay": "Shift this itinerary item by observed delay minutes",
+  "proactiveTripItem": "Verified itinerary item",
+  "proactiveTripDelayHelp": "Select a trip and watch in Sources first. Use a watch whose numeric value is delay minutes for this item. The original time must be verified. Fresh observations prepare affected times and alternatives; bookings stay unchanged. Set this case's time zone to the trip's local time zone.",
+  "proactiveWeeklyBudget": "Shared weekly budget, in minutes (optional with calendar)",
+  "proactiveCalendarCapacityHelp": "Use Today's working hours Monday–Friday in this case's time zone. Events, including all-day events, count as busy. Completed goal work uses the same weekly budget. Calendar failure stays unknown. Enable this owner-wide responsibility separately after saving.",
+  "proactiveTrigger": "Trigger",
+  "proactiveBefore": "Before",
+  "proactiveAfter": "After",
+  "proactiveCheckSettings": "Checks and interruptions",
+  "proactiveCheckSettingsHelp": "Saving only tracks this work. Enable ongoing checks separately. Optional items share one daily limit; approvals and failures remain visible. Equal quiet-hour values disable quiet hours.",
+  "proactiveCadence": "Minutes between checks",
+  "proactiveDailyChecks": "Maximum checks per day",
+  "proactiveOptionalItems": "Optional items per day",
+  "proactiveQuietStart": "Quiet hours start",
+  "proactiveQuietEnd": "Quiet hours end",
+  "proactiveTimeZone": "Time zone (for example Europe/Amsterdam)",
+  "proactiveExpiry": "Stop checking at",
+  "proactiveMainSource": "Main record",
+  "proactiveReviewed": "Reviewed",
+  "proactiveCaseNotes": "References, drafts and case notes",
+  "@proactiveReviewed": {
+    "description": "Acknowledge the current assumption evidence without resolving the decision."
+  },
+  "@proactiveCaseNotes": {
+    "description": "Owner-authored references, drafts and notes kept with a responsibility."
+  }
 }

@@ -49,7 +49,8 @@ public sealed record DocDraft(
     int SavedVersion,
     Guid? LibraryItemId,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    IReadOnlyDictionary<string, string>? SourceVersions = null);
 
 /// <summary>Owner settings section <see cref="Section"/>: drafts, newest first.</summary>
 public sealed record DocumentState(IReadOnlyList<DocDraft> Drafts)
@@ -65,7 +66,8 @@ public sealed record SectionReviseRequest(string? Action);
 
 public sealed record ChecklistItem(string Text, bool Ok);
 
-public sealed record DocumentView(DocDraft Draft, IReadOnlyList<ChecklistItem> Checklist);
+public sealed record DocumentView(DocDraft Draft, IReadOnlyList<ChecklistItem> Checklist,
+    bool Stale = false, IReadOnlyList<string>? ChangedSources = null);
 
 public sealed record DocumentExport(string FileName, string ContentType, string Content);
 

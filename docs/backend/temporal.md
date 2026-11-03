@@ -30,6 +30,7 @@ Defined in `src/Jarvis.Workflows/`:
 | Workflow | Purpose |
 |----------|---------|
 | `ReminderWorkflow` | Fire reminders (incl. recurrence in owner IANA TZ) and post to the reminder’s linked chat |
+| `ProactiveCaseWorkflow` | Source-bounded ongoing checks with revisions, claims, quiet hours and daily budgets; Wake signal for changed/resumed work; `ProactiveCaseDispatcher` repairs dispatch gaps. See [proactive-work.md](proactive-work.md) |
 | `AutomationScheduleWorkflow` / `AutomationPollWorkflow` / `AutomationRunWorkflow` | Owner automations; run results post to the rule’s linked chat. Every run ends as completed, failed or skipped; sensitive actions wait in the shared approval inbox (`automation-run:` request ids) and `TemporalWorkflowReconciler` closes abandoned runs |
 | `ConditionWatchWorkflow` | Poll metrics / device / calendar thresholds. One-shot by default; a `repeat` watch stays active, alerts when the condition becomes true, and alerts again only after it cleared and `cooldownMinutes` passed |
 | `JarvisTaskWorkflow` | Background agent tasks with approval linkage |

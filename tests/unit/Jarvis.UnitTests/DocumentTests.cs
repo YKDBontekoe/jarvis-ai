@@ -27,6 +27,7 @@ public sealed class DocumentTests
         public readonly List<LibraryItem> Notes = [];
         public readonly List<NoteDraft> Saved = [];
         public readonly InMemorySettingsStore Settings = new();
+        public Jarvis.Application.Proactivity.IProactiveSourceReader? SourceReader;
 
         public Setup(string? outcome = "Cook for ten in the new kitchen by June.")
         {
@@ -49,7 +50,7 @@ public sealed class DocumentTests
                     return LibraryOperation<LibraryItem>.Ok(Note("saved"));
                 })),
             Fake<IDailyBriefingRepository>.Create(("GetAsync", _ => null)),
-            new FixedClock());
+            new FixedClock(), SourceReader);
 
         public LibraryItem Note(string title, string summary = "A short summary.") =>
             new(Guid.NewGuid(), Owner, "note", null, title, summary, [], [], "text", "app", ProjectId, Now, Now);
@@ -58,6 +59,29 @@ public sealed class DocumentTests
             string direction = CommitmentDirections.IOwe, Guid? project = null) =>
             new(Guid.NewGuid(), Owner, direction, who, what, due, CommitmentStatuses.Open, false, CommitmentSources.Chat,
                 null, null, null, Now, Now, project ?? ProjectId);
+    }
+
+    [Fact]
+    public async Task Changed_sources_mark_a_draft_stale_without_overwriting_owner_wording()
+    {
+        var f = new Setup();
+        var version = "v1";
+        f.SourceReader = Fake<Jarvis.Application.Proactivity.IProactiveSourceReader>.Create(("ReadAsync", args =>
+            (IReadOnlyList<Jarvis.Application.Proactivity.ProactiveSource>)((IReadOnlyList<string>)args[2]!).Select(reference =>
+                new Jarvis.Application.Proactivity.ProactiveSource(reference, "Project", version, "active", "Current outcome")).ToArray()));
+        var created = await f.Service.CreateAsync(Owner, new("project_update", f.ProjectId, "self", "en"), TestContext.Current.CancellationToken);
+        Assert.True(created.Succeeded);
+        var id = created.Value!.Draft.Id;
+        await f.Service.EditSectionAsync(Owner, id, "where", "My carefully edited introduction.", TestContext.Current.CancellationToken);
+        version = "v2";
+        var current = (await f.Service.GetAsync(Owner, id, TestContext.Current.CancellationToken))!;
+        Assert.True(current.Stale);
+        Assert.Contains($"project:{f.ProjectId}", current.ChangedSources!);
+        Assert.Equal("My carefully edited introduction.", current.Draft.Sections.Single(s => s.Id == "where").Body);
+        await f.Service.ReviseSectionAsync(Owner, id, "next", "rebuild", TestContext.Current.CancellationToken);
+        current = (await f.Service.GetAsync(Owner, id, TestContext.Current.CancellationToken))!;
+        Assert.True(current.Stale); // The edited introduction still rests on the old project version.
+        Assert.Equal("My carefully edited introduction.", current.Draft.Sections.Single(s => s.Id == "where").Body);
     }
 
     private sealed class FixedClock : TimeProvider

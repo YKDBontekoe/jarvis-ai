@@ -100,6 +100,9 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Apps.AppGoalToolContributor>();
         services.AddScoped<IAgentToolContributor, Documents.DocumentToolContributor>();
         services.AddScoped<IAgentToolContributor, Opportunities.OpportunityToolContributor>();
+        services.AddScoped<IAgentToolContributor, Proactivity.ProactiveToolContributor>();
+        services.AddScoped<IAgentContextContributor, Proactivity.ProactiveContextContributor>();
+        services.AddScoped<Jarvis.Application.Proactivity.IProactiveClaimReviewer, Proactivity.ProactiveClaimReviewer>();
         services.AddScoped<IAgentToolContributor, Stories.StoryToolContributor>();
         services.AddScoped<IAgentToolContributor, Setup.SetupToolContributor>();
         services.AddScoped<IAgentToolContributor, Trips.TripToolContributor>();

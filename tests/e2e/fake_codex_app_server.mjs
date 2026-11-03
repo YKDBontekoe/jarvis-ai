@@ -12,6 +12,7 @@ const CONTEXT_PREFIXES = [
   'Current time reference:',
   'Context mode:',
   'Situation across Jarvis',
+  'Ongoing proactive work',
   'Stored personal memory references',
   'Active durable tasks',
   'Active condition watches',
@@ -101,6 +102,8 @@ const text = value => ({ type: 'text', text: value, name: '', argumentsJson: '' 
 const call = (name, args) => ({ type: 'tool_call', text: '', name, argumentsJson: JSON.stringify(args) });
 
 function plan(prompt) {
+  if (prompt.includes("You are Jarvis's proactive research claim reviewer"))
+    return text('{"reviews":[]}');
   if (prompt.includes("You are Jarvis's independent nightly memory quality judge"))
     return text('{"findings":[]}');
   if (prompt.includes('updating the durable portrait of the user from their memories'))
@@ -146,6 +149,11 @@ function plan(prompt) {
   const results = conversation.results;
   const last = results.at(-1) ?? '';
   const has = name => tools.has(name);
+
+  if (lower.startsWith('keep track of ') && has('TrackOpenLoop')) {
+    if (results.length === 0) return call('TrackOpenLoop', { title: request.slice(0, 120), objective: request, explicitRequest: true });
+    return text('Tracked this unfinished work. Ongoing checks remain off until you enable them.');
+  }
 
   if (results.length > 0 && /rejected/i.test(last))
     return text("Understood — I didn't do that. Let me know if you'd like a different approach.");

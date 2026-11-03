@@ -29,6 +29,7 @@ internal static class TemporalWorkerRegistration
         nameof(HabitCheckInWorkflow),
         nameof(PeopleCheckInWorkflow),
         nameof(AgentReactionWorkflow),
+        nameof(ProactiveCaseWorkflow),
     ];
 
     public static readonly IReadOnlyList<string> ActivityTypeNames =
@@ -61,6 +62,7 @@ internal static class TemporalWorkerRegistration
         "DeliverHabitCheckIn",
         "RunPeopleCheckIn",
         "RunAgentReaction",
+        "CheckProactiveCase",
     ];
 
     public static TemporalWorker CreateWorker(TemporalClient client, IServiceProvider services)
@@ -96,6 +98,8 @@ internal static class TemporalWorkerRegistration
             .AddWorkflow<WeeklyReviewWorkflow>()
             .AddWorkflow<HabitCheckInWorkflow>()
             .AddWorkflow<AgentReactionWorkflow>()
+            .AddWorkflow<ProactiveCaseWorkflow>()
+            .AddActivity(services.GetRequiredService<ProactiveCaseActivities>().CheckAsync)
             .AddActivity(reminders.DeliverReminderAsync)
             .AddActivity(reminders.DeliverReminderOccurrenceAsync)
             .AddActivity(reminders.FailReminderAsync)

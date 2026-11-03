@@ -15,9 +15,18 @@ public sealed class TemporalReminderScheduler(IConfiguration configuration) : IF
     IConditionWatchScheduler, IDailyBriefingScheduler, Jarvis.Application.Learning.IHeartbeatScheduler,
     Jarvis.Application.Learning.IDreamingScheduler, IAutomationScheduler,
     Jarvis.Application.Reviews.IWeeklyReviewScheduler, Jarvis.Application.Habits.IHabitCheckInScheduler,
-    Jarvis.Application.People.IPeopleCheckInScheduler, Jarvis.Application.Events.IAgentReactionScheduler
+    Jarvis.Application.People.IPeopleCheckInScheduler, Jarvis.Application.Events.IAgentReactionScheduler,
+    Jarvis.Application.Proactivity.IProactiveCaseScheduler
 {
     public const string TaskQueue = "jarvis-workflows";
+    public async Task ScheduleProactiveAsync(Guid ownerId, Guid caseId, CancellationToken ct)
+    {
+        var client = await GetClientAsync(ct);
+        var handle = await client.StartWorkflowAsync((ProactiveCaseWorkflow workflow) => workflow.RunAsync(new(ownerId, caseId)),
+            new(ProactiveCaseWorkflow.Id(ownerId, caseId), TaskQueue)
+            { IdConflictPolicy = WorkflowIdConflictPolicy.UseExisting, IdReusePolicy = WorkflowIdReusePolicy.AllowDuplicate });
+        await handle.SignalAsync(workflow => workflow.WakeAsync());
+    }
     private readonly SemaphoreSlim _clientLock = new(1, 1);
     private TemporalClient? _client;
 

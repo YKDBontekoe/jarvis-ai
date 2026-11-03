@@ -439,6 +439,714 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Blur Jarvis when you swipe up or switch apps'**
   String get hideInSwitcherSubtitle;
+
+  /// Proactive work: Title
+  ///
+  /// In en, this message translates to:
+  /// **'Ongoing work'**
+  String get proactiveTitle;
+
+  /// Proactive work: New
+  ///
+  /// In en, this message translates to:
+  /// **'New responsibility'**
+  String get proactiveNew;
+
+  /// Proactive work: Description
+  ///
+  /// In en, this message translates to:
+  /// **'The things you asked Jarvis to keep moving. Every change has a reason and a history.'**
+  String get proactiveDescription;
+
+  /// Proactive work: Empty
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing tracked yet'**
+  String get proactiveEmpty;
+
+  /// Proactive work: Confirm
+  ///
+  /// In en, this message translates to:
+  /// **'Update this responsibility?'**
+  String get proactiveConfirm;
+
+  /// Proactive work: ConfirmBody
+  ///
+  /// In en, this message translates to:
+  /// **'Your choice is kept in the history. Resolving or stopping ends ongoing checks.'**
+  String get proactiveConfirmBody;
+
+  /// Proactive work: Continue
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get proactiveContinue;
+
+  /// Proactive work: Edit
+  ///
+  /// In en, this message translates to:
+  /// **'Edit responsibility'**
+  String get proactiveEdit;
+
+  /// Proactive work: Open
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get proactiveOpen;
+
+  /// Proactive work: Suggested
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested · checks off'**
+  String get proactiveSuggested;
+
+  /// Proactive work: Paused
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get proactivePaused;
+
+  /// Proactive work: Resolved
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get proactiveResolved;
+
+  /// Proactive work: Stopped
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get proactiveStopped;
+
+  /// Proactive work: NeedsInput
+  ///
+  /// In en, this message translates to:
+  /// **'Needs you'**
+  String get proactiveNeedsInput;
+
+  /// Proactive work: Checking
+  ///
+  /// In en, this message translates to:
+  /// **'Ongoing checks enabled'**
+  String get proactiveChecking;
+
+  /// Proactive work: Tracked
+  ///
+  /// In en, this message translates to:
+  /// **'Tracked · checks off'**
+  String get proactiveTracked;
+
+  /// Proactive work: StopWhen
+  ///
+  /// In en, this message translates to:
+  /// **'Stop when'**
+  String get proactiveStopWhen;
+
+  /// Proactive work: Accept
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get proactiveAccept;
+
+  /// Proactive work: Pause
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get proactivePause;
+
+  /// Proactive work: Enable
+  ///
+  /// In en, this message translates to:
+  /// **'Enable checks'**
+  String get proactiveEnable;
+
+  /// Proactive work: Resolve
+  ///
+  /// In en, this message translates to:
+  /// **'Mark resolved'**
+  String get proactiveResolve;
+
+  /// Proactive work: Stop
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get proactiveStop;
+
+  /// Proactive work: Evidence
+  ///
+  /// In en, this message translates to:
+  /// **'Evidence'**
+  String get proactiveEvidence;
+
+  /// Proactive work: Steps
+  ///
+  /// In en, this message translates to:
+  /// **'Next steps'**
+  String get proactiveSteps;
+
+  /// Proactive work: Done
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get proactiveDone;
+
+  /// Proactive work: Sources
+  ///
+  /// In en, this message translates to:
+  /// **'Sources'**
+  String get proactiveSources;
+
+  /// Proactive work: History
+  ///
+  /// In en, this message translates to:
+  /// **'What Jarvis did'**
+  String get proactiveHistory;
+
+  /// Proactive work: Undo
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get proactiveUndo;
+
+  /// Proactive work: Feedback
+  ///
+  /// In en, this message translates to:
+  /// **'Did this help?'**
+  String get proactiveFeedback;
+
+  /// Proactive work: Useful
+  ///
+  /// In en, this message translates to:
+  /// **'Useful'**
+  String get proactiveUseful;
+
+  /// Proactive work: NotUseful
+  ///
+  /// In en, this message translates to:
+  /// **'Not useful'**
+  String get proactiveNotUseful;
+
+  /// Proactive work: TooEarly
+  ///
+  /// In en, this message translates to:
+  /// **'Too early'**
+  String get proactiveTooEarly;
+
+  /// Proactive work: TooMuch
+  ///
+  /// In en, this message translates to:
+  /// **'Too much effort'**
+  String get proactiveTooMuch;
+
+  /// Proactive work: Save
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get proactiveSave;
+
+  /// Proactive work: Name
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get proactiveName;
+
+  /// Proactive work: Required
+  ///
+  /// In en, this message translates to:
+  /// **'Fill this in'**
+  String get proactiveRequired;
+
+  /// Proactive work: Objective
+  ///
+  /// In en, this message translates to:
+  /// **'What should Jarvis keep moving?'**
+  String get proactiveObjective;
+
+  /// Proactive work: Kind
+  ///
+  /// In en, this message translates to:
+  /// **'Kind of work'**
+  String get proactiveKind;
+
+  /// Proactive work: KindIntention
+  ///
+  /// In en, this message translates to:
+  /// **'Unfinished intention'**
+  String get proactiveKindIntention;
+
+  /// Proactive work: KindProject
+  ///
+  /// In en, this message translates to:
+  /// **'Project follow-through'**
+  String get proactiveKindProject;
+
+  /// Proactive work: KindFollow
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a reply'**
+  String get proactiveKindFollow;
+
+  /// Proactive work: KindContext
+  ///
+  /// In en, this message translates to:
+  /// **'Keep context current'**
+  String get proactiveKindContext;
+
+  /// Proactive work: KindReturn
+  ///
+  /// In en, this message translates to:
+  /// **'Return'**
+  String get proactiveKindReturn;
+
+  /// Proactive work: KindRefund
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get proactiveKindRefund;
+
+  /// Proactive work: KindRepair
+  ///
+  /// In en, this message translates to:
+  /// **'Repair'**
+  String get proactiveKindRepair;
+
+  /// Proactive work: EnableExplanation
+  ///
+  /// In en, this message translates to:
+  /// **'Saving tracks this work. Enable ongoing checks separately when you are ready. Existing permissions still apply.'**
+  String get proactiveEnableExplanation;
+
+  /// Proactive work: LastCheck
+  ///
+  /// In en, this message translates to:
+  /// **'Last checked'**
+  String get proactiveLastCheck;
+
+  /// Proactive work: NextCheck
+  ///
+  /// In en, this message translates to:
+  /// **'Next check'**
+  String get proactiveNextCheck;
+
+  /// Proactive work: Preparation
+  ///
+  /// In en, this message translates to:
+  /// **'Prepared for you'**
+  String get proactivePreparation;
+
+  /// Proactive work: Capacity
+  ///
+  /// In en, this message translates to:
+  /// **'Time available, in minutes'**
+  String get proactiveCapacity;
+
+  /// Proactive work: ValidMinutes
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid number of minutes'**
+  String get proactiveValidMinutes;
+
+  /// Proactive work: Deadline
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a deadline'**
+  String get proactiveDeadline;
+
+  /// Proactive work: ClearDeadline
+  ///
+  /// In en, this message translates to:
+  /// **'Clear deadline'**
+  String get proactiveClearDeadline;
+
+  /// Proactive work: Remove
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get proactiveRemove;
+
+  /// Proactive work: AddStep
+  ///
+  /// In en, this message translates to:
+  /// **'Add a step'**
+  String get proactiveAddStep;
+
+  /// Proactive work: Effort
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated minutes, if known'**
+  String get proactiveEffort;
+
+  /// Proactive work: Completion
+  ///
+  /// In en, this message translates to:
+  /// **'How will you know it is done?'**
+  String get proactiveCompletion;
+
+  /// Proactive work: Source
+  ///
+  /// In en, this message translates to:
+  /// **'Linked source, optional'**
+  String get proactiveSource;
+
+  /// Proactive work: DependsOn
+  ///
+  /// In en, this message translates to:
+  /// **'Waits for these steps'**
+  String get proactiveDependsOn;
+
+  /// Proactive work: Cancel
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get proactiveCancel;
+
+  /// Proactive work: KindDeadline
+  ///
+  /// In en, this message translates to:
+  /// **'Deadline risk'**
+  String get proactiveKindDeadline;
+
+  /// Proactive work: KindDay
+  ///
+  /// In en, this message translates to:
+  /// **'Adaptive day plan'**
+  String get proactiveKindDay;
+
+  /// Proactive work: KindMeeting
+  ///
+  /// In en, this message translates to:
+  /// **'Meeting continuity'**
+  String get proactiveKindMeeting;
+
+  /// Proactive work: KindCapacity
+  ///
+  /// In en, this message translates to:
+  /// **'Shared goal capacity'**
+  String get proactiveKindCapacity;
+
+  /// Proactive work: KindTrip
+  ///
+  /// In en, this message translates to:
+  /// **'Trip monitoring'**
+  String get proactiveKindTrip;
+
+  /// Proactive work: KindConsistency
+  ///
+  /// In en, this message translates to:
+  /// **'Related changes'**
+  String get proactiveKindConsistency;
+
+  /// Proactive work: KindDecision
+  ///
+  /// In en, this message translates to:
+  /// **'Decision assumptions'**
+  String get proactiveKindDecision;
+
+  /// Proactive work: KindResearch
+  ///
+  /// In en, this message translates to:
+  /// **'Research updates'**
+  String get proactiveKindResearch;
+
+  /// Proactive work: KindMemory
+  ///
+  /// In en, this message translates to:
+  /// **'Memory comparison'**
+  String get proactiveKindMemory;
+
+  /// Proactive work: KindTrial
+  ///
+  /// In en, this message translates to:
+  /// **'Routine observation'**
+  String get proactiveKindTrial;
+
+  /// Proactive work: Pin
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this block in place'**
+  String get proactivePin;
+
+  /// Proactive work: Unpin
+  ///
+  /// In en, this message translates to:
+  /// **'Allow this block to move'**
+  String get proactiveUnpin;
+
+  /// A document has changed source facts; owner edits were preserved.
+  ///
+  /// In en, this message translates to:
+  /// **'Supporting information changed. Review the affected sections or rebuild them from sources. Your wording has been kept.'**
+  String get proactiveDraftStale;
+
+  /// Proactive memory comparison: proactiveReviewMemories
+  ///
+  /// In en, this message translates to:
+  /// **'Review these memories'**
+  String get proactiveReviewMemories;
+
+  /// Proactive memory comparison: proactiveKeepFirst
+  ///
+  /// In en, this message translates to:
+  /// **'Keep first value'**
+  String get proactiveKeepFirst;
+
+  /// Proactive memory comparison: proactiveKeepSecond
+  ///
+  /// In en, this message translates to:
+  /// **'Keep second value'**
+  String get proactiveKeepSecond;
+
+  /// Proactive memory comparison: proactiveKeepBoth
+  ///
+  /// In en, this message translates to:
+  /// **'Keep both with context'**
+  String get proactiveKeepBoth;
+
+  /// Proactive memory comparison: proactiveFirstContext
+  ///
+  /// In en, this message translates to:
+  /// **'When does the first apply?'**
+  String get proactiveFirstContext;
+
+  /// Proactive memory comparison: proactiveSecondContext
+  ///
+  /// In en, this message translates to:
+  /// **'When does the second apply?'**
+  String get proactiveSecondContext;
+
+  /// Proactive memory comparison: proactiveMemoryHistory
+  ///
+  /// In en, this message translates to:
+  /// **'This is your choice. Earlier versions stay in Memory history. Pinned memories must be edited in Memory.'**
+  String get proactiveMemoryHistory;
+
+  /// Proactive assumption monitoring: proactiveAssumptions
+  ///
+  /// In en, this message translates to:
+  /// **'Assumptions to revisit'**
+  String get proactiveAssumptions;
+
+  /// Proactive assumption monitoring: proactiveAddAssumption
+  ///
+  /// In en, this message translates to:
+  /// **'Add an assumption'**
+  String get proactiveAddAssumption;
+
+  /// Proactive assumption monitoring: proactiveAssumptionHelp
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a source first. A numeric condition needs a watch with a current observation. Nothing resolves the decision for you.'**
+  String get proactiveAssumptionHelp;
+
+  /// Proactive assumption monitoring: proactiveAssumptionStatement
+  ///
+  /// In en, this message translates to:
+  /// **'What should Jarvis flag?'**
+  String get proactiveAssumptionStatement;
+
+  /// Proactive assumption monitoring: proactiveReviewWhen
+  ///
+  /// In en, this message translates to:
+  /// **'Revisit when'**
+  String get proactiveReviewWhen;
+
+  /// Proactive assumption monitoring: proactiveSourceChanges
+  ///
+  /// In en, this message translates to:
+  /// **'The source changes'**
+  String get proactiveSourceChanges;
+
+  /// Proactive assumption monitoring: proactiveAbove
+  ///
+  /// In en, this message translates to:
+  /// **'The observed value rises above'**
+  String get proactiveAbove;
+
+  /// Proactive assumption monitoring: proactiveBelow
+  ///
+  /// In en, this message translates to:
+  /// **'The observed value falls below'**
+  String get proactiveBelow;
+
+  /// Proactive assumption monitoring: proactiveThreshold
+  ///
+  /// In en, this message translates to:
+  /// **'Threshold'**
+  String get proactiveThreshold;
+
+  /// No description provided for @proactivePreviousPreparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous preparation'**
+  String get proactivePreviousPreparation;
+
+  /// No description provided for @proactivePreparationChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes since the previous preparation'**
+  String get proactivePreparationChanges;
+
+  /// No description provided for @proactiveCalendarCapacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Include this week\'s calendar availability'**
+  String get proactiveCalendarCapacity;
+
+  /// No description provided for @proactiveTripChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitored trip changes'**
+  String get proactiveTripChanges;
+
+  /// No description provided for @proactiveImportantClaims.
+  ///
+  /// In en, this message translates to:
+  /// **'Important claims'**
+  String get proactiveImportantClaims;
+
+  /// No description provided for @proactiveAddClaim.
+  ///
+  /// In en, this message translates to:
+  /// **'Track an important claim'**
+  String get proactiveAddClaim;
+
+  /// No description provided for @proactiveClaimStatement.
+  ///
+  /// In en, this message translates to:
+  /// **'Claim to keep checking'**
+  String get proactiveClaimStatement;
+
+  /// No description provided for @proactiveClaimHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a saved public web source first. Jarvis compares this explicit claim with that source\'s current evidence, cites a verified quotation and keeps ambiguous or unavailable evidence unknown. It never changes your original claim or resolves an outcome automatically.'**
+  String get proactiveClaimHelp;
+
+  /// No description provided for @proactiveAddTripMonitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch a trip change'**
+  String get proactiveAddTripMonitor;
+
+  /// No description provided for @proactiveShiftByDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift this itinerary item by observed delay minutes'**
+  String get proactiveShiftByDelay;
+
+  /// No description provided for @proactiveTripItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified itinerary item'**
+  String get proactiveTripItem;
+
+  /// No description provided for @proactiveTripDelayHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a trip and watch in Sources first. Use a watch whose numeric value is delay minutes for this item. The original time must be verified. Fresh observations prepare affected times and alternatives; bookings stay unchanged. Set this case\'s time zone to the trip\'s local time zone.'**
+  String get proactiveTripDelayHelp;
+
+  /// No description provided for @proactiveWeeklyBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared weekly budget, in minutes (optional with calendar)'**
+  String get proactiveWeeklyBudget;
+
+  /// No description provided for @proactiveCalendarCapacityHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Today\'s working hours Monday–Friday in this case\'s time zone. Events, including all-day events, count as busy. Completed goal work uses the same weekly budget. Calendar failure stays unknown. Enable this owner-wide responsibility separately after saving.'**
+  String get proactiveCalendarCapacityHelp;
+
+  /// No description provided for @proactiveTrigger.
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger'**
+  String get proactiveTrigger;
+
+  /// No description provided for @proactiveBefore.
+  ///
+  /// In en, this message translates to:
+  /// **'Before'**
+  String get proactiveBefore;
+
+  /// No description provided for @proactiveAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'After'**
+  String get proactiveAfter;
+
+  /// No description provided for @proactiveCheckSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Checks and interruptions'**
+  String get proactiveCheckSettings;
+
+  /// No description provided for @proactiveCheckSettingsHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving only tracks this work. Enable ongoing checks separately. Optional items share one daily limit; approvals and failures remain visible. Equal quiet-hour values disable quiet hours.'**
+  String get proactiveCheckSettingsHelp;
+
+  /// No description provided for @proactiveCadence.
+  ///
+  /// In en, this message translates to:
+  /// **'Minutes between checks'**
+  String get proactiveCadence;
+
+  /// No description provided for @proactiveDailyChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum checks per day'**
+  String get proactiveDailyChecks;
+
+  /// No description provided for @proactiveOptionalItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional items per day'**
+  String get proactiveOptionalItems;
+
+  /// No description provided for @proactiveQuietStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet hours start'**
+  String get proactiveQuietStart;
+
+  /// No description provided for @proactiveQuietEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet hours end'**
+  String get proactiveQuietEnd;
+
+  /// No description provided for @proactiveTimeZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Time zone (for example Europe/Amsterdam)'**
+  String get proactiveTimeZone;
+
+  /// No description provided for @proactiveExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop checking at'**
+  String get proactiveExpiry;
+
+  /// No description provided for @proactiveMainSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Main record'**
+  String get proactiveMainSource;
+
+  /// Acknowledge the current assumption evidence without resolving the decision.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviewed'**
+  String get proactiveReviewed;
+
+  /// Owner-authored references, drafts and notes kept with a responsibility.
+  ///
+  /// In en, this message translates to:
+  /// **'References, drafts and case notes'**
+  String get proactiveCaseNotes;
 }
 
 class _AppLocalizationsDelegate

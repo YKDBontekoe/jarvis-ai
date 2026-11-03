@@ -18,7 +18,7 @@ public sealed class MeetingService(
     IDecisionService decisions,
     IPeopleService people,
     ICalendarFeed? calendar = null,
-    TimeProvider? timeProvider = null) : IMeetingService
+    TimeProvider? timeProvider = null, Proactivity.IProactiveRepository? proactive = null) : IMeetingService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -83,7 +83,7 @@ public sealed class MeetingService(
             Purpose = edit.Purpose is null ? current.Document.Purpose : Clean(edit.Purpose, MeetingRules.MaxPurposeLength),
             PrivateNotes = edit.PrivateNotes is null ? current.Document.PrivateNotes
                 : string.IsNullOrWhiteSpace(edit.PrivateNotes) ? null : edit.PrivateNotes.Trim(),
-            Agenda = agenda
+            Agenda = agenda, GeneratedAgenda = edit.Agenda is null && current.Document.GeneratedAgenda
         };
         var updated = current with
         {
@@ -116,19 +116,37 @@ public sealed class MeetingService(
                     .Select(file => new PrepFile(file.Id, file.FileName)));
         }
 
+        IReadOnlySet<Guid>? series = null;
+        if (proactive is not null)
+        {
+            var reference = $"meeting:{id}";
+            var cases = (await proactive.ListAsync(ownerId, cancellationToken)).Where(c => !c.Terminal && c.Kind == "meeting" && c.SourceRefs.Contains(reference));
+            var ids = cases.SelectMany(c => c.SourceRefs).Where(r => EntityRef.TryParse(r, out var parsed) && parsed.Type == EntityTypes.Meeting)
+                .Select(r => EntityRef.Parse(r).Id).ToHashSet();
+            if (ids.Count > 0) series = ids;
+        }
         var inputs = new PrepInputs(current.Title, current.Document.Purpose, current.Document.Template, today,
             current.Document.Participants.Select(p => p.Name).ToArray(), current.ProjectId, projectName, outcome, next,
             await commitments.ListAsync(ownerId, null, CommitmentStatuses.Open, false, cancellationToken),
             await decisions.ListAsync(ownerId, null, DecisionRules.MaxLimit, cancellationToken), files,
-            await repository.ListAsync(ownerId, cancellationToken), current.Id);
+            await repository.ListAsync(ownerId, cancellationToken), current.Id, series);
         var (prep, agenda) = MeetingPrepBuilder.Build(inputs, clock.GetUtcNow());
+        if (current.Document.Prep is { } previous)
+        {
+            var oldText = previous.Items.Select(item => item.Text).ToHashSet();
+            var newText = prep.Items.Select(item => item.Text).ToHashSet();
+            prep = prep with { PreviousBuiltAt = previous.BuiltAt, ChangesSincePrevious =
+                newText.Except(oldText).Select(text => "Added: " + text)
+                    .Concat(oldText.Except(newText).Select(text => "Removed from preparation: " + text)).Take(20).ToArray() };
+        }
 
         // The owner's own agenda is never overwritten: it is only filled in when it is still empty.
         var updated = current with
         {
             Document = current.Document with
             {
-                Prep = prep, Agenda = current.Document.Agenda.Count == 0 ? agenda : current.Document.Agenda
+                Prep = prep, Agenda = current.Document.Agenda.Count == 0 || current.Document.GeneratedAgenda ? agenda : current.Document.Agenda,
+                GeneratedAgenda = current.Document.Agenda.Count == 0 || current.Document.GeneratedAgenda
             },
             UpdatedAt = clock.GetUtcNow()
         };

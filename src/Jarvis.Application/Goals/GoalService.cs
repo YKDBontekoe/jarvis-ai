@@ -20,7 +20,8 @@ public sealed class GoalService(
     ICommitmentService commitments,
     IDayPlannerService planner,
     IDailyBriefingRepository briefings,
-    TimeProvider? timeProvider = null) : IGoalService
+    TimeProvider? timeProvider = null,
+    Proactivity.IProactiveRepository? proactive = null, Proactivity.IProactiveCapacityService? capacity = null) : IGoalService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -248,6 +249,8 @@ public sealed class GoalService(
     private async Task<GoalOperation<GoalView>> MutateAsync(Guid ownerId, Guid goalId,
         Func<GoalRecord, DateOnly, Task<GoalOperation<GoalRecord>>> change, CancellationToken cancellationToken)
     {
+        var atomic = settings as IAtomicOwnerSettingsStore;
+        var expected = atomic is null ? null : await atomic.ReadJsonAsync(ownerId, GoalState.Section, cancellationToken);
         var all = await LoadAsync(ownerId, cancellationToken);
         var goal = all.FirstOrDefault(item => item.Id == goalId);
         if (goal is null) return GoalOperation<GoalView>.NotFound();
@@ -255,7 +258,47 @@ public sealed class GoalService(
         var result = await change(goal, today);
         if (!result.Succeeded) return new GoalOperation<GoalView>(default, result.Failure, result.Field, result.Message);
         var updated = result.Value! with { UpdatedAt = clock.GetUtcNow() };
-        await SaveAsync(ownerId, all.Select(item => item.Id == goalId ? updated : item).ToArray(), cancellationToken);
+        if (proactive is not null && updated.Plan is { } plan)
+        {
+            foreach (var budget in (await proactive.ListAsync(ownerId, cancellationToken))
+                         .Where(c => c.Kind == "goal_capacity" && c.Enabled && !c.Terminal && (c.AvailableMinutes is not null || c.Policy.UseCalendarCapacity)))
+            {
+                var scope = budget.SourceRefs.Where(r => r.StartsWith("goal:", StringComparison.Ordinal)).ToHashSet();
+                if (scope.Count > 0 && !scope.Contains($"goal:{goalId}")) continue;
+                var candidates = all.Select(g => g.Id == goalId ? updated : g)
+                    .Where(g => scope.Count == 0 || scope.Contains($"goal:{g.Id}"));
+                var used = candidates.Where(g => g.Plan?.WeekStart == plan.WeekStart)
+                    .Sum(g => g.Plan!.Items.Where(i => i.Status == GoalPlanStatuses.Done ||
+                        g.Status == GoalStatuses.Active && i.Status == GoalPlanStatuses.Accepted).Sum(i => i.Minutes));
+                var previous = all.Where(g => g.Plan?.WeekStart == plan.WeekStart && (scope.Count == 0 || scope.Contains($"goal:{g.Id}")))
+                    .Sum(g => g.Plan!.Items.Where(i => i.Status == GoalPlanStatuses.Done ||
+                        g.Status == GoalStatuses.Active && i.Status == GoalPlanStatuses.Accepted).Sum(i => i.Minutes));
+                if (used <= previous) continue;
+                var available = budget.AvailableMinutes;
+                if (budget.Policy.UseCalendarCapacity)
+                {
+                    var actual = capacity is null ? null : await capacity.CalculateAsync(budget, cancellationToken);
+                    if (actual?.TotalMinutes is null || actual.WeekStart != plan.WeekStart)
+                        return GoalOperation<GoalView>.Conflict("capacity", actual?.Explanation ?? "Calendar capacity is unknown. Review it before accepting more work.");
+                    available = actual.TotalMinutes;
+                }
+                var currentBudget = await proactive.GetAsync(ownerId, budget.Id, cancellationToken);
+                if (currentBudget is null || !currentBudget.Enabled || currentBudget.Terminal ||
+                    currentBudget.AvailableMinutes != budget.AvailableMinutes || currentBudget.Policy.UseCalendarCapacity != budget.Policy.UseCalendarCapacity ||
+                    currentBudget.Policy.TimeZoneId != budget.Policy.TimeZoneId || !currentBudget.SourceRefs.ToHashSet().SetEquals(budget.SourceRefs))
+                    return GoalOperation<GoalView>.Conflict("capacity", "The shared capacity settings changed during planning. Refresh before accepting this step.");
+                if (used > available)
+                    return GoalOperation<GoalView>.Conflict("capacity", $"These goals would use {used} minutes of the shared {available}-minute week. Reduce this step or free time in another goal first.");
+            }
+        }
+        var changedGoals = all.Select(item => item.Id == goalId ? updated : item).ToArray();
+        if (atomic is not null)
+        {
+            if (!await atomic.CompareExchangeJsonAsync(ownerId, GoalState.Section, expected,
+                    Proactivity.ProactiveRules.Serialize(new GoalState(changedGoals)), cancellationToken))
+                return GoalOperation<GoalView>.Conflict("goals", "Your goal plans changed. Refresh before accepting this step.");
+        }
+        else await SaveAsync(ownerId, changedGoals, cancellationToken);
         return GoalOperation<GoalView>.Ok(await ViewAsync(ownerId, updated, cancellationToken));
     }
 

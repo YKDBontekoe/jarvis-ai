@@ -14,6 +14,40 @@ namespace Jarvis.UnitTests;
 public sealed class MemoryQualityReviewTests
 {
     [Fact]
+    public async Task Contradictions_create_profile_scoped_suggestions_without_enabling_checks_or_changing_memories()
+    {
+        var owner = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var profile = Guid.NewGuid();
+        var first = new MemoryRecord(Guid.NewGuid(), owner, "fact", "Short answers", .7f, .9f,
+            "user", null, now, now, null, false, ProfileId: profile);
+        var second = first with { Id = Guid.NewGuid(), Content = "Detailed answers" };
+        var client = new CaptureClient(JsonSerializer.Serialize(new { findings = new[] { new {
+            kind = "contradiction", severity = "medium", memoryIds = new[] { first.Id, second.Id },
+            entityIds = Array.Empty<Guid>(), reason = "Different answer preferences need context.", recommendation = "Ask which applies." } } }));
+        var drafts = new List<Jarvis.Application.Proactivity.ProactiveCaseDraft>();
+        var proactive = Fake<Jarvis.Application.Proactivity.IProactiveService>.Create(("CreateAsync", args => {
+            Assert.Equal(owner, args[0]);
+            drafts.Add((Jarvis.Application.Proactivity.ProactiveCaseDraft)args[1]!);
+            return null;
+        }));
+        var service = new MemoryQualityReviewService(new FixedChatClientResolver(client),
+            Fake<IKnowledgeGraphRepository>.Create(("GetOverviewAsync", _ => new GraphOverview([], [], [])),
+                ("ListEntitiesAsync", _ => (IReadOnlyList<GraphEntityRecord>)Array.Empty<GraphEntityRecord>())),
+            new InMemorySettingsStore(), Options.Create(new MemoryReviewOptions()),
+            NullLogger<MemoryQualityReviewService>.Instance, proactive: proactive);
+        Assert.Equal("completed", (await service.ReviewAsync(owner, [first, second], TestContext.Current.CancellationToken))!.Status);
+        var draft = Assert.Single(drafts);
+        Assert.Equal(profile, draft.ProfileId);
+        Assert.False(draft.Explicit);
+        Assert.False(draft.Enabled);
+        Assert.Equal(2, draft.SourceRefs!.Count);
+        drafts.Clear();
+        await service.ReviewAsync(owner, [first, second with { ProfileId = Guid.NewGuid() }], TestContext.Current.CancellationToken);
+        Assert.Empty(drafts);
+    }
+
+    [Fact]
     public void Findings_require_valid_scoped_ids_and_supported_shapes()
     {
         var memory = Guid.NewGuid();

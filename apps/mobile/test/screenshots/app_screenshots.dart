@@ -11,6 +11,7 @@ import 'package:jarvis_mobile/ui/phosphor_icons.dart';
 import 'package:jarvis_mobile/main.dart';
 
 import 'fixtures.dart';
+import 'proactive_fixtures.dart';
 import 'harness.dart';
 
 /// Renders the main screens with sample data into build/screenshots (or
@@ -74,6 +75,82 @@ void main() {
 
   for (final dark in [false, true]) {
     final mode = dark ? 'dark' : 'light';
+
+    screenshotTest('ongoing work $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'proactive');
+      await capture(tester, 'proactive-list-$mode');
+      await tester.tap(
+        find.byKey(const ValueKey('proactive-case-$proactiveCaseId')),
+      );
+      await settle(tester);
+      await capture(tester, 'proactive-detail-$mode');
+    });
+
+    screenshotTest('ongoing work editor $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'proactive');
+      await tester.tap(find.text('New responsibility'));
+      await settle(tester);
+      await capture(tester, 'proactive-editor-$mode');
+      final settings = find.text('Checks and interruptions');
+      await tester.ensureVisible(settings);
+      await settle(tester);
+      await tester.tap(settings);
+      await settle(tester);
+      await tester.ensureVisible(find.text('Maximum checks per day (1–96)'));
+      await settle(tester);
+      await capture(tester, 'proactive-settings-$mode');
+    });
+
+    screenshotTest('weekly capacity controls $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'proactive');
+      final row = find.byKey(
+        const ValueKey('proactive-case-$proactiveCapacityCaseId'),
+      );
+      await tester.ensureVisible(row);
+      await settle(tester);
+      await tester.tap(row);
+      await settle(tester);
+      await tester.tap(find.text('Edit responsibility'));
+      await settle(tester);
+      final settings = find.text('Checks and interruptions');
+      await tester.ensureVisible(settings);
+      await settle(tester);
+      await tester.tap(settings);
+      await settle(tester);
+      await tester.ensureVisible(
+        find.text("Include this week's calendar availability"),
+      );
+      await settle(tester);
+      await capture(tester, 'proactive-calendar-$mode');
+    });
+
+    screenshotTest('trip delay controls $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'proactive');
+      final row = find.byKey(
+        const ValueKey('proactive-case-$proactiveTripCaseId'),
+      );
+      await tester.ensureVisible(row);
+      await settle(tester);
+      await tester.tap(row);
+      await settle(tester);
+      await capture(tester, 'proactive-trip-$mode');
+      await tester.tap(find.text('Edit responsibility'));
+      await settle(tester);
+      final add = find.text('Watch a trip change');
+      await tester.ensureVisible(add);
+      await settle(tester);
+      await tester.tap(add);
+      await settle(tester);
+      await capture(tester, 'proactive-trip-monitor-$mode');
+    });
 
     screenshotTest('home $mode', (tester) async {
       usePhone(tester);
@@ -536,7 +613,9 @@ void main() {
       await settle(tester);
       await capture(tester, '01i-home-learning-${dark ? 'dark' : 'light'}');
     });
-    screenshotTest('home suggestion row ${dark ? 'dark' : 'light'}', (tester) async {
+    screenshotTest('home suggestion row ${dark ? 'dark' : 'light'}', (
+      tester,
+    ) async {
       usePhone(tester);
       // A quieter day: Needs you lists the most urgent eight, so a suggestion only shows when there is room.
       http = ScreenshotHttp({
@@ -577,7 +656,9 @@ void main() {
   });
 
   for (final dark in [false, true]) {
-    screenshotTest('learning evolution ${dark ? 'dark' : 'light'}', (tester) async {
+    screenshotTest('learning evolution ${dark ? 'dark' : 'light'}', (
+      tester,
+    ) async {
       usePhone(tester);
       await start(tester, dark: dark);
       await openTab(tester, 'you');
@@ -590,7 +671,10 @@ void main() {
         find.byKey(const Key('learning-autonomousEvolution')),
       );
       await settle(tester);
-      await capture(tester, '17b-learning-evolution-${dark ? 'dark' : 'light'}');
+      await capture(
+        tester,
+        '17b-learning-evolution-${dark ? 'dark' : 'light'}',
+      );
     });
   }
 

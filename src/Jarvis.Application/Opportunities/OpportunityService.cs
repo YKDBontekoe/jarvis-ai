@@ -22,7 +22,8 @@ public sealed class OpportunityService(
     IProjectStore projects,
     IProjectFocusService projectFocus,
     IOwnerSettingsStore settings,
-    TimeProvider? timeProvider = null) : IOpportunityService
+    TimeProvider? timeProvider = null,
+    Proactivity.IProactiveRepository? proactive = null) : IOpportunityService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -31,7 +32,13 @@ public sealed class OpportunityService(
         var state = await LoadAsync(ownerId, cancellationToken);
         var input = await GatherAsync(ownerId, cancellationToken);
         var muted = (state.MutedKinds ?? []).Where(pair => pair.Value > input.Today).Select(pair => pair.Key).ToArray();
-        return new OpportunityList(OpportunityEngine.Evaluate(input, state), state.History ?? [], muted);
+        var items = OpportunityEngine.Evaluate(input, state);
+        if (proactive is not null)
+        {
+            var cases = await proactive.ListAsync(ownerId, cancellationToken);
+            items = items.Where(i => !i.Evidence.Any(r => Proactivity.ProactiveAttentionRules.Covered(cases, r))).ToArray();
+        }
+        return new OpportunityList(items, state.History ?? [], muted);
     }
 
     public async Task<bool> FeedbackAsync(Guid ownerId, string key, string verdict,

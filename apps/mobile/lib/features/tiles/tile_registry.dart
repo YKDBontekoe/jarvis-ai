@@ -20,6 +20,16 @@ const _large = TileSize.large;
 /// Every feature that can be a tile, in the order Everything lists them.
 /// Chats and Settings read live app state, so they have no loader.
 final List<TileSpec> tileSpecs = [
+  const TileSpec(
+    id: 'proactive',
+    name: 'Ongoing work',
+    description: 'The responsibilities Jarvis keeps moving, with sources and a history of every change.',
+    icon: PhosphorIconsRegular.sparkle,
+    category: TileCategory.plan,
+    sizes: [_icon, _strip, _square, _wide],
+    destination: 'proactive',
+    fallback: 'What Jarvis is keeping track of',
+  ),
   // Plan
   const TileSpec(
     id: 'activity',

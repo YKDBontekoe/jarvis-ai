@@ -78,7 +78,8 @@ public sealed class ConversationTurnService(
     AgentRunCoordinator coordinator,
     IHubContext<JarvisEventsHub> hub,
     ILogger<ConversationTurnService> logger,
-    Jarvis.Application.Learning.ILearningRecorder learning)
+    Jarvis.Application.Learning.ILearningRecorder learning,
+    Jarvis.Application.Proactivity.IProactiveService? proactive = null)
 {
     public const string FailureMessage = "Jarvis could not complete this response.";
 
@@ -136,6 +137,15 @@ public sealed class ConversationTurnService(
         if (!isSameUserTurn)
         {
             await store.AddMessageAsync(userMessage, cancellationToken);
+            if (Jarvis.Application.Proactivity.OpenLoopDetector.Detect(content, userMessage.Id, conversation.ProfileId) is { } intention)
+            {
+                // Capture is best-effort and never enables ongoing work or changes the conversation's success.
+                try
+                {
+                    if (proactive is not null) await proactive.CreateAsync(ownerId, intention, cancellationToken);
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException) { }
+            }
             // A message that pushes back on the reply right before it is worth knowing about; only the fact is kept.
             if (lastMessage is { Role: "assistant" } && Jarvis.Application.Learning.CorrectionDetector.LooksLikeCorrection(content))
                 learning.RecordSignal(ownerId, conversationId, Jarvis.Application.Learning.LearningSignalKinds.Correction,

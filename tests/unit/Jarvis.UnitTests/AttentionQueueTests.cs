@@ -6,6 +6,7 @@ using Jarvis.Application.Workflows;
 using Jarvis.Domain.Decisions;
 using Jarvis.Domain.Inbox;
 using Xunit;
+using Jarvis.Application.Proactivity;
 
 namespace Jarvis.UnitTests;
 
@@ -144,6 +145,40 @@ public sealed class AttentionQueueTests
         var back = await service.UnsnoozeAsync(Owner, commitmentId, default);
         Assert.Equal(2, back.Value!.Items.Count);
         Assert.True((await service.UnsnoozeAsync(Owner, commitmentId, default)).NotFound);
+    }
+
+    [Fact]
+    public async Task Coordinated_preparation_keeps_the_underlying_snooze_and_failures_remain_visible()
+    {
+        var promise = Promise("Send the deck", Today);
+        var root = "commitment:" + promise.Id;
+        var store = new InMemorySettingsStore();
+        await store.SaveAsync(Owner, Jarvis.Application.Settings.SettingsSections.Attention,
+            new AttentionState { Snoozed = { [root] = Now.AddDays(1) } }, default);
+        var value = new ProactiveCase(Guid.NewGuid(), Owner, "fixture", "follow_through", "Review the reply", "Follow through",
+            "open", true, null, root, [root], null, new(QuietStart: 0, QuietEnd: 0), [], [], null, null,
+            "Review the reply", [], [new("reply", "Review the reply", "The reply arrived.", root)], [], [],
+            Now.AddDays(-1), Now, Now, Now.AddHours(1));
+        ProactiveCase? extra = null;
+        var service = new AttentionService(
+            Fake<IToolApprovalStore>.Create(("ListActionableAsync", _ => Array.Empty<ToolApprovalRecord>())),
+            Fake<IJarvisTaskService>.Create(("ListAsync", _ => Array.Empty<JarvisTaskRecord>())),
+            Fake<IReminderService>.Create(("ListAsync", _ => Array.Empty<ReminderRecord>())),
+            Fake<ICommitmentService>.Create(("TodayAsync", _ => Today), ("ListAsync", _ => new[] { promise })),
+            Fake<IDecisionRepository>.Create(("ListAsync", _ => Array.Empty<Decision>())), store, new Clock(),
+            Fake<IProactiveRepository>.Create(("ListAsync", _ => extra is null ? new[] { value } : new[] { value, extra })));
+        var snoozed = await service.GetAsync(Owner, default);
+        Assert.Empty(snoozed.Items);
+        Assert.Equal(1, snoozed.Snoozed);
+        await store.SaveAsync(Owner, Jarvis.Application.Settings.SettingsSections.Attention, new AttentionState(), default);
+        var current = Assert.Single((await service.GetAsync(Owner, default)).Items);
+        Assert.Equal(root, current.Id);
+        Assert.Equal("proactive:" + value.Id, current.Destination);
+        value = value with { Status = "needs_input", Policy = value.Policy with { OptionalItemsPerDay = 0 } };
+        extra = value with { Id = Guid.NewGuid(), Status = "open", UpdatedAt = Now.AddHours(1), Policy = value.Policy with { OptionalItemsPerDay = 3 } };
+        await store.SaveAsync(Owner, Jarvis.Application.Settings.SettingsSections.Attention,
+            new AttentionState { Snoozed = { [root] = Now.AddDays(1) } }, default);
+        Assert.True(Assert.Single((await service.GetAsync(Owner, default)).Items).Locked);
     }
 
     private sealed class Clock : TimeProvider

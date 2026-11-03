@@ -198,7 +198,18 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 4. **Format only the files you touched** (`dart format <files>`), never all of `lib/`.
 5. **Update this playbook** when you add a token, component or pattern.
 
-## 11. Open items
+## 11. Ongoing proactive work
+
+- Responsibilities use the existing HeroCard and FeatureRow vocabulary: next action first, then source-backed findings, steps, current sources and action history.
+- `HeroCard.maxTitleScale` optionally clamps only its display heading (1.3× on responsibility details); body text keeps the full system size.
+- Saving tracks work; enabling periodic checks is a separate, explicit action. Suggestions remain labelled as suggestions until accepted.
+- Pause, stop and resolve are distinct. Resolving is an owner decision, never inferred from an incoming reply.
+- Learned check-frequency changes show the reason and an Undo that preserves later edits. Board: [mockups/proactive-work.html](mockups/proactive-work.html).
+- Cadence, owner-local quiet hours, check budget and optional interruption limit live in the editor's expandable settings. History rows expand to show their trigger and before/after evidence; earlier preparation remains available as history.
+
+- Calendar capacity is opt-in and uses owner-selected hours and time zone. Trip delay mapping names a selected watch and a verified itinerary item; preparation leaves reservations unchanged. Research claims keep their original wording and show source-backed review.
+
+## 12. Open items
 
 - The compact Home header is approved as a mockup and not built yet. Hold the orb to talk and the amber Home dot from the navigation mockup are not built.
 - A "Leave now" travel estimate needs locations on calendar events and reminders.

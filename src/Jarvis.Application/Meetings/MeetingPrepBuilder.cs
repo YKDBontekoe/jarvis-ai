@@ -23,7 +23,7 @@ public sealed record PrepInputs(
     IReadOnlyList<DecisionView> Decisions,
     IReadOnlyList<PrepFile> ProjectFiles,
     IReadOnlyList<MeetingRecord> EarlierMeetings,
-    Guid MeetingId);
+    Guid MeetingId, IReadOnlySet<Guid>? SeriesMeetingIds = null);
 
 /// <summary>
 /// Builds the prep pack from facts the owner already has: what is open with the people involved, decisions still
@@ -122,13 +122,27 @@ public static class MeetingPrepBuilder
         // What an earlier meeting with the same people or project left open.
         var earlier = input.EarlierMeetings
             .Where(meeting => meeting.Id != input.MeetingId)
-            .Where(meeting => meeting.ProjectId is not null && meeting.ProjectId == input.ProjectId ||
-                              meeting.Document.Participants.Any(p => people.Any(person => SameName(p.Name, person.Key))))
+            .Where(meeting => (meeting.StartsAt ?? meeting.CreatedAt) <
+                (input.EarlierMeetings.FirstOrDefault(current => current.Id == input.MeetingId)?.StartsAt ?? now))
+            .Where(meeting => input.SeriesMeetingIds is { } series ? series.Contains(meeting.Id) :
+                meeting.ProjectId is not null && meeting.ProjectId == input.ProjectId ||
+                meeting.Document.Participants.Any(p => people.Any(person => SameName(p.Name, person.Key))))
             .OrderByDescending(meeting => meeting.StartsAt ?? meeting.CreatedAt).ThenBy(meeting => meeting.Id)
             .Take(MaxEarlier);
         foreach (var meeting in earlier)
         {
             var on = (meeting.StartsAt ?? meeting.CreatedAt).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            foreach (var accepted in meeting.Document.Candidates.Where(c => c.State == CandidateStates.Accepted))
+            {
+                var openPromise = input.Commitments.FirstOrDefault(c => accepted.ResultRef == $"commitment:{c.Id}" &&
+                    !c.Suggested && c.Status == CommitmentStatuses.Open);
+                var openDecision = input.Decisions.FirstOrDefault(d => accepted.ResultRef == $"decision:{d.Id}" && d.Status != DecisionStatuses.Resolved);
+                if (openPromise is null && openDecision is null) continue;
+                var text = openPromise?.Description ?? openDecision!.Title;
+                items.Add(new PrepItem("From earlier meetings", PrepItemKinds.Fact,
+                    $"Still open from “{meeting.Title}” ({on}): {text}", accepted.ResultRef));
+                if (!agenda.Any(a => a.Text.Contains(text, StringComparison.Ordinal))) AddAgenda("Follow through: " + text);
+            }
             foreach (var open in meeting.Document.Candidates.Where(c => c.State == CandidateStates.Pending))
             {
                 var label = open.Kind == CandidateKinds.Question ? "Still unanswered" : "Not reviewed yet";

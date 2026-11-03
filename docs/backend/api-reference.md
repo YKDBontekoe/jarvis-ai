@@ -39,6 +39,9 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 
 ## Automation
 
+Ongoing work uses `/proactivity/cases` for listing, detail, edits, checks, lifecycle, feedback and supported Undo.
+See [proactive-work.md](proactive-work.md#api) for request shapes, revision conflicts and release boundaries.
+
 | Area | Paths |
 |------|-------|
 | Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}`, `POST /reminders/{id}/snooze` (`minutes` or `until`), `POST /reminders/{id}/complete` (`conversationId` on each reminder). A place reminder posts `place` (`name`, `latitude`, `longitude`, `radiusMeters` 50–5000, `trigger` `arrive`/`leave`, `repeats`) instead of `dueAt` |

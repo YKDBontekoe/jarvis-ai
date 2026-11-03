@@ -129,7 +129,8 @@ public sealed class AgentReactionHandler(
     IAgentReactionScheduler scheduler,
     IOwnerSettingsStore settings,
     IDailyBriefingRepository briefings,
-    TimeProvider? timeProvider = null) : IJarvisEventHandler
+    TimeProvider? timeProvider = null,
+    Proactivity.IProactiveRepository? proactive = null) : IJarvisEventHandler
 {
     private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
 
@@ -138,6 +139,8 @@ public sealed class AgentReactionHandler(
 
     public async Task HandleAsync(JarvisEvent ev, CancellationToken cancellationToken)
     {
+        if (proactive is not null && ev.Kind is JarvisEventKinds.WatchFired or JarvisEventKinds.CommitmentCreated or JarvisEventKinds.InboxNeedsReply &&
+            ev.Subject is { } subject && Proactivity.ProactiveAttentionRules.Covered(await proactive.ListAsync(ev.OwnerId, cancellationToken), subject.ToString())) return;
         var verdict = await EvaluateAsync(settings, briefings, ev, _clock.GetUtcNow(), cancellationToken);
         if (verdict == ReactionVerdict.React) await scheduler.EnqueueAsync(ev.OwnerId, ev.Id!.Value, cancellationToken);
     }
@@ -171,7 +174,8 @@ public sealed class AgentReactionRunner(
     IOwnerSettingsStore settings,
     IDailyBriefingRepository briefings,
     IJarvisTaskService tasks,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    Proactivity.IProactiveRepository? proactive = null)
 {
     public const int MaxEventsPerReaction = 10;
     private readonly TimeProvider _clock = timeProvider ?? TimeProvider.System;
@@ -188,8 +192,11 @@ public sealed class AgentReactionRunner(
             .ToList();
 
         var worth = new List<OwnerEventRecord>();
+        var cases = proactive is null ? [] : await proactive.ListAsync(ownerId, cancellationToken);
         foreach (var record in stored)
         {
+            if (record.Kind is JarvisEventKinds.WatchFired or JarvisEventKinds.CommitmentCreated or JarvisEventKinds.InboxNeedsReply &&
+                record.SubjectRef is { } reference && Proactivity.ProactiveAttentionRules.Covered(cases, reference)) continue;
             var ev = new JarvisEvent(ownerId, record.Kind, record.Summary,
                 EntityRef.TryParse(record.SubjectRef, out var subject) ? subject : null, record.Data,
                 record.ConversationId, record.Origin, record.CausedByTaskId, record.At, record.Id);

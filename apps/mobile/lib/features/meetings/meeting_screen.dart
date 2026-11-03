@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
+import '../../l10n/l10n.dart';
 import '../search/context_commands.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -359,6 +360,18 @@ class _MeetingScreenState extends State<MeetingScreen>
                   'decisions still waiting and what the project is for.',
                   style: TextStyle(color: colors.inkSoft),
                 ),
+              if (jsonStrings(prep?['changesSincePrevious']).isNotEmpty) ...[
+                Text(
+                  context.l10n.proactivePreparationChanges,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                for (final change in jsonStrings(prep?['changesSincePrevious']))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(change),
+                  ),
+                const SizedBox(height: 12),
+              ],
               for (final entry in sections.entries) ...[
                 Padding(
                   padding: const EdgeInsets.only(top: 10, bottom: 4),

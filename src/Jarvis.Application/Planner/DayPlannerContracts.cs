@@ -21,7 +21,7 @@ public sealed record DayPlanItem(
     bool Done,
     DateTimeOffset? StartAt,
     DateTimeOffset CreatedAt,
-    string? SourceRef = null);
+    string? SourceRef = null, bool Pinned = false);
 
 /// <summary>
 /// The owner's plan for one local day, kept in owner settings (no table of its own). <see cref="TimeZoneId"/> is the
@@ -44,7 +44,7 @@ public sealed record DayTimelineEntryDto(
     bool Done);
 
 public sealed record DayPlanItemDto(Guid Id, string Title, int Minutes, bool Done, DateTimeOffset? StartAt,
-    DateTimeOffset? EndAt, string? SourceRef = null);
+    DateTimeOffset? EndAt, string? SourceRef = null, bool Pinned = false);
 
 public sealed record DayFreeSlotDto(DateTimeOffset StartAt, DateTimeOffset EndAt, int Minutes);
 
@@ -70,7 +70,7 @@ public sealed record DayPlanResultDto(DayTimelineDto Today, int Scheduled, IRead
 /// </summary>
 public sealed record AddDayPlanItemRequest(string? Title = null, int? Minutes = null, string? SourceRef = null);
 
-public sealed record UpdateDayPlanItemRequest(string? Title = null, int? Minutes = null, bool? Done = null);
+public sealed record UpdateDayPlanItemRequest(string? Title = null, int? Minutes = null, bool? Done = null, bool? Pinned = null);
 
 public sealed record SaveDayHoursRequest(TimeOnly DayStart, TimeOnly DayEnd);
 

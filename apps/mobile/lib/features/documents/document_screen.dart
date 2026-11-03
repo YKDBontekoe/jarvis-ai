@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
+import '../../l10n/l10n.dart';
 import '../outcomes/outcome_feedback_row.dart';
 import '../search/context_commands.dart';
 import '../../theme.dart';
@@ -165,6 +166,8 @@ class _DocumentScreenState extends State<DocumentScreen>
                         ),
                       ),
                       const GroupLabel('Sections'),
+                      if (_view?['stale'] == true)
+                        InlineNotice(message: context.l10n.proactiveDraftStale),
                       for (var i = 0; i < sections.length; i++)
                         _section(sections[i], i),
                       GroupLabel(

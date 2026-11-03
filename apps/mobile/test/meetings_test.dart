@@ -93,6 +93,39 @@ void main() {
       show(tester, MeetingScreen(http: http.client(), meetingId: _id));
 
   testWidgets(
+    'refreshed preparation explains changes from the preceding version',
+    (tester) async {
+      http.on(
+        'GET',
+        '/api/v1/meetings/$_id',
+        _meeting(
+          prep: {
+            ..._prep(),
+            'previousBuiltAt': '2026-10-16T09:00:00Z',
+            'changesSincePrevious': [
+              'Removed from preparation: Confirm the supplier',
+              'Added: Review the accepted delivery decision',
+            ],
+          },
+        ),
+      );
+      await detail(tester);
+      expect(
+        find.text('Changes since the previous preparation'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Removed from preparation: Confirm the supplier'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Added: Review the accepted delivery decision'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'the list offers calendar events to prepare and creates a meeting with a prep pack',
     (tester) async {
       http
