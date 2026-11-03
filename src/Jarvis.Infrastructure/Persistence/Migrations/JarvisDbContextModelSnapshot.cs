@@ -4251,6 +4251,45 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("price_history", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ProactiveCaseEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Document")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("document");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("fingerprint");
+
+                    b.Property<DateTimeOffset?>("NextCheckAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_check_at");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NextCheckAt");
+
+                    b.HasIndex("OwnerId", "Fingerprint")
+                        .IsUnique();
+
+                    b.ToTable("proactive_cases", (string)null);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.RemoteAgentEntity", b =>
                 {
                     b.Property<Guid>("Id")

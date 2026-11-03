@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../activity/activity_screen.dart';
+import '../proactivity/proactive_screen.dart';
 import '../approvals/approvals_screen.dart';
 import '../watches/condition_watches_screen.dart';
 import '../briefing/daily_briefing_screen.dart';
@@ -108,6 +109,11 @@ Widget? utilityPageFor(
   /// confirmation when it saved or null when it was cancelled.
   ValueChanged<String?>? onQuickCreateDone,
 }) => switch (destination) {
+  'proactive' => ProactiveScreen(http: http),
+  final value when value.startsWith('proactive:') => ProactiveScreen(
+    http: http,
+    caseId: value.substring('proactive:'.length),
+  ),
   'tasks' => TasksScreen(http: http),
   'tasks$createDestinationSuffix' => TasksScreen(
     http: http,

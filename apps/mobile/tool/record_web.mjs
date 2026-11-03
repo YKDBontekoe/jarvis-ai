@@ -88,6 +88,13 @@ await capture('start');
 
 let failed = false;
 for (const step of steps) {
+  if (/^scroll:-?\d+$/.test(step)) {
+    await page.mouse.move(width / 2, height * 0.65);
+    await page.mouse.wheel(0, Math.max(-2000, Math.min(2000, Number(step.slice(7)))));
+    await page.waitForTimeout(800);
+    await capture(step);
+    continue;
+  }
   // Exact button names first (tab bar, toolbars), then any visible partial match.
   const exact = page.getByRole('button', { name: step, exact: true });
   const target = (await exact.count()) > 0

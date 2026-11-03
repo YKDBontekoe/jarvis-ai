@@ -20,6 +20,14 @@ public static class LifeFeaturesRegistration
 {
     public static IServiceCollection AddJarvisLifeFeatures(this IServiceCollection services)
     {
+        services.AddScoped<Jarvis.Application.Proactivity.IProactiveRepository, ProactiveRepository>();
+        services.AddScoped<Jarvis.Application.Proactivity.IOwnerSettingDocuments, ProactiveRepository>();
+        services.AddScoped<Jarvis.Application.Proactivity.IProactivePreparationService, Jarvis.Application.Proactivity.ProactivePreparationService>();
+        services.AddScoped<Jarvis.Application.Proactivity.IProactiveCapacityService, Jarvis.Application.Proactivity.ProactiveCapacityService>();
+        services.AddScoped<Jarvis.Application.Proactivity.IProactiveSourceReader, Jarvis.Infrastructure.Proactivity.ProactiveSourceReader>();
+        services.AddScoped<Jarvis.Application.Proactivity.IProactiveService, Jarvis.Application.Proactivity.ProactiveService>();
+        services.AddScoped<Jarvis.Application.Proactivity.ProactiveMemoryResolution>();
+        services.AddScoped<Jarvis.Application.Events.IJarvisEventHandler, Jarvis.Application.Proactivity.ProactiveInvalidation>();
         // Timeline: each source reads one area; the service merges them.
         services.AddScoped<ITimelineSource, JournalTimelineSource>();
         services.AddScoped<ITimelineSource, ExpenseTimelineSource>();

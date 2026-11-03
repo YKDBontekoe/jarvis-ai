@@ -45,7 +45,8 @@ public static class PrepItemKinds
 /// </summary>
 public sealed record PrepItem(string Section, string Kind, string Text, string? Ref = null);
 
-public sealed record MeetingPrep(DateTimeOffset BuiltAt, IReadOnlyList<PrepItem> Items);
+public sealed record MeetingPrep(DateTimeOffset BuiltAt, IReadOnlyList<PrepItem> Items,
+    IReadOnlyList<string>? ChangesSincePrevious = null, DateTimeOffset? PreviousBuiltAt = null);
 
 public static class CandidateKinds
 {
@@ -89,7 +90,7 @@ public sealed record MeetingDocument(
     string? PrivateNotes,
     MeetingPrep? Prep,
     string? DebriefText,
-    IReadOnlyList<DebriefCandidate> Candidates);
+    IReadOnlyList<DebriefCandidate> Candidates, bool GeneratedAgenda = false);
 
 public sealed record MeetingRecord(
     Guid Id,

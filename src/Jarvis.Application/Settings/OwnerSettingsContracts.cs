@@ -8,6 +8,13 @@ public interface IOwnerSettingsStore
     Task<IReadOnlyList<Guid>> ListOwnersAsync(string section, CancellationToken cancellationToken);
 }
 
+/// <summary>Optional optimistic concurrency for feature documents shared by several writers.</summary>
+public interface IAtomicOwnerSettingsStore
+{
+    Task<string?> ReadJsonAsync(Guid ownerId, string section, CancellationToken ct);
+    Task<bool> CompareExchangeJsonAsync(Guid ownerId, string section, string? expectedJson, string afterJson, CancellationToken ct);
+}
+
 /// <summary>
 /// Every owner on this install. Features that are on by default for owners who never saved a settings row use this
 /// instead of <see cref="IOwnerSettingsStore.ListOwnersAsync"/>, which only lists owners with a stored row.

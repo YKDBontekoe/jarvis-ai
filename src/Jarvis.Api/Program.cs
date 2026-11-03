@@ -128,6 +128,7 @@ api.MapScenarioEndpoints();
 api.MapAppGoalEndpoints();
 api.MapDocumentEndpoints();
 api.MapOpportunityEndpoints();
+api.MapProactiveEndpoints();
 api.MapStoryEndpoints();
 api.MapSetupEndpoints();
 api.MapPreferenceEndpoints();

@@ -38,6 +38,7 @@ import '../skills/skills_screen.dart';
 import 'get_started_card.dart';
 import 'next_up.dart' hide greetingFor;
 import '../../l10n/l10n.dart';
+import '../proactivity/proactive_home_card.dart';
 
 /// Replaces Home's wall clock when no [JarvisHome.clock] is given
 /// (screenshots of the evening).
@@ -930,6 +931,12 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                       ),
                     ),
                     const SizedBox(height: 28),
+                    if (widget.ready)
+                      ProactiveHomeCard(
+                        http: widget.source.http,
+                        onOpen: widget.onOpen,
+                        revision: widget.refreshRevision,
+                      ),
                     if (_briefing != null)
                       FadeSlideIn(
                         index: 2,

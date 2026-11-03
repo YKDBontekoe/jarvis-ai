@@ -140,6 +140,29 @@ public sealed class MeetingServiceTests
     }
 
     [Fact]
+    public async Task Recurring_preparation_carries_accepted_work_then_removes_completed_items_from_generated_agenda()
+    {
+        var harness = new Harness();
+        var previous = await Meeting(harness);
+        var promise = new Commitment(Guid.CreateVersion7(), Owner, CommitmentDirections.IOwe, "Different attendee", "Confirm the supplier",
+            null, "open", false, CommitmentSources.Meeting, null, null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        harness.Existing.Add(promise);
+        harness.Repository.Rows[previous.Id] = previous with { StartsAt = DateTimeOffset.UtcNow.AddDays(-7), Document = previous.Document with {
+            PrivateNotes = "Private negotiation limits", Candidates = [new("accepted", CandidateKinds.IOwe, promise.Description, promise.Counterparty,
+                null, null, "Owner accepted", CandidateStates.Accepted, $"commitment:{promise.Id}")] } };
+        var next = await Meeting(harness, new MeetingParticipant("New attendee"));
+        var prepared = (await harness.Service.PrepareAsync(next.Id, Owner, default)).Value!;
+        Assert.Contains(prepared.Document.Agenda, a => a.Text.Contains(promise.Description));
+        Assert.DoesNotContain(prepared.Document.Prep!.Items, item => item.Text.Contains("Private negotiation"));
+        harness.Existing.Clear();
+        var updated = (await harness.Service.PrepareAsync(next.Id, Owner, default)).Value!;
+        Assert.DoesNotContain(updated.Document.Agenda, a => a.Text.Contains(promise.Description));
+        Assert.Contains(updated.Document.Prep!.ChangesSincePrevious!, change => change.Contains("Removed from preparation") && change.Contains(promise.Description));
+        Assert.NotNull(updated.Document.Prep.PreviousBuiltAt);
+        Assert.Empty(harness.Commitments);
+    }
+
+    [Fact]
     public async Task Reading_a_debrief_creates_no_commitment_and_no_decision()
     {
         var harness = new Harness();

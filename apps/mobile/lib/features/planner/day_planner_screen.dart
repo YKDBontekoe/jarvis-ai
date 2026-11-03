@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
+import '../../l10n/l10n.dart';
 import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -198,6 +199,24 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
       await _load();
     } catch (error) {
       _toast(_problem(error, 'Could not remove that to-do.'));
+    } finally {
+      if (mounted) setState(() => _busyItems.remove(id));
+    }
+  }
+
+  Future<void> _pin(Map<String, dynamic> item) async {
+    final id = asJsonString(item['id']);
+    if (id == null || _busyItems.contains(id)) return;
+    setState(() => _busyItems.add(id));
+    try {
+      await widget.http.patch<dynamic>(
+        '$_base/items/$id',
+        queryParameters: _zone,
+        data: {'pinned': !asJsonBool(item['pinned'])},
+      );
+      await _load();
+    } catch (error) {
+      if (mounted) _toast(_problem(error, context.l10n.proactiveNeedsInput));
     } finally {
       if (mounted) setState(() => _busyItems.remove(id));
     }
@@ -401,6 +420,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                         busy: _busyItems.contains(asJsonString(item['id'])),
                         onToggle: () => unawaited(_toggle(item)),
                         onRemove: () => unawaited(_remove(item)),
+                        onPin: () => unawaited(_pin(item)),
                       ),
                   ],
                 ),
@@ -912,6 +932,7 @@ class _TodoRow extends StatelessWidget {
     required this.busy,
     required this.onToggle,
     required this.onRemove,
+    required this.onPin,
     super.key,
   });
 
@@ -919,6 +940,7 @@ class _TodoRow extends StatelessWidget {
   final bool busy;
   final VoidCallback onToggle;
   final VoidCallback onRemove;
+  final VoidCallback onPin;
 
   @override
   Widget build(BuildContext context) {
@@ -978,10 +1000,32 @@ class _TodoRow extends StatelessWidget {
                 ],
               ),
             ),
-            IconButton(
-              tooltip: 'Remove $title',
-              onPressed: busy ? null : onRemove,
-              icon: Icon(PhosphorIconsRegular.x, size: 16, color: colors.muted),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: asJsonBool(item['pinned'])
+                      ? context.l10n.proactiveUnpin
+                      : context.l10n.proactivePin,
+                  onPressed: busy || done ? null : onPin,
+                  icon: Icon(
+                    PhosphorIconsRegular.pushPin,
+                    size: 16,
+                    color: asJsonBool(item['pinned'])
+                        ? colors.accent
+                        : colors.muted,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove $title',
+                  onPressed: busy ? null : onRemove,
+                  icon: Icon(
+                    PhosphorIconsRegular.x,
+                    size: 16,
+                    color: colors.muted,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -24,7 +24,7 @@ public sealed record MemoryReviewClient(IChatClient Client);
 /// <summary>Nightly independent critique of the active memory bank and graph, retained for owner review.</summary>
 public sealed class MemoryQualityReviewService(IChatClientResolver clients, IKnowledgeGraphRepository graph,
     IOwnerSettingsStore settings, IOptions<MemoryReviewOptions> options, ILogger<MemoryQualityReviewService> logger,
-    TimeProvider? clock = null)
+    TimeProvider? clock = null, Jarvis.Application.Proactivity.IProactiveService? proactive = null)
 {
     internal const string PromptMarker = "You are Jarvis's independent nightly memory quality judge";
     private const int MaxCharacters = 140_000;
@@ -95,6 +95,23 @@ public sealed class MemoryQualityReviewService(IChatClientResolver clients, IKno
             var result = new MemoryQualityReview(now, "completed", config.Model, included.Count,
                 overview.Entities.Count, partial, findings);
             await settings.SaveAsync(ownerId, LearningSections.MemoryQualityReview, result, cancellationToken);
+            if (proactive is not null)
+                foreach (var finding in findings.Where(f => f.Kind == "contradiction" && f.MemoryIds.Count == 2))
+                {
+                    var compared = included.Where(m => finding.MemoryIds.Contains(m.Id)).OrderBy(m => m.Id).ToArray();
+                    if (compared.Length != 2 || compared.Select(m => m.ProfileId).Distinct().Count() != 1) continue;
+                    try
+                    {
+                        await proactive.CreateAsync(ownerId, new("memory_conflict", "Review conflicting memories",
+                            "Review conflicting memories " + string.Join(", ", compared.Select(m => m.Id)),
+                            compared.Select(m => "memory:" + m.Id).ToArray(), ProfileId: compared[0].ProfileId,
+                            Explicit: false, Enabled: false, Notes: finding.Reason), cancellationToken);
+                    }
+                    catch (Exception error) when (error is not OperationCanceledException)
+                    {
+                        logger.LogWarning("Memory comparison could not be queued ({ErrorType}).", error.GetType().Name);
+                    }
+                }
             return result;
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)

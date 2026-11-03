@@ -90,10 +90,11 @@ public sealed class DayPlannerService(
         {
             Title = request.Title is null ? current.Title : CleanTitle(request.Title),
             Minutes = request.Minutes is int minutes ? CleanMinutes(minutes) : current.Minutes,
-            Done = request.Done ?? current.Done
+            Done = request.Done ?? current.Done,
+            Pinned = request.Pinned ?? current.Pinned
         };
         // A new length no longer matches the block it had, so it waits for the next plan.
-        if (updated.Minutes != current.Minutes && !updated.Done) updated = updated with { StartAt = null };
+        if (updated.Minutes != current.Minutes && !updated.Done && !updated.Pinned) updated = updated with { StartAt = null };
         await SaveAsync(ownerId, day.State with
         {
             Items = day.State.Items.Select(item => item.Id == itemId ? updated : item).ToArray()
@@ -123,14 +124,14 @@ public sealed class DayPlannerService(
 
         // Done to-dos keep their block; open ones are placed again, so a missed block moves to later today.
         var busy = BlockingEvents(events.Events)
-            .Concat(day.State.Items.Where(item => item.Done && item.StartAt is not null)
+            .Concat(day.State.Items.Where(item => (item.Done || item.Pinned) && item.StartAt is not null)
                 .Select(item => new TimeRange(item.StartAt!.Value, item.StartAt.Value.AddMinutes(item.Minutes))))
             .ToArray();
-        var open = day.State.Items.Where(item => !item.Done).ToArray();
+        var open = day.State.Items.Where(item => !item.Done && !item.Pinned).ToArray();
         var placed = DayPlanScheduler.Place(window, busy,
             open.Select(item => (item.Id, TimeSpan.FromMinutes(item.Minutes))));
 
-        var items = day.State.Items.Select(item => item.Done
+        var items = day.State.Items.Select(item => item.Done || item.Pinned
                 ? item
                 : item with { StartAt = placed.TryGetValue(item.Id, out var start) ? start : null })
             .ToArray();
@@ -148,7 +149,7 @@ public sealed class DayPlannerService(
         var day = await LoadDayAsync(ownerId, timeZoneId, cancellationToken);
         var state = day.State with
         {
-            Items = day.State.Items.Select(item => item.Done ? item : item with { StartAt = null }).ToArray(),
+            Items = day.State.Items.Select(item => item.Done || item.Pinned ? item : item with { StartAt = null }).ToArray(),
             PlannedAt = null
         };
         await SaveAsync(ownerId, state, cancellationToken);
@@ -284,7 +285,7 @@ public sealed class DayPlannerService(
             _ => saved with
             {
                 Date = today,
-                Items = (saved.Items ?? []).Where(item => !item.Done).Select(item => item with { StartAt = null })
+                Items = (saved.Items ?? []).Where(item => !item.Done).Select(item => item with { StartAt = null, Pinned = false })
                     .ToArray(),
                 PlannedAt = null
             }
@@ -300,7 +301,7 @@ public sealed class DayPlannerService(
         settings.SaveAsync(ownerId, Section, state, cancellationToken);
 
     private static DayPlanItemDto ToDto(DayPlanItem item) =>
-        new(item.Id, item.Title, item.Minutes, item.Done, item.StartAt, item.StartAt?.AddMinutes(item.Minutes), item.SourceRef);
+        new(item.Id, item.Title, item.Minutes, item.Done, item.StartAt, item.StartAt?.AddMinutes(item.Minutes), item.SourceRef, item.Pinned);
 
     private static string CleanTitle(string? title)
     {

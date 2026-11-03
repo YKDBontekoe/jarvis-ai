@@ -66,6 +66,31 @@ class EntityType {
 }
 
 const entityTypes = <String, EntityType>{
+  'meeting': EntityType(
+    'Meeting',
+    PhosphorIconsRegular.calendarBlank,
+    'meetings',
+    'Meetings',
+  ),
+  'goal': EntityType('Goal', PhosphorIconsRegular.target, 'goals', 'Goals'),
+  'trip': EntityType(
+    'Trip',
+    PhosphorIconsRegular.airplaneTilt,
+    'trips',
+    'Trips',
+  ),
+  'document': EntityType(
+    'Document',
+    PhosphorIconsRegular.fileText,
+    'documents',
+    'Documents',
+  ),
+  'message': EntityType(
+    'Message',
+    PhosphorIconsRegular.chatCircle,
+    'chats',
+    'Chats',
+  ),
   'task': EntityType('Task', PhosphorIconsRegular.listChecks, 'tasks', 'Tasks'),
   'reminder': EntityType(
     'Reminder',

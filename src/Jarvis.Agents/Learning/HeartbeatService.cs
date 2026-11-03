@@ -32,7 +32,8 @@ public sealed class HeartbeatService(
     ICommitmentService commitments,
     ILogger<HeartbeatService> logger,
     TimeProvider? timeProvider = null,
-    Jarvis.Application.Events.IJarvisEventBus? events = null)
+    Jarvis.Application.Events.IJarvisEventBus? events = null,
+    Jarvis.Application.Proactivity.IProactiveRepository? proactive = null)
 {
     private static readonly TimeSpan MeetingPrepLead = TimeSpan.FromMinutes(20);
     private static readonly TimeSpan MeetingPrepHorizon = TimeSpan.FromHours(2);
@@ -84,6 +85,12 @@ public sealed class HeartbeatService(
                 .Concat(InsightItems(reflected))
                 .Where(item => !known.Contains(item.Key))
                 .ToList();
+            if (proactive is not null)
+            {
+                var cases = await proactive.ListAsync(ownerId, cancellationToken);
+                candidates.RemoveAll(item => Jarvis.Application.Proactivity.ProactiveAttentionRules.HeartbeatReference(item.Key) is { } reference &&
+                    Jarvis.Application.Proactivity.ProactiveAttentionRules.Covered(cases, reference));
+            }
             var plan = HeartbeatPlanner.Plan(candidates, autonomy, taskStarts.Count);
             foreach (var item in plan.Start)
             {

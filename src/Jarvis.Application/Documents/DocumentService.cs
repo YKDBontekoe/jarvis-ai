@@ -18,7 +18,8 @@ public sealed class DocumentService(
     ICommitmentService commitments,
     ILibraryService library,
     IDailyBriefingRepository briefings,
-    TimeProvider? timeProvider = null) : IDocumentService
+    TimeProvider? timeProvider = null,
+    Proactivity.IProactiveSourceReader? sourceReader = null) : IDocumentService
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
@@ -27,7 +28,7 @@ public sealed class DocumentService(
 
     public async Task<DocumentView?> GetAsync(Guid ownerId, Guid id, CancellationToken cancellationToken) =>
         (await LoadAsync(ownerId, cancellationToken)).FirstOrDefault(draft => draft.Id == id) is { } draft
-            ? ViewOf(draft)
+            ? await CurrentViewAsync(ownerId, draft, cancellationToken)
             : null;
 
     public async Task<DocumentOperation<DocumentView>> CreateAsync(Guid ownerId, DocumentRequest request,
@@ -54,6 +55,8 @@ public sealed class DocumentService(
         var now = clock.GetUtcNow();
         var draft = new DocDraft(Guid.NewGuid(), $"{sources.Project.Name}: update {today:d MMM yyyy}",
             DocumentKinds.ProjectUpdate, projectId, audience, language, sections, unknowns, 1, 0, null, now, now);
+        if (sourceReader is not null)
+            draft = draft with { SourceVersions = await VersionsAsync(ownerId, sections, cancellationToken) };
         await SaveStateAsync(ownerId, [draft, .. all], cancellationToken);
         return DocumentOperation<DocumentView>.Ok(ViewOf(draft));
     }
@@ -167,8 +170,14 @@ public sealed class DocumentService(
             Version = draft.Version + 1,
             UpdatedAt = clock.GetUtcNow()
         };
+        if (sourceReader is not null && !result.Value!.Edited)
+        {
+            var versions = new Dictionary<string, string>(draft.SourceVersions ?? new Dictionary<string, string>());
+            foreach (var pair in await VersionsAsync(ownerId, [result.Value], cancellationToken)) versions[pair.Key] = pair.Value;
+            updated = updated with { SourceVersions = versions };
+        }
         await SaveStateAsync(ownerId, all.Select(item => item.Id == id ? updated : item).ToArray(), cancellationToken);
-        return DocumentOperation<DocumentView>.Ok(ViewOf(updated));
+        return DocumentOperation<DocumentView>.Ok(await CurrentViewAsync(ownerId, updated, cancellationToken));
     }
 
     private async Task<ProjectUpdateSources?> GatherAsync(Guid ownerId, Guid projectId,
@@ -186,6 +195,24 @@ public sealed class DocumentService(
     }
 
     private static DocumentView ViewOf(DocDraft draft) => new(draft, ProjectUpdateBuilder.Checklist(draft));
+
+    private async Task<IReadOnlyDictionary<string, string>> VersionsAsync(Guid ownerId, IReadOnlyList<DocSection> sections, CancellationToken ct)
+    {
+        var refs = sections.SelectMany(s => s.Refs).Distinct().Take(40).ToArray();
+        var current = await sourceReader!.ReadAsync(ownerId, null, refs, ct);
+        return sections.SelectMany(s => s.Refs.Select(reference => new { Key = s.Id + "|" + reference,
+                Version = current.FirstOrDefault(c => c.Ref == reference)?.Version ?? "missing" }))
+            .DistinctBy(s => s.Key).ToDictionary(s => s.Key, s => s.Version);
+    }
+
+    private async Task<DocumentView> CurrentViewAsync(Guid ownerId, DocDraft draft, CancellationToken ct)
+    {
+        if (sourceReader is null || draft.SourceVersions is null) return ViewOf(draft);
+        var current = await VersionsAsync(ownerId, draft.Sections, ct);
+        var changed = current.Where(pair => draft.SourceVersions.TryGetValue(pair.Key, out var old) && old != pair.Value)
+            .Select(pair => pair.Key[(pair.Key.IndexOf('|') + 1)..]).Distinct().ToArray();
+        return new(draft, ProjectUpdateBuilder.Checklist(draft), changed.Length > 0, changed);
+    }
 
     private async Task<IReadOnlyList<DocDraft>> LoadAsync(Guid ownerId, CancellationToken cancellationToken) =>
         (await settings.GetAsync<DocumentState>(ownerId, DocumentState.Section, cancellationToken))?.Drafts ?? [];

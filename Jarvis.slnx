@@ -28,6 +28,7 @@
     <Project Path="tests/eval/Jarvis.ExtractionEval/Jarvis.ExtractionEval.csproj" />
     <Project Path="tests/eval/Jarvis.FileEval/Jarvis.FileEval.csproj" />
     <Project Path="tests/eval/Jarvis.GraphEval/Jarvis.GraphEval.csproj" />
+    <Project Path="tests/eval/Jarvis.ProactiveEval/Jarvis.ProactiveEval.csproj" />
   </Folder>
   <Folder Name="/workers/">
     <Project Path="workers/Jarvis.Worker/Jarvis.Worker.csproj" />

@@ -22,11 +22,15 @@ class HeroCard extends StatelessWidget {
     this.segments,
     this.doneSegments = 0,
     this.footer,
+    this.maxTitleScale,
     super.key,
   });
 
   final String label;
   final String title;
+
+  /// Display headings may clamp; body and controls retain the owner's full text scale.
+  final double? maxTitleScale;
   final String? subtitle;
 
   /// Number of progress segments, with [doneSegments] filled.
@@ -61,6 +65,10 @@ class HeroCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               title,
+              textScaler: maxTitleScale == null
+                  ? null
+                  : MediaQuery.textScalerOf(context)
+                        .clamp(maxScaleFactor: maxTitleScale!),
               style: TextStyle(
                 fontFamily: 'Geist',
                 fontSize: 26,

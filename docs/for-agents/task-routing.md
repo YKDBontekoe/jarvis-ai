@@ -10,6 +10,7 @@ Use this table to jump to the right doc and code **before** broad repo search.
 | Chat streaming / SignalR | [chat-agent-runtime.md](../architecture/chat-agent-runtime.md) | `Jarvis.Api/Conversations/`, hub |
 | Tool approvals stuck | [chat-agent-runtime.md](../architecture/chat-agent-runtime.md) | `Jarvis.Application/Approvals/` |
 | Reminder/watch/task scheduling | [temporal.md](../backend/temporal.md) | `Jarvis.Workflows/`, `Jarvis.Worker` |
+| Open loops / proactive cases / attention coordination | [proactive-work.md](../backend/proactive-work.md) | `Jarvis.Application/Proactivity/`, `Jarvis.Infrastructure/Proactivity/`, `features/proactivity/` |
 | Memory search / forget / pin | [memory-knowledge-learning.md](../backend/memory-knowledge-learning.md) | `Jarvis.Application/Memory/`, Infrastructure |
 | Knowledge graph UI/API | same + [mobile/client-architecture.md](../mobile/client-architecture.md) | `features/memory/`, graph endpoints |
 | MCP server / integration secret | [integrations-and-mcp.md](../backend/integrations-and-mcp.md) | `Jarvis.Mcp/`, `IntegrationEndpoints` |

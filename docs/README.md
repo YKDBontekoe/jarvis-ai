@@ -25,6 +25,7 @@ This folder is the canonical reference for humans and coding agents working in t
 | Memory, knowledge graph, learning | [backend/memory-knowledge-learning.md](backend/memory-knowledge-learning.md) |
 | MCP, integrations, channels, browser | [backend/integrations-and-mcp.md](backend/integrations-and-mcp.md) |
 | Timeline, inbox, finance, studio, library, modes, missions | [backend/life-features.md](backend/life-features.md) |
+| Ongoing proactive work, bounded capabilities, receipts, scheduling and API | [backend/proactive-work.md](backend/proactive-work.md) |
 
 ## Client and operations
 

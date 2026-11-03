@@ -35,6 +35,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddScoped<IJarvisTaskService, JarvisTaskService>();
         services.AddSingleton<ITaskRunAbort, TaskRunAbort>();
         services.AddSingleton<TemporalReminderScheduler>();
+        services.AddSingleton<Jarvis.Application.Proactivity.IProactiveCaseScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<IFileProcessingScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<IConditionWatchScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
         services.AddSingleton<IDailyBriefingScheduler>(sp => sp.GetRequiredService<TemporalReminderScheduler>());
@@ -47,6 +48,8 @@ public static class WorkerServiceCollectionExtensions
         services.AddHostedService<TemporalWorkflowReconciler>();
         services.AddHostedService<MemoryIndexingWorker>();
         services.AddHostedService<MissionSupervisor>();
+        services.AddHostedService<ProactiveCaseDispatcher>();
+        services.AddSingleton<ProactiveCaseActivities>();
         services.AddHostedService<OwnerEventRetentionWorker>();
         services.AddHostedService<TemporalWorkerHostedService>();
         services.AddScoped<IReminderService, ReminderService>();

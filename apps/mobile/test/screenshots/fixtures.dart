@@ -1,6 +1,8 @@
 // Realistic sample data for the screenshot harness. Nothing here reaches a
 // server; dates are relative to "now" so the screens read as current.
 
+import 'proactive_fixtures.dart';
+
 String _iso(DateTime value) => value.toUtc().toIso8601String();
 
 DateTime _now() => DateTime.now();
@@ -904,6 +906,23 @@ Map<String, Object?> laptopSurface() => {
 };
 
 Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
+  'GET /api/v1/proactivity/cases': [
+    proactiveWork(),
+    proactiveTripWork(),
+    proactiveCapacityWork(),
+  ],
+  'GET /api/v1/proactivity/cases/$proactiveCaseId': proactiveWork(),
+  'GET /api/v1/proactivity/cases/sources': proactiveSources(),
+  'GET /api/v1/proactivity/cases/$proactiveTripCaseId': proactiveTripWork(),
+  'GET /api/v1/proactivity/cases/$proactiveCapacityCaseId':
+      proactiveCapacityWork(),
+  'POST /api/v1/proactivity/cases/$proactiveCaseId/commands': {
+    ...proactiveWork(),
+    'status': 'paused',
+    'enabled': false,
+    'revision': 4,
+    'nextCheckAt': null,
+  },
   'GET /api/v1/conversations': conversations(),
   'GET /api/v1/conversations/$conversationId': {
     'id': conversationId,

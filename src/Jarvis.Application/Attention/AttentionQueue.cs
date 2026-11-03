@@ -42,6 +42,8 @@ public sealed class AttentionState
     public Dictionary<string, DateTimeOffset> Snoozed { get; set; } = [];
 }
 
+public sealed record ProactiveAttentionDay(DateOnly Day, IReadOnlyList<string> Groups);
+
 public sealed record AttentionFacts(
     IReadOnlyList<ToolApprovalRecord> Approvals,
     IReadOnlyList<JarvisTaskRecord> Tasks,
@@ -166,7 +168,8 @@ public sealed class AttentionService(
     ICommitmentService commitments,
     IDecisionRepository decisions,
     IOwnerSettingsStore settings,
-    TimeProvider? timeProvider = null) : IAttentionService
+    TimeProvider? timeProvider = null,
+    Proactivity.IProactiveRepository? proactive = null) : IAttentionService
 {
     public const int MaxSnoozeDays = 14;
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
@@ -215,7 +218,48 @@ public sealed class AttentionService(
             await commitments.ListAsync(ownerId, null, CommitmentStatuses.Open, true, cancellationToken),
             await decisions.ListAsync(ownerId, cancellationToken),
             today, now);
-        return AttentionRules.Build(facts);
+        var all = AttentionRules.Build(facts).ToList();
+        if (proactive is not null)
+        {
+            const string ledgerSection = "proactivity.attention";
+            var atomic = settings as IAtomicOwnerSettingsStore;
+            var rawLedger = atomic is null ? null : await atomic.ReadJsonAsync(ownerId, ledgerSection, cancellationToken);
+            var ledger = rawLedger is null ? await settings.GetAsync<ProactiveAttentionDay>(ownerId, ledgerSection, cancellationToken) :
+                System.Text.Json.JsonSerializer.Deserialize<ProactiveAttentionDay>(rawLedger, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+            var shown = ledger?.Day == today ? ledger.Groups.ToHashSet() : [];
+            var originallyShown = shown.Count;
+            var newRows = new HashSet<string>();
+            var cases = await proactive.ListAsync(ownerId, cancellationToken);
+            var optional = cases.Where(c => !c.Terminal && c.Status != "paused" &&
+                (c.Status == "suggested" || c.Findings.Count > 0 || c.Status == "needs_input"))
+                .GroupBy(c => c.RootRef ?? c.Id.ToString()).Select(g => g
+                    .OrderByDescending(c => c.Status == "needs_input" || c.Findings.Any(f => f.Severity == "problem"))
+                    .ThenByDescending(c => c.UpdatedAt).First());
+            foreach (var value in optional.OrderByDescending(c => c.Status == "needs_input").ThenByDescending(c => c.UpdatedAt))
+            {
+                var groupKey = value.RootRef ?? value.Id.ToString();
+                var locked = value.Status == "needs_input" || value.Findings.Any(f => f.Severity == "problem");
+                var matching = value.RootRef is { } root ? all.Where(i => i.Id == root || i.Destination == root).ToArray() : [];
+                if (matching.Any(i => i.Locked)) continue;
+                if (!locked && (Proactivity.ProactiveRules.Quiet(value.Policy, now) ||
+                    value.LastCheckedAt < now.AddDays(-1) || !shown.Contains(groupKey) && shown.Count >= value.Policy.OptionalItemsPerDay)) continue;
+                // Prefer the current actionable preparation over an overlapping optional reminder.
+                all.RemoveAll(i => matching.Contains(i));
+                var attentionId = value.RootRef ?? "proactive:" + value.Id;
+                all.Add(new(attentionId, locked ? AttentionKinds.Problem : "proactive", value.Title,
+                    value.Findings.FirstOrDefault()?.Reason ?? value.NextAction,
+                    locked ? AttentionUrgency.Now : AttentionUrgency.Review, "proactive:" + value.Id, null, 0, locked));
+                if (!locked && shown.Add(groupKey)) newRows.Add(attentionId);
+            }
+            if (shown.Count != originallyShown)
+            {
+                var updatedLedger = new ProactiveAttentionDay(today, shown.ToArray());
+                if (atomic is null) await settings.SaveAsync(ownerId, ledgerSection, updatedLedger, cancellationToken);
+                else if (!await atomic.CompareExchangeJsonAsync(ownerId, ledgerSection, rawLedger,
+                    Proactivity.ProactiveRules.Serialize(updatedLedger), cancellationToken)) all.RemoveAll(i => newRows.Contains(i.Id));
+            }
+        }
+        return all.OrderBy(i => AttentionUrgency.Rank(i.Urgency)).ToArray();
     }
 
     /// <summary>Snoozes that have run out are dropped so the document stays small.</summary>

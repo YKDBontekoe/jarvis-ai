@@ -9,6 +9,7 @@ using Jarvis.Application.Workflows;
 using Jarvis.Domain.Habits;
 using Jarvis.Domain.Inbox;
 using Xunit;
+using Jarvis.Application.Proactivity;
 
 namespace Jarvis.UnitTests;
 
@@ -140,7 +141,8 @@ public sealed class GoalTests
     private sealed record Setup(GoalService Service, InMemorySettingsStore Settings, List<AddDayPlanItemRequest> Planned,
         Guid HabitId, Guid ProjectId, Commitment Promise);
 
-    private static Setup Create(int thisWeek = 1, bool projectOpen = true)
+    private static Setup Create(int thisWeek = 1, bool projectOpen = true,
+        IProactiveRepository? proactive = null, IProactiveCapacityService? capacity = null)
     {
         var habitId = Guid.NewGuid();
         var projectId = Guid.NewGuid();
@@ -168,12 +170,67 @@ public sealed class GoalTests
         var settings = new InMemorySettingsStore();
         var briefings = Fake<IDailyBriefingRepository>.Create(("GetAsync", _ => null));
         return new Setup(new GoalService(settings, habitService, store, focus, promises, dayPlanner, briefings,
-            new FixedClock(Now)), settings, planned, habitId, projectId, promise);
+            new FixedClock(Now), proactive, capacity), settings, planned, habitId, projectId, promise);
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private static ProactiveCase WeeklyBudget(bool calendar) => new(Guid.NewGuid(), Owner, "fixture", "goal_capacity", "Shared week", "Fit goals into one week",
+        "open", true, null, null, [], null, new(UseCalendarCapacity: calendar), [], [], null, 90, "Review", [], [], [], [], Now, Now, null, Now);
+
+    [Fact]
+    public async Task Several_accepted_goal_plans_share_fresh_calendar_capacity_and_unknown_availability_blocks_more_work()
+    {
+        var budget = WeeklyBudget(true);
+        int? available = 60;
+        var s = Create(proactive: Fake<IProactiveRepository>.Create(("ListAsync", _ => new[] { budget }), ("GetAsync", _ => budget)),
+            capacity: Fake<IProactiveCapacityService>.Create(("CalculateAsync", _ =>
+                new ProactiveCapacity(GoalLogic.MondayOf(Today), available, available, 0, "Calendar availability is unknown.", Now))));
+        var goals = Enumerable.Range(0, 3).Select(i => Goal() with { Title = "Goal " + i,
+            Plan = new(GoalLogic.MondayOf(Today), [new(Guid.NewGuid(), "Step " + i, 30, GoalPlanStatuses.Proposed, null, "step-" + i)]) }).ToArray();
+        await s.Settings.SaveAsync(Owner, GoalState.Section, new GoalState(goals), default);
+        Assert.True((await s.Service.ActOnPlanItemAsync(Owner, goals[0].Id, goals[0].Plan!.Items[0].Id, new("accept", null), null, default)).Succeeded);
+        Assert.True((await s.Service.ActOnPlanItemAsync(Owner, goals[1].Id, goals[1].Plan!.Items[0].Id, new("accept", null), null, default)).Succeeded);
+        var overflow = await s.Service.ActOnPlanItemAsync(Owner, goals[2].Id, goals[2].Plan!.Items[0].Id, new("accept", null), null, default);
+        Assert.Equal("capacity", overflow.Field);
+        Assert.Contains("shared 60-minute week", overflow.Message);
+        available = null;
+        var unknown = await s.Service.ActOnPlanItemAsync(Owner, goals[2].Id, goals[2].Plan!.Items[0].Id, new("accept", null), null, default);
+        Assert.Contains("unknown", unknown.Message);
+        Assert.Empty(s.Planned);
+        var persisted = (await s.Settings.GetAsync<GoalState>(Owner, GoalState.Section, default))!;
+        Assert.Equal(60, persisted.Goals.SelectMany(g => g.Plan!.Items).Where(i => i.Status == GoalPlanStatuses.Accepted).Sum(i => i.Minutes));
+    }
+
+    [Fact]
+    public async Task Completed_work_keeps_using_the_week_budget_after_its_goal_is_paused()
+    {
+        var budget = WeeklyBudget(false);
+        var s = Create(proactive: Fake<IProactiveRepository>.Create(("ListAsync", _ => new[] { budget }), ("GetAsync", _ => budget)));
+        var done = Goal(status: GoalStatuses.Paused) with { Plan = new(GoalLogic.MondayOf(Today), [new(Guid.NewGuid(), "Done", 60, GoalPlanStatuses.Done, null, "done")]) };
+        var next = Goal() with { Plan = new(GoalLogic.MondayOf(Today), [new(Guid.NewGuid(), "More work", 60, GoalPlanStatuses.Proposed, null, "more")]) };
+        await s.Settings.SaveAsync(Owner, GoalState.Section, new GoalState([done, next]), default);
+        Assert.Equal("capacity", (await s.Service.ActOnPlanItemAsync(Owner, next.Id, next.Plan!.Items[0].Id, new("accept", null), null, default)).Field);
+    }
+
+    [Fact]
+    public async Task An_owner_budget_edit_during_calendar_lookup_does_not_accept_a_plan_using_the_old_limit()
+    {
+        var budget = WeeklyBudget(true);
+        var s = Create(proactive: Fake<IProactiveRepository>.Create(("ListAsync", _ => new[] { budget }), ("GetAsync", _ => budget)),
+            capacity: Fake<IProactiveCapacityService>.Create(("CalculateAsync", _ => {
+                budget = budget with { AvailableMinutes = 0, Revision = budget.Revision + 1 };
+                return new ProactiveCapacity(GoalLogic.MondayOf(Today), 60, 60, 0, "Before the owner edit", Now);
+            })));
+        var goal = Goal() with { Plan = new(GoalLogic.MondayOf(Today), [new(Guid.NewGuid(), "New step", 30, GoalPlanStatuses.Proposed, null, "new")]) };
+        await s.Settings.SaveAsync(Owner, GoalState.Section, new GoalState([goal]), default);
+        var result = await s.Service.ActOnPlanItemAsync(Owner, goal.Id, goal.Plan!.Items[0].Id, new("accept", null), null, default);
+        Assert.Equal("capacity", result.Field);
+        Assert.Contains("changed during planning", result.Message);
+        Assert.Equal(GoalPlanStatuses.Proposed, (await s.Settings.GetAsync<GoalState>(Owner, GoalState.Section, default))!.Goals[0].Plan!.Items[0].Status);
     }
 
     private static GoalInput Input(string title = "Run a 10k", Guid? project = null, IReadOnlyList<Guid>? habits = null,

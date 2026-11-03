@@ -28,6 +28,7 @@ public sealed class WorkerTemporalRegistrationTests
             typeof(Jarvis.Worker.Activities.HabitCheckInActivities),
             typeof(Jarvis.Worker.Activities.PeopleCheckInActivities),
             typeof(Jarvis.Worker.Learning.AgentReactionActivities),
+            typeof(Jarvis.Worker.Activities.ProactiveCaseActivities),
         };
 
         var discovered = implementationTypes
@@ -64,6 +65,7 @@ public sealed class WorkerTemporalRegistrationTests
             typeof(HabitCheckInWorkflow),
             typeof(PeopleCheckInWorkflow),
             typeof(AgentReactionWorkflow),
+            typeof(ProactiveCaseWorkflow),
         };
 
         var discovered = workflowTypes

@@ -12,6 +12,8 @@ import 'harness.dart';
 /// Writes a screenshot of each page. Run:
 /// flutter test test/screenshots/layout_audit.dart
 const destinations = [
+  'proactive',
+  'proactive:019a4320-0000-7000-8000-000000000001',
   'tasks',
   'projects',
   'project:p2',

@@ -10,7 +10,8 @@ namespace Jarvis.Infrastructure.Events;
 /// task, a memory's source). Every query is scoped to the owner, and titles are read the same way, so a ref to
 /// someone else's thing resolves to nothing.
 /// </summary>
-public sealed class RelatedEntityService(JarvisDbContext db, IEntityLinkRepository links) : IRelatedEntityService
+public sealed class RelatedEntityService(JarvisDbContext db, IEntityLinkRepository links,
+    Jarvis.Application.Settings.IOwnerSettingsStore? settings = null) : IRelatedEntityService
 {
     private const int MaxRelated = 40;
     private const int TitleLength = 120;
@@ -173,6 +174,12 @@ public sealed class RelatedEntityService(JarvisDbContext db, IEntityLinkReposito
         var id = entity.Id;
         var title = entity.Type switch
         {
+            EntityTypes.Meeting => await db.Meetings.Where(x => x.OwnerId == ownerId && x.Id == id).Select(x => x.Title).FirstOrDefaultAsync(ct),
+            EntityTypes.Message => await db.Messages.Where(x => x.Id == id && db.Conversations.Any(c => c.Id == x.ConversationId && c.OwnerId == ownerId))
+                .Select(x => "Source message").FirstOrDefaultAsync(ct),
+            EntityTypes.Goal => settings is null ? null : (await settings.GetAsync<Jarvis.Application.Goals.GoalState>(ownerId, Jarvis.Application.Goals.GoalState.Section, ct))?.Goals.FirstOrDefault(x => x.Id == id)?.Title,
+            EntityTypes.Trip => settings is null ? null : (await settings.GetAsync<Jarvis.Application.Trips.TripState>(ownerId, Jarvis.Application.Trips.TripState.Section, ct))?.Items.FirstOrDefault(x => x.Id == id)?.Title,
+            EntityTypes.Document => settings is null ? null : (await settings.GetAsync<Jarvis.Application.Documents.DocumentState>(ownerId, Jarvis.Application.Documents.DocumentState.Section, ct))?.Drafts.FirstOrDefault(x => x.Id == id)?.Title,
             EntityTypes.Task => await db.Tasks.Where(x => x.OwnerId == ownerId && x.Id == id).Select(x => x.Title).FirstOrDefaultAsync(ct),
             EntityTypes.Reminder => await db.Reminders.Where(x => x.OwnerId == ownerId && x.Id == id).Select(x => x.Title).FirstOrDefaultAsync(ct),
             EntityTypes.Watch => await db.ConditionWatches.Where(x => x.OwnerId == ownerId && x.Id == id).Select(x => x.Title).FirstOrDefaultAsync(ct),

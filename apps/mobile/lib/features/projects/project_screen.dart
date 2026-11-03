@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
+import '../proactivity/proactive_screen.dart';
+import '../../l10n/l10n.dart';
 import '../files/files_screen.dart';
 import '../../json_maps.dart';
 import '../search/context_commands.dart';
@@ -438,8 +440,24 @@ class _ProjectScreenState extends State<ProjectScreen>
               icon: const Icon(PhosphorIconsRegular.dotsThree, size: 22),
               onSelected: (value) {
                 if (value == 'delete') unawaited(_delete());
+                if (value == 'proactive') {
+                  unawaited(
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => ProactiveScreen(
+                          http: widget.http,
+                          rootRef: 'project:${widget.projectId}',
+                        ),
+                      ),
+                    ),
+                  );
+                }
               },
               itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'proactive',
+                  child: Text(context.l10n.proactiveTitle),
+                ),
                 PopupMenuItem(
                   value: 'delete',
                   child: Row(
