@@ -16,5 +16,9 @@
     "@whiskeysockets/baileys": "7.0.0-rc14",
     "pino": "^9.5.0",
     "qrcode": "^1.5.4"
+  },
+  "overrides": {
+    "glob": "^14.0.3",
+    "minimatch": "^11.0.4"
   }
 }

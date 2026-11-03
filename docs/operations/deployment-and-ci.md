@@ -175,7 +175,7 @@ web server against a separate local API, continue passing
 2. Sign the server in to ChatGPT from the app after the first deploy
 3. Firebase/APNs for push (optional)
 4. Pin container image digests
-5. Disable `Authentication:AllowRegistration` after bootstrap
+5. Registration closes itself after the first account (`AUTH_ALLOW_REGISTRATION=first`); set `true` only while you add more accounts
 6. Never expose a local Aspire (Development) instance publicly
 
 Detailed operator steps remain in [README.md](../../README.md#production-deployment).

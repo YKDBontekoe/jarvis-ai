@@ -25,9 +25,15 @@ public sealed partial class CodexSignIn(CodexExecutable executable, ILogger<Code
     private CodexDeviceCode? _pending;
     private string? _error;
 
+    // `codex login status` starts a process; Setup, Home and Settings ask often, so the answer is kept briefly and
+    // shared by concurrent callers. Starting or finishing a sign-in drops it.
+    internal static readonly TimeSpan SignedInCacheLifetime = TimeSpan.FromSeconds(10);
+    private readonly Lock _signedInLock = new();
+    private (Task<bool> Check, DateTimeOffset At)? _signedIn;
+
     public async Task<CodexSignInStatus> GetStatusAsync(CancellationToken cancellationToken)
     {
-        var signedIn = await IsSignedInAsync(cancellationToken);
+        var signedIn = await CachedSignedInAsync(cancellationToken);
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -43,6 +49,7 @@ public sealed partial class CodexSignIn(CodexExecutable executable, ILogger<Code
     /// <summary>Starts a device-code sign-in, or returns the one already waiting.</summary>
     public async Task<CodexSignInStatus> StartAsync(CancellationToken cancellationToken)
     {
+        ForgetSignedIn();
         if (await IsSignedInAsync(cancellationToken))
             throw new InvalidOperationException("Codex is already signed in on this server.");
         await _gate.WaitAsync(cancellationToken);
@@ -97,6 +104,24 @@ public sealed partial class CodexSignIn(CodexExecutable executable, ILogger<Code
         return url.Success && code.Success ? new CodexDeviceCode(url.Value, code.Value, now.Add(CodeLifetime)) : null;
     }
 
+    private Task<bool> CachedSignedInAsync(CancellationToken cancellationToken)
+    {
+        Task<bool> check;
+        lock (_signedInLock)
+        {
+            if (_signedIn is not { } cached || DateTimeOffset.UtcNow - cached.At >= SignedInCacheLifetime ||
+                cached.Check.IsFaulted || cached.Check.IsCanceled)
+                _signedIn = cached = (IsSignedInAsync(CancellationToken.None), DateTimeOffset.UtcNow);
+            check = cached.Check;
+        }
+        return check.WaitAsync(cancellationToken);
+    }
+
+    private void ForgetSignedIn()
+    {
+        lock (_signedInLock) _signedIn = null;
+    }
+
     private async Task<bool> IsSignedInAsync(CancellationToken cancellationToken)
     {
         using var process = new Process { StartInfo = StartInfo(executable.Resolve(), "login", "status") };
@@ -129,6 +154,7 @@ public sealed partial class CodexSignIn(CodexExecutable executable, ILogger<Code
             using var timeout = new CancellationTokenSource(CodeLifetime + TimeSpan.FromMinutes(1));
             await process.WaitForExitAsync(timeout.Token);
             await drain;
+            ForgetSignedIn();
             await _gate.WaitAsync();
             try
             {

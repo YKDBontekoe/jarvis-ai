@@ -15,7 +15,7 @@ Jarvis is designed to **fail closed** when authentication, scanning, or approval
 
 Refresh tokens are stored hashed and rotated on every use; presenting an already-rotated token revokes the whole session. A background worker in the API deletes tokens a day after they expire (revoked tokens that have not expired are kept, since they are how replay is noticed).
 
-Production requires `Authentication:Issuer`, `Authentication:Audience`, and `Authentication:SigningKey` (≥32 bytes). Set `Authentication:AllowRegistration=false` after bootstrap.
+Production requires `Authentication:Issuer`, `Authentication:Audience`, and `Authentication:SigningKey` (≥32 bytes). Production defaults to `Authentication:AllowRegistration=first`, so only the first account can sign up; `true` reopens registration and `false` closes it.
 
 ## Secrets and credentials
 

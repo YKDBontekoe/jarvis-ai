@@ -26,7 +26,7 @@ All colours come from `JarvisColors.of(context)` (`apps/mobile/lib/theme.dart`).
 | `outlineStrong` | `#d3d3de` | `#363642` | Borders that must show |
 | `ink` | `#16161d` | `#f2f2f7` | Primary text, primary buttons |
 | `inkSoft` | `#5a5b68` | `#a9aab8` | Secondary text |
-| `muted` | `#8a8b9a` | `#7c7d8d` | Tertiary text, caps labels |
+| `muted` | `#656675` | `#8f90a0` | Tertiary text, caps labels (≥ 4.5:1 on every surface) |
 | `onInk` | `#ffffff` | `#0f0f14` | Text on `ink` |
 | `accent` | `#5b4ef0` | `#8f86ff` | Links, counts, selection, Jarvis |
 | `accentDeep` | `#4338ca` | `#c4c0ff` | Text on `accentSoft` |

@@ -45,8 +45,20 @@ REQUIRED_ENV = {
 }
 
 
+def _newest_input_mtime() -> float:
+    """The newest AppHost source or infra file the generated Compose file is built from."""
+    inputs = [REPO_ROOT / "src" / "Jarvis.AppHost", REPO_ROOT / "infra"]
+    return max((path.stat().st_mtime for root in inputs for path in root.rglob("*")
+                if path.is_file() and "/bin/" not in str(path) and "/obj/" not in str(path)), default=0)
+
+
 def _publish(directory: Path, features: str) -> Path:
     compose = directory / "docker-compose.yaml"
+    # A file left by an earlier run is reused only while nothing it was built from has changed; otherwise a
+    # changed squid.conf or AppHost default would be tested against the old output.
+    if compose.exists() and "JARVIS_GENERATED_COMPOSE_DIR" not in os.environ and \
+            compose.stat().st_mtime < _newest_input_mtime():
+        compose.unlink()
     if not compose.exists():
         subprocess.run(
             ["scripts/deploy/publish-compose.sh", str(directory)],

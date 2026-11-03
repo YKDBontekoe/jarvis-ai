@@ -144,6 +144,7 @@ internal static class ApiServiceRegistration
         services.AddScoped<IJarvisTaskRepository, WorkflowRepository>();
         services.AddScoped<IJarvisTaskService, JarvisTaskService>();
         services.AddSingleton<PublicJsonMetricReader>();
+        services.AddSingleton<CalendarFeedCache>();
         services.AddScoped<ICalendarFeed, CalendarFeed>();
         services.AddScoped<Jarvis.Application.Planner.IDayPlannerService, Jarvis.Application.Planner.DayPlannerService>();
         services.AddScoped<WatchMetricReader>();

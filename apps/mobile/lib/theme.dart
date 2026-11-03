@@ -108,7 +108,8 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
     outlineStrong: Color(0xffd3d3de),
     ink: Color(0xff16161d),
     inkSoft: Color(0xff5a5b68),
-    muted: Color(0xff8a8b9a),
+    // 4.5:1 or more on every surface (WCAG AA for small text).
+    muted: Color(0xff656675),
     onInk: Color(0xffffffff),
     accent: Color(0xff5b4ef0),
     accentDeep: Color(0xff4338ca),
@@ -136,7 +137,7 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
     outlineStrong: Color(0xff363642),
     ink: Color(0xfff2f2f7),
     inkSoft: Color(0xffa9aab8),
-    muted: Color(0xff7c7d8d),
+    muted: Color(0xff8f90a0),
     onInk: Color(0xff0f0f14),
     accent: Color(0xff8f86ff),
     accentDeep: Color(0xffc4c0ff),

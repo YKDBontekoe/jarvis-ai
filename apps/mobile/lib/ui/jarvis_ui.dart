@@ -1602,45 +1602,52 @@ class StatusChip extends StatelessWidget {
       child: InkWell(
         customBorder: const StadiumBorder(),
         onTap: onAction,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 6, 12, 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: 7),
-              // The label gives way at large text so the action stays.
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                    color: colors.inkSoft,
+        child: ConstrainedBox(
+          // With an action the chip is a 44pt target (playbook §9).
+          constraints: BoxConstraints(minHeight: onAction == null ? 0 : 44),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 6, 12, 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
                   ),
                 ),
-              ),
-              if (actionLabel != null) ...[
-                Text(
-                  '  ·  ',
-                  style: TextStyle(fontSize: 12.5, color: colors.muted),
-                ),
-                Text(
-                  actionLabel!,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: colors.accent,
+                const SizedBox(width: 7),
+                // The label gives way at large text so the action stays.
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: colors.inkSoft,
+                    ),
                   ),
                 ),
+                if (actionLabel != null) ...[
+                  Text(
+                    '  ·  ',
+                    style: TextStyle(fontSize: 12.5, color: colors.muted),
+                  ),
+                  Text(
+                    actionLabel!,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.accent,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

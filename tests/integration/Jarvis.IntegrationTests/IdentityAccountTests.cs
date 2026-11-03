@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Pgvector.EntityFrameworkCore;
 using Testcontainers.PostgreSql;
+using Microsoft.AspNetCore.Http;
 using Xunit;
 
 namespace Jarvis.IntegrationTests;
@@ -45,6 +46,20 @@ public sealed class AccountTokenOptionsTests
         }).Build();
         Assert.Throws<InvalidOperationException>(() => AccountTokenOptions.From(developmentKey, isDevelopment: false));
     }
+
+    [Theory]
+    [InlineData(null, RegistrationMode.Open)]
+    [InlineData("true", RegistrationMode.Open)]
+    [InlineData("True", RegistrationMode.Open)]
+    [InlineData("false", RegistrationMode.Closed)]
+    [InlineData("first", RegistrationMode.FirstAccount)]
+    [InlineData(" FIRST ", RegistrationMode.FirstAccount)]
+    public void Registration_mode_reads_true_false_and_first(string? value, RegistrationMode expected) =>
+        Assert.Equal(expected, AccountTokenOptions.ParseRegistration(value));
+
+    [Fact]
+    public void Registration_mode_rejects_an_unknown_value() =>
+        Assert.Throws<InvalidOperationException>(() => AccountTokenOptions.ParseRegistration("sometimes"));
 }
 
 public sealed class IdentityAccountTests : IAsyncLifetime
@@ -151,5 +166,50 @@ public sealed class IdentityAccountTests : IAsyncLifetime
         // The rotated-away token is still known, so replaying it still revokes the whole session.
         Assert.False((await refreshTokens.RotateAsync(rotatedAway, TimeSpan.FromDays(30), CancellationToken.None)).Succeeded);
         Assert.False((await refreshTokens.RotateAsync(replacement.RefreshToken, TimeSpan.FromDays(30), CancellationToken.None)).Succeeded);
+    }
+
+    [Fact]
+    public async Task First_account_registration_admits_one_owner_then_closes()
+    {
+        var tokens = WithRegistration(RegistrationMode.FirstAccount);
+
+        // Several sign-ups at once on an empty server: exactly one becomes the owner.
+        var results = await Task.WhenAll(Enumerable.Range(0, 5).Select(index =>
+            RegisterAsync(tokens, $"first-{index}-{Guid.NewGuid():N}@example.com")));
+
+        Assert.Equal(1, results.Count(status => status == StatusCodes.Status200OK));
+        Assert.Equal(4, results.Count(status => status == StatusCodes.Status403Forbidden));
+        Assert.Equal(StatusCodes.Status403Forbidden, await RegisterAsync(tokens, $"later-{Guid.NewGuid():N}@example.com"));
+        await using var scope = _services!.CreateAsyncScope();
+        Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<UserManager<JarvisUser>>().Users.CountAsync());
+    }
+
+    [Fact]
+    public async Task Open_registration_admits_more_accounts_and_closed_admits_none()
+    {
+        Assert.Equal(StatusCodes.Status403Forbidden,
+            await RegisterAsync(WithRegistration(RegistrationMode.Closed), $"closed-{Guid.NewGuid():N}@example.com"));
+        var open = WithRegistration(RegistrationMode.Open);
+        Assert.Equal(StatusCodes.Status200OK, await RegisterAsync(open, $"a-{Guid.NewGuid():N}@example.com"));
+        Assert.Equal(StatusCodes.Status200OK, await RegisterAsync(open, $"b-{Guid.NewGuid():N}@example.com"));
+    }
+
+    private AccountTokenOptions WithRegistration(RegistrationMode mode) => new()
+    {
+        Issuer = _tokens.Issuer,
+        Audience = _tokens.Audience,
+        SigningKey = _tokens.SigningKey,
+        Registration = mode,
+    };
+
+    private async Task<int> RegisterAsync(AccountTokenOptions tokens, string email)
+    {
+        await using var scope = _services!.CreateAsyncScope();
+        var result = await Jarvis.Api.Security.IdentityAuthEndpoints.Register(
+            new Jarvis.Api.Security.AuthCredentialsRequest(email, "Correct-horse-1"),
+            scope.ServiceProvider.GetRequiredService<UserManager<JarvisUser>>(),
+            scope.ServiceProvider.GetRequiredService<RefreshTokenStore>(), tokens, CancellationToken.None);
+        return Assert.IsAssignableFrom<Microsoft.AspNetCore.Http.IStatusCodeHttpResult>(result).StatusCode
+               ?? StatusCodes.Status200OK;
     }
 }
