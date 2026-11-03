@@ -225,8 +225,11 @@ class _MessageBubbleState extends State<MessageBubble> {
                 if (!message.pending)
                   Padding(
                     padding: const EdgeInsets.only(top: 6, left: -8 + 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    // Wraps instead of overflowing: five actions do not fit
+                    // beside the avatar on a 320pt phone at large text.
+                    child: Wrap(
+                      key: const Key('message-actions'),
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         _CopyButton(copied: _copied, onPressed: _copy),
                         if (widget.onRate != null) ...[

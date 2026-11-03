@@ -104,6 +104,24 @@ public sealed class CodexInstallationTests : IDisposable
     }
 
     [Fact]
+    public async Task Version_check_does_not_wait_for_a_cli_that_reads_stdin()
+    {
+        // A wrapper or fixture that drains stdin used to hang the check until its 15 second timeout, so the
+        // installed version was reported unknown and the first Settings load took 15 seconds.
+        const string versionBranch = "if \"--version\" in sys.argv:\n";
+        Assert.Contains(versionBranch, CurrentCliScript, StringComparison.Ordinal);
+        var script = CurrentCliScript.Replace(versionBranch, versionBranch + "    sys.stdin.read()\n",
+            StringComparison.Ordinal);
+        var installation = CreateInstallation("""{"version":"0.157.0"}""", cliScript: script);
+
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var status = await installation.Status.GetStatusAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("0.145.0", status.InstalledVersion);
+        Assert.True(started.Elapsed < TimeSpan.FromSeconds(10), $"took {started.Elapsed}");
+    }
+
+    [Fact]
     public async Task Update_installs_the_registry_release_and_loads_its_models()
     {
         var installation = CreateInstallation("""{"version":"0.157.0"}""");
@@ -180,14 +198,14 @@ public sealed class CodexInstallationTests : IDisposable
     private static int CountCalls(string directory, string argument) =>
         File.ReadAllLines(Path.Combine(directory, "calls.log")).Count(line => line.Contains(argument, StringComparison.Ordinal));
 
-    private Installation CreateInstallation(string registryBody, bool stockName = true)
+    private Installation CreateInstallation(string registryBody, bool stockName = true, string? cliScript = null)
     {
         var directory = Directory.CreateDirectory(Path.Combine(_root, Guid.NewGuid().ToString("N"))).FullName;
         var cliDirectory = Path.Combine(directory, "current");
         Directory.CreateDirectory(cliDirectory);
         var executableName = stockName ? "codex" : "fake_codex_app_server.mjs";
         var executablePath = Path.Combine(cliDirectory, executableName);
-        WriteExecutable(executablePath, CurrentCliScript);
+        WriteExecutable(executablePath, cliScript ?? CurrentCliScript);
 
         var npmPath = Path.Combine(directory, "npm");
         WriteExecutable(npmPath, NpmScript);

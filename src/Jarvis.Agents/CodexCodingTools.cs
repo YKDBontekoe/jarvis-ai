@@ -242,6 +242,8 @@ public sealed class CodexCodingTools(IConfiguration configuration, ILogger<Codex
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
         using var process = new Process { StartInfo = start };
         if (!process.Start()) throw new InvalidOperationException($"Could not start {executable}.");
+        // Nothing is sent: an open stdin would let a prompt (git credentials) wait out the timeout.
+        process.StandardInput.Close();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(60));
         using var killOnCancellation = timeout.Token.Register(() =>

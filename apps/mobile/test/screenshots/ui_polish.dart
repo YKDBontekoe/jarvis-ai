@@ -108,12 +108,22 @@ void main() {
             final look = brightness == Brightness.light ? 'day' : 'night';
             final suffix =
                 '$look-${size.width.toInt()}-${(scale * 100).toInt()}';
-            expect(
+            // Tabs are icons; the only text in the capsule is the open tab's
+            // name, when it fits. The strip above it carries its own text.
+            final capsuleText = tester.widgetList<Text>(
               find.descendant(
-                of: find.byType(JarvisTabBar),
+                of: find.descendant(
+                  of: find.byType(JarvisTabBar),
+                  matching: find.byKey(const Key('dock-capsule')),
+                ),
                 matching: find.byType(Text),
               ),
-              findsNothing,
+            );
+            expect(
+              capsuleText.where(
+                (text) => text.key != const Key('tab-selected-label'),
+              ),
+              isEmpty,
             );
             await capture(tester, 'polish-home-$suffix');
             await tester.tap(find.byKey(const Key('tab-chats')));
@@ -142,6 +152,11 @@ void main() {
             await settle(tester);
             expect(find.text('WhatsApp · Work'), findsOneWidget);
             expect(find.text('No messages yet'), findsNothing);
+            // Scrolling folds the dock to the open tab; tapping it unfolds.
+            if (find.byKey(const Key('tab-everything')).evaluate().isEmpty) {
+              await tester.tap(find.byKey(const Key('tab-chats')));
+              await settle(tester);
+            }
             await tester.tap(find.byKey(const Key('tab-everything')));
             await settle(tester);
             await capture(tester, 'polish-everything-$suffix');

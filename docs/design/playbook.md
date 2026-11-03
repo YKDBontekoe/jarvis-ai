@@ -70,7 +70,7 @@ Geist for everything (`JarvisType`, `theme.dart`).
   - text next to fixed-width controls goes in `Expanded`/`Flexible` with `maxLines` and an ellipsis;
   - tags that sit beside a title are `Flexible` and only as wide as their label (`ChatTag`).
 - **Text scaling:** body text follows the system size fully. Only display headings clamp (greeting 1.3×, day line 1.6×, 3 lines).
-- **Nothing overflows at 3×.** `layout_audit.dart` (`large-text`, 320pt wide) and `ui_polish.dart` fail on any overflow at the largest accessibility size. In a `Row`, text that can grow is `Flexible` or `Expanded` and ellipsizes; a title next to an action uses `Wrap` so the action can drop under it; a line with a button stacks when `textScalerOf(context).scale(1) >= 1.5`; every `DropdownButtonFormField` sets `isExpanded: true`.
+- **Nothing overflows at 3×.** `layout_audit.dart` (`large-text`, 320pt wide) and `ui_polish.dart` fail on any overflow at the largest accessibility size. In a `Row`, text that can grow is `Flexible` or `Expanded` and ellipsizes; a title next to an action uses `Wrap` so the action can drop under it; a line with a button stacks when `textScalerOf(context).scale(1) >= 1.5`; every `DropdownButtonFormField` sets `isExpanded: true`. A row of icon actions under a message (Copy, rate, ⋯, Try again) is a `Wrap`, so the last action drops to a second line instead of being clipped at 320pt and 3×.
 - Section rhythm on Home is 20–28 between sections and 8–14 inside a card.
 - Wide layout (≥ 900): a navigation rail, a list pane, and a detail pane. A WhatsApp chat linked to a person adds the About panel (320 wide) when the pane is ≥ 860 (`PersonPanel.fits`).
 

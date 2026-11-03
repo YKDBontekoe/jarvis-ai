@@ -102,6 +102,28 @@ void main() {
     },
   );
 
+  testWidgets('the travellers stepper is named for screen readers', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    http.on('GET', '/api/v1/trips', <Object>[]);
+    await show(tester, TripsScreen(http: http.client(), today: today));
+    await tester.tap(find.byKey(const Key('trip-start')));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Fewer travellers'), findsOneWidget);
+    expect(find.byTooltip('More travellers'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.byKey(const Key('trip-more'))).tooltip,
+      'More travellers',
+    );
+    expect(find.bySemanticsLabel('1 traveller'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('trip-more')));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('2 travellers'), findsOneWidget);
+    semantics.dispose();
+  });
+
   testWidgets('options show how fresh their quote is', (tester) async {
     http.on('GET', '/api/v1/trips/t1', view());
     await show(

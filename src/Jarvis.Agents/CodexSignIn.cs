@@ -103,6 +103,9 @@ public sealed partial class CodexSignIn(CodexExecutable executable, ILogger<Code
         try
         {
             process.Start();
+            // Nothing is sent: close stdin so a CLI or wrapper that reads it exits instead of waiting out the timeout
+            // (and reporting "signed out").
+            process.StandardInput.Close();
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(20));
             await process.WaitForExitAsync(timeout.Token);

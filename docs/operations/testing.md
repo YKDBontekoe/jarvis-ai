@@ -52,7 +52,7 @@ Fixtures under `tests/e2e/`:
 | `platform_flow.mjs` | A2A, devices, voice options; `JARVIS_PLATFORM_CHAT=1` for `RenderUi` |
 
 Quickest path (also in cloud sessions): `scripts/dev/smoke.sh` starts the AppHost with `verification`, waits for
-`/health`, and runs `local_fixture_flow.mjs` (`up`, `test [flow.mjs …]` and `down` run the steps separately; logs in
+`/health`, and runs `local_fixture_flow.mjs` and `ask_file_flow.mjs` (a real upload through ClamAV, object storage and indexing) (`up`, `test [flow.mjs …]` and `down` run the steps separately; logs in
 `artifacts/smoke/`). In Claude Code cloud sessions it skips the WhatsApp bridge image, whose `npm ci` cannot run inside
 `docker build` behind the sandbox proxy.
 

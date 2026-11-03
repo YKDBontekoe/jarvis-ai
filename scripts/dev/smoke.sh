@@ -4,7 +4,7 @@
 # then run the e2e fixture flows against it.
 #
 #   scripts/dev/smoke.sh up                 # start (background) and wait until healthy
-#   scripts/dev/smoke.sh test [flow.mjs …]  # run e2e flows (default: local_fixture_flow.mjs)
+#   scripts/dev/smoke.sh test [flow.mjs …]  # run e2e flows (default: local_fixture_flow.mjs ask_file_flow.mjs)
 #   scripts/dev/smoke.sh down               # stop the AppHost and its containers
 #   scripts/dev/smoke.sh                    # up + test (leaves the stack running)
 #
@@ -54,7 +54,8 @@ up() {
 
 test_flows() {
   local flows=("$@")
-  [ ${#flows[@]} -eq 0 ] && flows=(local_fixture_flow.mjs)
+  # ask_file_flow uploads a real file, so it covers the virus scanner, object storage and indexing.
+  [ ${#flows[@]} -eq 0 ] && flows=(local_fixture_flow.mjs ask_file_flow.mjs)
   (cd tests/e2e && { [ -d node_modules ] || npm ci --silent; })
   for flow in "${flows[@]}"; do
     echo "==> $flow"

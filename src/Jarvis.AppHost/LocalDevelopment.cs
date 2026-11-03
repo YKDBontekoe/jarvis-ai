@@ -40,7 +40,9 @@ internal static class LocalDevelopment
             .WithEnvironment("AWS_SECRET_ACCESS_KEY", objectStorageSecretKey)
             .WithEnvironment("S3_BUCKET", objectStorageBucket)
             .WithVolume("jarvis-object-storage-data", "/data")
-            .WithEndpoint(targetPort: 8333, port: 8333, name: "s3");
+            // An HTTP endpoint: the API and worker pass this URL to the S3 SDK, which rejects the tcp:// scheme a
+            // plain WithEndpoint gets.
+            .WithHttpEndpoint(targetPort: 8333, port: 8333, name: "s3");
 
         var livekit = builder.AddContainer("livekit", "livekit/livekit-server", "latest")
             .WithEnvironment("LIVEKIT_KEYS", $"{livekitApiKey}: {livekitApiSecret}")
