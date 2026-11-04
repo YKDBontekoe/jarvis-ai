@@ -68,9 +68,7 @@ void main() {
     expect(body['localTime'], '09:00:00');
   });
 
-  testWidgets('swiping a reminder marks it done or snoozes it', (
-    tester,
-  ) async {
+  testWidgets('swiping a reminder marks it done or snoozes it', (tester) async {
     http.on('GET', '/api/v1/reminders', [
       {
         'id': 'r1',
@@ -392,18 +390,29 @@ void main() {
       },
     ]);
     http.on('GET', '/api/v1/notifications', <Object>[]);
+    final snoozedUntil = DateTime.now().add(const Duration(minutes: 10));
     http.on('POST', '/api/v1/reminders/r1/snooze', {
       'id': 'r1',
       'title': 'Call mom',
       'status': 'pending',
-      'dueAt': DateTime.now()
-          .add(const Duration(minutes: 10))
-          .toUtc()
-          .toIso8601String(),
+      'dueAt': snoozedUntil.toUtc().toIso8601String(),
     });
     await show(tester);
 
-    expect(find.textContaining('Reminded you Today'), findsOneWidget);
+    // Near midnight "3 minutes ago" is yesterday and "in 10 minutes" is
+    // tomorrow, so the expected day follows the clock.
+    String dayOf(DateTime moment) {
+      final today = DateTime.now();
+      final local = moment.toLocal();
+      if (local.year == today.year &&
+          local.month == today.month &&
+          local.day == today.day) {
+        return 'Today';
+      }
+      return local.isAfter(today) ? 'Tomorrow' : 'Yesterday';
+    }
+
+    expect(find.textContaining('Reminded you ${dayOf(fired)}'), findsOneWidget);
     await tester.tap(find.byTooltip('Reminder actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remind me again…'));
@@ -414,7 +423,10 @@ void main() {
     final body =
         http.sent('POST', '/api/v1/reminders/r1/snooze').single.body as Map;
     expect(body['minutes'], 10);
-    expect(find.textContaining('Snoozed until Today'), findsOneWidget);
+    expect(
+      find.textContaining('Snoozed until ${dayOf(snoozedUntil)}'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('an upcoming one-time reminder can be marked done', (

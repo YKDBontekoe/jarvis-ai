@@ -149,7 +149,11 @@ void main() {
     await linkWhatsApp(tester);
     await show(tester);
     await pick(tester, ChatFilter.all);
-    expect(find.byKey(const Key('chats-section-today')), findsOneWidget);
+    // The newest chat is 5 minutes old, so in the first minutes after
+    // midnight it sits under Yesterday.
+    final newest = now.subtract(const Duration(minutes: 5));
+    final heading = newest.day == now.day ? 'today' : 'yesterday';
+    expect(find.byKey(Key('chats-section-$heading')), findsOneWidget);
     final sam = tester.getTopLeft(find.text('Sam')).dy;
     final family = tester.getTopLeft(find.text('Family')).dy;
     final lisbon = tester.getTopLeft(find.text('Lisbon trip')).dy;

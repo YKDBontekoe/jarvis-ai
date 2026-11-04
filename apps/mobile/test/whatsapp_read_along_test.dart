@@ -291,7 +291,15 @@ void main() {
   testWidgets('chat shows both sides, drafts a reply and sends it', (
     tester,
   ) async {
-    final now = DateTime.now().toUtc();
+    // Both messages fall inside today even just after midnight, so the day
+    // header is "Today" whenever the test runs.
+    final local = DateTime.now();
+    final midnight = DateTime(local.year, local.month, local.day);
+    final now =
+        (local.difference(midnight) < const Duration(minutes: 5)
+                ? midnight.add(const Duration(minutes: 5))
+                : local)
+            .toUtc();
     http.on('GET', '$_piet/messages', [
       {
         'id': 'b',

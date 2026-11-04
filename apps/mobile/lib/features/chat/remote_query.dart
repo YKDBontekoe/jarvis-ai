@@ -76,3 +76,12 @@ bool isNearTranscriptBottom(
 /// it may take most of the screen while the transcript keeps a readable strip.
 double pinnedSurfaceMaxHeight(double availableHeight) =>
     (availableHeight * .62).clamp(160.0, 560.0).toDouble();
+
+/// What to show when a reply that continued on the server ended without an
+/// answer. A reason that already arrived (the `agent.failed` event, such as
+/// "Your Codex plan has reached its usage limit") is kept: catch-up used to
+/// replace it with the generic line, hiding what the owner could act on.
+String remoteQueryFailureMessage(String? reasonAlreadyShown) =>
+    reasonAlreadyShown != null && reasonAlreadyShown.trim().isNotEmpty
+    ? reasonAlreadyShown
+    : 'Jarvis could not complete this response.';

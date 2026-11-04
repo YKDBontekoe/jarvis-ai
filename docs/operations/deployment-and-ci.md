@@ -56,6 +56,12 @@ storage key when its data volume already exists. `JARVIS_DOMAIN` is the only inp
 deploys). Caddy serves LiveKit signaling under `/rtc` on that host, so one DNS record is enough. ChatGPT sign-in for
 the server's Codex CLI happens in the app (`/api/v1/settings/models/codex/sign-in`, device code).
 
+The Garage config binds IPv4 (`0.0.0.0`), which works on every host because Compose networks carry IPv4. Configs
+written before this change bound `[::]`; on a host without IPv6 Garage then restarts with "Address family not
+supported" and the API never becomes healthy. Delete `${JARVIS_DATA_DIR}/garage.toml` (it is regenerated with a new
+RPC secret; the data stays) or change the three `[::]` addresses to `0.0.0.0`. Registration defaults to
+`AUTH_ALLOW_REGISTRATION=first`: the first account becomes the owner and sign-up then closes.
+
 Bootstrap and deploy scripts: `scripts/deploy/remote-up.sh` (generate, pull, migrate, replace, health-check), `scripts/deploy/publish-compose.sh`, `scripts/deploy/compose-env.sh`.
 
 Before replacing the API and worker, the deploy starts the Temporal prerequisites and waits for

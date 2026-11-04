@@ -148,23 +148,25 @@ ensure GARAGE_CONFIG_FILE "${DATA_DIR}/garage.toml"
 garage_config="$(env_get GARAGE_CONFIG_FILE)"
 if [[ ! -f "${garage_config}" ]]; then
   # Single-node Garage. The region must match ObjectStorage__Region (us-east-1) for request signatures.
+  # IPv4 binds: Compose networks always carry IPv4, while "[::]" fails with "Address family not supported" on hosts
+  # without IPv6, and Garage then never serves the API's file storage.
   cat > "${garage_config}" <<EOF
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
 db_engine = "sqlite"
 replication_factor = 1
 
-rpc_bind_addr = "[::]:3901"
+rpc_bind_addr = "0.0.0.0:3901"
 rpc_public_addr = "127.0.0.1:3901"
 rpc_secret = "$(random_hex 32)"
 
 [s3_api]
 s3_region = "us-east-1"
-api_bind_addr = "[::]:3900"
+api_bind_addr = "0.0.0.0:3900"
 root_domain = ".s3.garage.localhost"
 
 [admin]
-api_bind_addr = "[::]:3903"
+api_bind_addr = "0.0.0.0:3903"
 admin_token = "$(random_hex 32)"
 metrics_token = "$(random_hex 32)"
 EOF
