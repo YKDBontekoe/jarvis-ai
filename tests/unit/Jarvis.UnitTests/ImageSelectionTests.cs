@@ -108,4 +108,20 @@ public sealed class ImageSelectionTests
         Assert.Contains("sent with this message",
             ImageSelection.Caption(hostile with { Reason = ImageReason.ThisMessage }), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Expense_guidance_keeps_a_question_about_a_receipt_read_only_and_never_relogs_a_reshown_photo()
+    {
+        // Found on the real model: "What is the total on this receipt?" logged an expense nobody asked for, and a
+        // photo shown again on a follow-up could have been logged a second time.
+        var guidance = Jarvis.Agents.Expenses.ExpenseContextContributor.Guidance;
+
+        Assert.Contains("do not log it unasked", guidance, StringComparison.Ordinal);
+        Assert.Contains("never log it again", guidance, StringComparison.Ordinal);
+        Assert.Contains("earlier photo shown again for reference", guidance, StringComparison.Ordinal);
+        // The caption the model sees for a re-shown photo must match the words the guidance keys on.
+        Assert.Contains("Earlier photo from this conversation, shown again for reference",
+            ImageSelection.Caption(new ImageToShow(Guid.NewGuid(), "r.png", "image/png", ImageReason.Earlier)),
+            StringComparison.Ordinal);
+    }
 }
