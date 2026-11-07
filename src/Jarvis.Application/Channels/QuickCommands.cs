@@ -11,6 +11,10 @@ public abstract record QuickCommand
 
     public sealed record Journal(string Text) : QuickCommand;
 
+    public sealed record ShowHabits : QuickCommand;
+
+    public sealed record Month : QuickCommand;
+
     public sealed record Today : QuickCommand;
 
     public sealed record Usage(string Message) : QuickCommand;
@@ -39,6 +43,10 @@ public static class QuickCommands
         {
             case "/today":
                 return new QuickCommand.Today();
+            case "/habits":
+                return new QuickCommand.ShowHabits();
+            case "/month":
+                return new QuickCommand.Month();
             case "/checkin":
                 var habits = rest.Split([',', ';', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     .Select(Flat).Where(name => name.Length > 0).Take(5).ToArray();

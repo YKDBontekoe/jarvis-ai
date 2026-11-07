@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 91 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 95 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -124,6 +124,10 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 89. `/remind every monday 9:00 bins` (any weekday, with or without `at`) makes a weekly reminder from chat.
 90. `/remind every other friday 17:00 report` makes a biweekly one (item 50), `/remind every day 8:00 pills` a daily one and `/remind every weekday …` a weekday one (9:00 when no time is given).
 91. The reply says what was set ("every other Friday at 17:00"); unreadable repeats ("every other day", a bad time, no text) get the format. 11 more unit tests, and `channels_flow.mjs` confirms the stored reminder is biweekly on Friday.
+92. Lists can have items taken off (ticked or not): service, `POST /lists/remove`, the assistant's `RemoveFromList`, with exact-then-single-partial matching and owner scope.
+93. `/remove shopping: milk` and `/clear shopping` (drop the ticked items) work from WhatsApp and Signal.
+94. `/habits` shows every habit with today's tick and streak.
+95. `/month` gives this month's total, count and top three categories. All run in `channels_flow.mjs` (25 checks) against the stack.
 
 A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 

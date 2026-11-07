@@ -14,6 +14,7 @@ internal sealed class ListToolContributor(IListService lists, ICurrentUser curre
         yield return AIFunctionFactory.Create(tools.GetListsAsync);
         yield return AIFunctionFactory.Create(tools.AddToListAsync);
         yield return AIFunctionFactory.Create(tools.TickListItemsAsync);
+        yield return AIFunctionFactory.Create(tools.RemoveFromListAsync);
         yield return AIFunctionFactory.Create(tools.ClearTickedListItemsAsync);
     }
 }
@@ -66,6 +67,18 @@ internal sealed class ListAgentTools(IListService lists, ICurrentUser currentUse
         return result.Succeeded
             ? $"Updated \"{result.Value!.Name}\": {result.Value.Items.Count(i => !i.Done)} open, {result.Value.Items.Count(i => i.Done)} ticked."
             : "I could not update the list: " + result.Message;
+    }
+
+    [Description("Take items off a list when the user says to remove them (\"take the eggs off my shopping list\"), ticked or not. Pass each item by the words on the list.")]
+    public async Task<string> RemoveFromListAsync(
+        [Description("The list's name.")] string list,
+        [Description("The items, by their words on the list.")] string[] items,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await lists.RemoveItemsAsync(currentUser.OwnerId, list, items ?? [], cancellationToken);
+        return result.Succeeded
+            ? $"Updated \"{result.Value!.Name}\": {result.Value.Items.Count} item(s) left."
+            : "I could not remove that: " + result.Message;
     }
 
     [Description("Remove the ticked items from a list, only when the user asks to clean it up. Open items stay.")]

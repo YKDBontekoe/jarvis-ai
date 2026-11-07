@@ -11,6 +11,10 @@ public abstract record ListCommand
 
     public sealed record Tick(string List, IReadOnlyList<string> Items) : ListCommand;
 
+    public sealed record Clear(string List) : ListCommand;
+
+    public sealed record Remove(string List, IReadOnlyList<string> Items) : ListCommand;
+
     public sealed record Usage(string Message) : ListCommand;
 }
 
@@ -22,7 +26,7 @@ public static class ListCommands
 {
     public const string UsageText =
         "Lists: /lists shows them, /list shopping shows one, /add shopping: milk, eggs adds items, " +
-        "/done shopping: milk ticks one off.";
+        "/done shopping: milk ticks one off, /remove shopping: milk takes one off, /clear shopping removes the ticked ones.";
 
     public static ListCommand? Parse(string text)
     {
@@ -37,7 +41,9 @@ public static class ListCommands
                 return new ListCommand.Show(null);
             case "/list":
                 return rest.Length == 0 ? new ListCommand.Show(null) : new ListCommand.Show(rest);
-            case "/add" or "/done":
+            case "/clear":
+                return rest.Length == 0 ? new ListCommand.Usage(UsageText) : new ListCommand.Clear(rest);
+            case "/add" or "/done" or "/remove":
                 var colon = rest.IndexOf(':');
                 if (colon <= 0 || colon == rest.Length - 1)
                     return new ListCommand.Usage(UsageText);
@@ -45,7 +51,12 @@ public static class ListCommands
                 var items = rest[(colon + 1)..].Split([',', '\n', ';'], StringSplitOptions.RemoveEmptyEntries |
                                                                        StringSplitOptions.TrimEntries);
                 if (list.Length == 0 || items.Length == 0) return new ListCommand.Usage(UsageText);
-                return command == "/add" ? new ListCommand.Add(list, items) : new ListCommand.Tick(list, items);
+                return command switch
+                {
+                    "/add" => new ListCommand.Add(list, items),
+                    "/remove" => new ListCommand.Remove(list, items),
+                    _ => new ListCommand.Tick(list, items),
+                };
             default:
                 return null;
         }

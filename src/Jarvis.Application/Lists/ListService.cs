@@ -57,6 +57,10 @@ public interface IListService
     Task<ListOperation<ListRecord>> SetDoneAsync(Guid ownerId, string listName, IReadOnlyList<string> items, bool done,
         CancellationToken cancellationToken);
 
+    /// <summary>Takes items off a list whether or not they are ticked (exact text, else a single partial match).</summary>
+    Task<ListOperation<ListRecord>> RemoveItemsAsync(Guid ownerId, string listName, IReadOnlyList<string> items,
+        CancellationToken cancellationToken);
+
     /// <summary>Removes the ticked items from a list.</summary>
     Task<ListOperation<ListRecord>> ClearDoneAsync(Guid ownerId, string listName, CancellationToken cancellationToken);
 
@@ -138,6 +142,33 @@ public sealed class ListService(IOwnerSettingsStore settings, TimeProvider? time
                 matches = current.Where(i => i.Done != done && i.Text.Contains(text, StringComparison.OrdinalIgnoreCase)).ToList();
             if (matches.Count != 1) { misses.Add(text); continue; }
             current[current.FindIndex(i => i.Id == matches[0].Id)] = matches[0] with { Done = done };
+        }
+        if (misses.Count > 0 && misses.Count == (items ?? []).Count)
+            return ListOperation<ListRecord>.NotFound("No single item matches: " + string.Join(", ", misses));
+        all[index] = all[index] with { Items = current, UpdatedAt = clock.GetUtcNow() };
+        await SaveAsync(ownerId, all, cancellationToken);
+        return ListOperation<ListRecord>.Ok(all[index]);
+    }
+
+    public async Task<ListOperation<ListRecord>> RemoveItemsAsync(Guid ownerId, string listName,
+        IReadOnlyList<string> items, CancellationToken cancellationToken)
+    {
+        using var turn = await LockAsync(ownerId, cancellationToken);
+        var all = (await LoadAsync(ownerId, cancellationToken)).ToList();
+        var found = Find(all, listName);
+        if (found.Failure != ListFailure.None) return new ListOperation<ListRecord>(null, found.Failure, found.Message);
+        var index = found.Index;
+        var current = all[index].Items.ToList();
+        var misses = new List<string>();
+        foreach (var raw in items ?? [])
+        {
+            var text = ListRules.Clean(raw, ListRules.MaxItemLength);
+            if (text is null) continue;
+            var matches = current.Where(i => i.Text.Equals(text, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count == 0)
+                matches = current.Where(i => i.Text.Contains(text, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (matches.Count != 1) { misses.Add(text); continue; }
+            current.RemoveAll(i => i.Id == matches[0].Id);
         }
         if (misses.Count > 0 && misses.Count == (items ?? []).Count)
             return ListOperation<ListRecord>.NotFound("No single item matches: " + string.Join(", ", misses));

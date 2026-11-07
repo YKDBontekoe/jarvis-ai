@@ -64,4 +64,12 @@ public sealed class QuickCommandTests
             Assert.IsType<QuickCommand.Journal>(QuickCommands.Parse("/journal " + new string('x', 9000))).Text.Length);
         Assert.Equal(QuickCommands.JournalUsage, Assert.IsType<QuickCommand.Usage>(QuickCommands.Parse("/journal   ")).Message);
     }
+
+    [Fact]
+    public void Habits_and_month_are_commands()
+    {
+        Assert.IsType<QuickCommand.ShowHabits>(QuickCommands.Parse("/habits"));
+        Assert.IsType<QuickCommand.Month>(QuickCommands.Parse("/Month"));
+        Assert.Null(QuickCommands.Parse("/monthly"));
+    }
 }

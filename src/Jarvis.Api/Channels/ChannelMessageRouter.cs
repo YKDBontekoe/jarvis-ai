@@ -87,9 +87,9 @@ public sealed class ChannelMessageRouter(
         I'm Jarvis. Message me like you would in the app.
         • /new — start a fresh conversation
         • /status — what I'm waiting on
-        • /checkin meditate, /spent 12.50 lunch, /journal text, /today — habits, spending, journal and your day
+        • /checkin meditate, /habits, /spent 12.50 lunch, /month, /journal text, /today — habits, spending, journal and your day
         • /remind in 30m call mum, /remind at 18:30 …, /remind tomorrow 9:00 …, /reminders — quick reminders
-        • /lists, /list shopping, /add shopping: milk, eggs, /done shopping: milk — your lists
+        • /lists, /list shopping, /add shopping: milk, eggs, /done, /remove, /clear — your lists
         • Send a photo (JPEG, PNG, WebP) or a file (PDF, Word, text) and ask about it
         • YES or NO — answer an approval request from this chat
         Approvals from app chats, tasks and automations can only be decided in the Jarvis app.

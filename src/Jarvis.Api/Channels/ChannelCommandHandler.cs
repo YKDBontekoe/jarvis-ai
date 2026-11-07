@@ -78,6 +78,21 @@ public sealed class ChannelCommandHandler(
                 var (saved, merged) = await journal.MergeAsync(ownerId, draft, cancellationToken);
                 await AuditAsync(ownerId, "journal", merged ? "journal.updated" : "journal.created", saved.Id, cancellationToken);
                 return merged ? $"📓 Added to your journal for {saved.EntryDate:ddd d MMM}." : $"📓 Saved your journal entry for {saved.EntryDate:ddd d MMM}.";
+            case QuickCommand.ShowHabits:
+                var all = await habits.ListAsync(ownerId, false, cancellationToken);
+                return all.Count == 0
+                    ? "No habits yet. Create one in the app or tell Jarvis."
+                    : string.Join("\n", all.Take(20).Select(h =>
+                        $"{(h.Stats.DoneToday ? "✅" : "⬜")} {h.Habit.Name} · streak {h.Stats.CurrentStreak} {h.Stats.StreakUnit}"));
+            case QuickCommand.Month:
+                var monthView = await preferences.GetAsync(ownerId, cancellationToken);
+                var monthZone = LocalClock.TryFind(monthView.HomeTimeZone, out var mz) ? mz : TimeZoneInfo.Utc;
+                var now = TimeZoneInfo.ConvertTime((timeProvider ?? TimeProvider.System).GetUtcNow(), monthZone);
+                var summary = await expenses.SummarizeMonthAsync(ownerId, now.Year, now.Month, cancellationToken);
+                if (summary.Count == 0) return $"Nothing logged yet in {now:MMMM}.";
+                var top = string.Join(", ", summary.Categories.OrderByDescending(c => c.Total).Take(3)
+                    .Select(c => $"{c.Category} {c.Total:0.00}"));
+                return $"{now:MMMM}: {summary.Total:0.00} {summary.Currency} in {summary.Count} expense(s). Top: {top}.";
             case QuickCommand.Today:
                 var day = await planner.GetTodayAsync(ownerId, null, cancellationToken);
                 var dayZone = LocalClock.TryFind(day.TimeZoneId, out var planZone) ? planZone : TimeZoneInfo.Utc;
@@ -160,6 +175,12 @@ public sealed class ChannelCommandHandler(
             case ListCommand.Add add:
                 var added = await lists.AddItemsAsync(ownerId, add.List, add.Items, cancellationToken);
                 return added.Succeeded ? ListCommands.Render(added.Value!) : "I could not add that: " + added.Message;
+            case ListCommand.Remove remove:
+                var removed = await lists.RemoveItemsAsync(ownerId, remove.List, remove.Items, cancellationToken);
+                return removed.Succeeded ? ListCommands.Render(removed.Value!) : "I could not remove that: " + removed.Message;
+            case ListCommand.Clear clear:
+                var cleared = await lists.ClearDoneAsync(ownerId, clear.List, cancellationToken);
+                return cleared.Succeeded ? ListCommands.Render(cleared.Value!) : "I could not clear that: " + cleared.Message;
             case ListCommand.Tick tick:
                 var ticked = await lists.SetDoneAsync(ownerId, tick.List, tick.Items, true, cancellationToken);
                 return ticked.Succeeded ? ListCommands.Render(ticked.Value!) : "I could not tick that: " + ticked.Message;

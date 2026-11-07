@@ -190,6 +190,10 @@ await check('check-in, spending and today commands work from WhatsApp without th
   await say(`/spent 7,40 espresso ${tag}`, `wamid.sp2-${tag}`, /same expense/);
   await say('/spent lunch', `wamid.sp3-${tag}`, /Log spending with/);
 
+  const habitsList = await say('/habits', `wamid.hb-${tag}`, new RegExp(`Stretch ${tag}`));
+  assert.match(habitsList.text, /✅/);
+  const monthly = await say("/month", `wamid.mo-${tag}`, /expense\(s\)|Nothing logged/);
+  assert.ok(monthly.text);
   const journal = await say(`/journal Chat note ${tag}: calm walk`, `wamid.jr-${tag}`, /journal/);
   assert.match(journal.text, /📓/);
   const entries = (await call('/journal')).body;
@@ -245,6 +249,11 @@ await check('list commands work from WhatsApp without the model', async () => {
   assert.match(lists.text, /1 open/);
   const usage = await say('/add oops', `wamid.oops-${tag}`, /\/add shopping: milk/);
   assert.ok(usage.text);
+  await say(`/add Chat ${tag}: butter, jam`, `wamid.add2-${tag}`, /butter/);
+  const removed = await say(`/remove Chat ${tag}: jam`, `wamid.rm-${tag}`, /butter/);
+  assert.doesNotMatch(removed.text, /jam/);
+  const cleared = await say(`/clear Chat ${tag}`, `wamid.clr-${tag}`, /eggs/);
+  assert.doesNotMatch(cleared.text, /milk/, 'the ticked item is gone');
   const stored = (await call('/lists')).body.find(list => list.name === `Chat ${tag}`);
   assert.ok(stored, 'the list is in the app too');
   await call(`/lists/${stored.id}`, { method: 'DELETE' });

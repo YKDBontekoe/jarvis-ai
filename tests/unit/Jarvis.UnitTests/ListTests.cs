@@ -203,4 +203,43 @@ public sealed class ListTests
         Assert.Empty(await provider.SearchAsync(Owner, "zebra", 8, default));
         Assert.True(Jarvis.Application.Search.SearchResultKinds.IsValid("list"));
     }
+
+    [Fact]
+    public async Task Removing_takes_items_off_ticked_or_not_by_exact_text_then_a_single_partial_match()
+    {
+        var service = Create();
+        await service.AddItemsAsync(Owner, "Shopping", ["Oat milk", "Milk chocolate", "Eggs", "Bread"], default);
+        await service.SetDoneAsync(Owner, "Shopping", ["Bread"], true, default);
+
+        var egg = await service.RemoveItemsAsync(Owner, "Shopping", ["egg", "bread"], default);
+        var ambiguous = await service.RemoveItemsAsync(Owner, "Shopping", ["milk"], default);
+        var exact = await service.RemoveItemsAsync(Owner, "Shopping", ["Oat milk"], default);
+
+        Assert.Equal(["Oat milk", "Milk chocolate"], egg.Value!.Items.Select(i => i.Text));
+        Assert.Equal(ListFailure.NotFound, ambiguous.Failure);
+        Assert.Equal(["Milk chocolate"], exact.Value!.Items.Select(i => i.Text));
+        Assert.Equal(ListFailure.NotFound, (await service.RemoveItemsAsync(Owner, "Nope", ["x"], default)).Failure);
+        Assert.Empty((await service.ListAsync(Guid.NewGuid(), default)));
+    }
+
+    [Fact]
+    public void Remove_and_clear_are_read_as_chat_commands_and_the_assistant_can_remove_items()
+    {
+        var remove = Assert.IsType<ListCommand.Remove>(ListCommands.Parse("/remove Shopping: eggs, bread"));
+        Assert.Equal(["eggs", "bread"], remove.Items);
+        Assert.Equal(new ListCommand.Clear("shopping"), ListCommands.Parse("/clear shopping"));
+        Assert.IsType<ListCommand.Usage>(ListCommands.Parse("/clear"));
+        Assert.IsType<ListCommand.Usage>(ListCommands.Parse("/remove shopping"));
+        Assert.Contains("RemoveFromList", Jarvis.Agents.ToolGroups.All.Single(g => g.Id == "lists").Tools);
+    }
+
+    [Fact]
+    public async Task The_assistant_removes_an_item()
+    {
+        var tools = new ListAgentTools(Create(), new User());
+        await tools.AddToListAsync("Shopping", ["Milk", "Eggs"]);
+
+        Assert.Contains("1 item(s) left", await tools.RemoveFromListAsync("Shopping", ["eggs"]), StringComparison.Ordinal);
+        Assert.StartsWith("I could not remove that", await tools.RemoveFromListAsync("Shopping", ["zebra"]), StringComparison.Ordinal);
+    }
 }

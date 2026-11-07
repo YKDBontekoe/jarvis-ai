@@ -27,6 +27,10 @@ internal static class ListEndpoints
             Result(await lists.SetDoneAsync(user.OwnerId, request.List ?? "", request.Items ?? [], request.Done ?? true, ct)))
             .WithName("SetListItemsDone");
 
+        group.MapPost("/remove", async (ListItemsRequest request, IListService lists, ICurrentUser user, CancellationToken ct) =>
+            Result(await lists.RemoveItemsAsync(user.OwnerId, request.List ?? "", request.Items ?? [], ct)))
+            .WithName("RemoveListItems");
+
         group.MapPost("/clear-done", async (ListNameRequest request, IListService lists, ICurrentUser user, CancellationToken ct) =>
             Result(await lists.ClearDoneAsync(user.OwnerId, request.List ?? "", ct)))
             .WithName("ClearDoneListItems");
