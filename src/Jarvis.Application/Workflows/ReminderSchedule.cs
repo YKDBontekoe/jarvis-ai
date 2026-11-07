@@ -39,7 +39,7 @@ public static class ReminderWeekdays
     {
         Reminder.RecurrenceDaily => All,
         Reminder.RecurrenceWeekdays => Weekdays,
-        Reminder.RecurrenceWeekly => weekdays & All,
+        Reminder.RecurrenceWeekly or Reminder.RecurrenceBiweekly => weekdays & All,
         _ => 0
     };
 
@@ -63,12 +63,12 @@ public static class ReminderSchedule
         var kind = (recurrence ?? Reminder.RecurrenceNone).Trim().ToLowerInvariant();
         if (kind is "weekday") kind = Reminder.RecurrenceWeekdays;
         if (!Reminder.RecurrenceKinds.Contains(kind))
-            throw new ArgumentException("Recurrence must be none, daily, weekdays, or weekly.");
+            throw new ArgumentException("Recurrence must be none, daily, weekdays, weekly, or biweekly.");
         if (!LocalClock.TryFind(timeZoneId, out var zone))
             throw new ArgumentException("Time zone identifier is not recognized by this server.");
         var mask = ReminderWeekdays.Normalize(kind, weekdays);
-        if (kind == Reminder.RecurrenceWeekly && mask == 0)
-            throw new ArgumentException("Choose at least one weekday for a weekly reminder.");
+        if (kind is Reminder.RecurrenceWeekly or Reminder.RecurrenceBiweekly && mask == 0)
+            throw new ArgumentException("Choose at least one weekday for a weekly or biweekly reminder.");
         return new ReminderRule(kind, mask, zone.Id, localTime, until);
     }
 
@@ -98,8 +98,31 @@ public static class ReminderSchedule
                 "That recurrence does not fire again before its end date.");
     }
 
-    public static DateTimeOffset? NextAfter(DateTimeOffset previousDueAt, ReminderRule rule) =>
-        NextOnOrAfter(previousDueAt.ToUniversalTime().AddSeconds(1), rule);
+    public static DateTimeOffset? NextAfter(DateTimeOffset previousDueAt, ReminderRule rule)
+    {
+        var previous = previousDueAt.ToUniversalTime();
+        if (rule.Recurrence != Reminder.RecurrenceBiweekly) return NextOnOrAfter(previous.AddSeconds(1), rule);
+        if (!LocalClock.TryFind(rule.TimeZoneId, out var zone))
+            throw new ArgumentException("Time zone identifier is not recognized by this server.");
+
+        // No stored anchor is needed: the occurrence that just fired is in an "on" week. The next one is either a later
+        // chosen weekday in that same week, or the first chosen weekday two weeks on.
+        var mask = ReminderWeekdays.Normalize(rule.Recurrence, rule.Weekdays);
+        if (mask == 0) mask = ReminderWeekdays.All;
+        var firedOn = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(previous, zone).DateTime);
+        var weekStart = firedOn.AddDays(-(((int)firedOn.DayOfWeek + 6) % 7)); // Monday
+        for (var offset = 0; offset < 21; offset++)
+        {
+            var day = weekStart.AddDays(offset);
+            var week = offset / 7;
+            if (week == 1) continue; // the off week
+            if ((ReminderWeekdays.Bit(day.DayOfWeek) & mask) == 0) continue;
+            if (rule.Until is { } until && day > until) return null;
+            var fireAt = LocalClock.Resolve(day.ToDateTime(rule.LocalTime), zone);
+            if (fireAt > previous) return fireAt;
+        }
+        return null;
+    }
 
     public static DateTimeOffset? NextOnOrAfter(DateTimeOffset utcNow, ReminderRule rule)
     {
@@ -143,6 +166,7 @@ public static class ReminderSchedule
             Reminder.RecurrenceDaily => $"every day at {time}",
             Reminder.RecurrenceWeekdays => $"every weekday at {time}",
             Reminder.RecurrenceWeekly => DescribeWeekly(rule.Weekdays, time),
+            Reminder.RecurrenceBiweekly => DescribeWeekly(rule.Weekdays, time).Replace("every ", "every other ", StringComparison.Ordinal),
             _ => $"at {time}"
         };
     }

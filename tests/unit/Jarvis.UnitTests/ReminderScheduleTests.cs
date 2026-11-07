@@ -113,4 +113,52 @@ public sealed class DailyBriefingComposerTests
         Assert.StartsWith("Quiet morning.", DailyBriefingComposer.Combine("Quiet morning.", facts));
         Assert.Contains("No reminders are due today.", DailyBriefingComposer.Combine("Quiet morning.", facts));
     }
+
+    [Fact]
+    public void Biweekly_on_one_day_skips_a_week()
+    {
+        var rule = ReminderSchedule.Normalize("biweekly", ReminderWeekdays.Monday, "Europe/Amsterdam", new TimeOnly(9, 0), null);
+        var monday = new DateTimeOffset(2030, 1, 14, 9, 0, 0, TimeSpan.FromHours(1));
+
+        var next = ReminderSchedule.NextAfter(monday, rule);
+        var after = ReminderSchedule.NextAfter(next!.Value, rule);
+
+        Assert.Equal(new DateTimeOffset(2030, 1, 28, 9, 0, 0, TimeSpan.FromHours(1)), next);
+        Assert.Equal(new DateTimeOffset(2030, 2, 11, 9, 0, 0, TimeSpan.FromHours(1)), after);
+    }
+
+    [Fact]
+    public void Biweekly_on_several_days_fires_the_later_days_of_the_week_before_skipping()
+    {
+        var rule = ReminderSchedule.Normalize("biweekly", ReminderWeekdays.Monday | ReminderWeekdays.Thursday, "UTC", new TimeOnly(8, 0), null);
+        var monday = new DateTimeOffset(2030, 1, 14, 8, 0, 0, TimeSpan.Zero);
+
+        var thursday = ReminderSchedule.NextAfter(monday, rule)!.Value;
+        var twoWeeksOn = ReminderSchedule.NextAfter(thursday, rule)!.Value;
+
+        Assert.Equal(new DateTimeOffset(2030, 1, 17, 8, 0, 0, TimeSpan.Zero), thursday);
+        Assert.Equal(new DateTimeOffset(2030, 1, 28, 8, 0, 0, TimeSpan.Zero), twoWeeksOn);
+        Assert.Equal(new DateTimeOffset(2030, 1, 31, 8, 0, 0, TimeSpan.Zero), ReminderSchedule.NextAfter(twoWeeksOn, rule));
+    }
+
+    [Fact]
+    public void Biweekly_needs_a_weekday_stops_at_until_and_is_described_in_words()
+    {
+        Assert.Throws<ArgumentException>(() => ReminderSchedule.Normalize("biweekly", 0, "UTC", new TimeOnly(9, 0), null));
+        var rule = ReminderSchedule.Normalize("biweekly", ReminderWeekdays.Friday, "UTC", new TimeOnly(9, 0), new DateOnly(2030, 1, 20));
+        var friday = new DateTimeOffset(2030, 1, 18, 9, 0, 0, TimeSpan.Zero);
+
+        Assert.Null(ReminderSchedule.NextAfter(friday, rule));
+        Assert.Equal("every other Friday at 09:00", ReminderSchedule.Describe(rule));
+    }
+
+    [Fact]
+    public void A_biweekly_series_starts_on_the_requested_day_so_that_day_sets_the_weeks()
+    {
+        var rule = ReminderSchedule.Normalize("biweekly", ReminderWeekdays.Wednesday, "UTC", new TimeOnly(9, 0), null);
+        var now = new DateTimeOffset(2030, 1, 14, 12, 0, 0, TimeSpan.Zero);
+        var requested = new DateTimeOffset(2030, 1, 23, 9, 0, 0, TimeSpan.Zero);
+
+        Assert.Equal(requested, ReminderSchedule.ResolveFirst(requested, rule, now));
+    }
 }

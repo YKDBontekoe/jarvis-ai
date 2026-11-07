@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 49 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 51 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -80,13 +80,17 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 48. A story outline takes turns between kinds, newest first, so a busy week of tasks and decisions no longer pushes every journal moment out of a recap. Found by `story_flow` against a database with many earlier runs; unit test added.
 49. `meeting_flow` and `story_flow` no longer break on leftovers from earlier runs (they matched the wrong, older record, and assumed the outline is never capped).
 
+## Fifth batch: bigger features
+
+50. Biweekly ("every other week") reminders, on one or several weekdays. The first occurrence sets which weeks count, so no schema change or migration was needed; the assistant's reminder tool accepts `biweekly`. Verified through the API and with unit tests for single-day, multi-day, end-date and first-occurrence cases.
+51. The app's reminder editor offers "Every 2 weeks" with the weekday chips, and repeat labels read "Every other Mon, Fri".
+
 Seen but left alone: Home lists the five oldest-due promises, so with five or more overdue promises one due today is not on Home. That may be intended (overdue first), so it is a question for the owner, not a fix.
 
 ## Gaps found but not built
 
 Found by asking the real model 20 everyday requests. Still open:
 
-- biweekly ("every other week") reminders need a recurrence anchored to a start date;
 - the day planner covers only today;
 - a shopping list;
 - pausing (not archiving) a habit.

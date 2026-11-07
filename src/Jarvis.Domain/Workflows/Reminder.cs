@@ -6,6 +6,9 @@ public sealed class Reminder
     public const string RecurrenceDaily = "daily";
     public const string RecurrenceWeekdays = "weekdays";
     public const string RecurrenceWeekly = "weekly";
+
+    /// <summary>Every other week on the chosen weekdays; the first occurrence sets which weeks count.</summary>
+    public const string RecurrenceBiweekly = "biweekly";
     public const int OverdueRescheduleGraceMinutes = 2;
     public const string LocationArrive = "arrive";
     public const string LocationLeave = "leave";
@@ -21,7 +24,7 @@ public sealed class Reminder
 
     public static readonly IReadOnlySet<string> RecurrenceKinds = new HashSet<string>(StringComparer.Ordinal)
     {
-        RecurrenceNone, RecurrenceDaily, RecurrenceWeekdays, RecurrenceWeekly
+        RecurrenceNone, RecurrenceDaily, RecurrenceWeekdays, RecurrenceWeekly, RecurrenceBiweekly
     };
 
     private Reminder() { }
