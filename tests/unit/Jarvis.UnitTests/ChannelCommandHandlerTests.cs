@@ -14,13 +14,22 @@ public sealed class ChannelCommandHandlerTests
 {
     private static readonly Guid Owner = Guid.NewGuid();
 
-    private static ChannelCommandHandler Create(IListService? lists = null, IExpenseService? expenses = null) => new(
+    private sealed class FixedTime(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    private static ChannelCommandHandler Create(IListService? lists = null, IExpenseService? expenses = null,
+        Jarvis.Application.Journal.IJournalService? journal = null, Jarvis.Application.Audit.IAuditEventStore? audit = null) => new(
         lists ?? new ListService(new InMemorySettingsStore()),
         Fake<IReminderService>.Create(),
         Fake<IOwnerPreferenceService>.Create(("GetAsync", _ => new PreferencesView("Europe/Amsterdam", "chosen", true, "now", null))),
         Fake<IHabitService>.Create(),
         expenses ?? Fake<IExpenseService>.Create(),
-        Fake<IDayPlannerService>.Create());
+        Fake<IDayPlannerService>.Create(),
+        journal ?? Fake<Jarvis.Application.Journal.IJournalService>.Create(),
+        audit ?? Fake<Jarvis.Application.Audit.IAuditEventStore>.Create(),
+        new FixedTime(new DateTimeOffset(2026, 11, 7, 20, 30, 0, TimeSpan.Zero)));
 
     [Theory]
     [InlineData("What is on my shopping list?")]
@@ -64,5 +73,36 @@ public sealed class ChannelCommandHandlerTests
         Assert.Contains("Logged 12.50 EUR at lunch", reply, StringComparison.Ordinal);
         Assert.Equal(12.5m, seen!.Amount);
         Assert.Equal(ExpenseSources.Chat, seen.Source);
+    }
+
+    [Fact]
+    public async Task A_journal_command_adds_to_todays_entry_in_the_owners_zone_and_audits_the_id_only()
+    {
+        Jarvis.Application.Journal.JournalDraft? seen = null;
+        var entryId = Guid.NewGuid();
+        var journal = Fake<Jarvis.Application.Journal.IJournalService>.Create(("MergeAsync", args =>
+        {
+            seen = (Jarvis.Application.Journal.JournalDraft)args[1]!;
+            return (new Jarvis.Domain.Journal.JournalEntry(entryId, Owner, seen.EntryDate, "chat", seen.Content!, null, null, null, null, null, null,
+                [], null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow), true);
+        }));
+        var metadata = new List<string?>();
+        var audit = Fake<Jarvis.Application.Audit.IAuditEventStore>.Create(("AppendAsync", args =>
+        {
+            metadata.Add((string?)args[6]);
+            return new Jarvis.Application.Audit.AuditEventRecord(Guid.NewGuid(), null, "journal", "journal.updated", "low", null,
+                DateTimeOffset.UtcNow, true, null);
+        }));
+        var handler = Create(journal: journal, audit: audit);
+
+        var reply = await handler.TryHandleAsync(Owner, "/journal Walked along the canal and felt calm.", default);
+
+        Assert.Contains("Added to your journal", reply, StringComparison.Ordinal);
+        Assert.Equal(new DateOnly(2026, 11, 7), seen!.EntryDate); // 20:30 UTC is 21:30 in Amsterdam, still the 7th
+        Assert.Equal("chat", seen.Source);
+        var logged = Assert.Single(metadata);
+        Assert.Contains(entryId.ToString(), logged, StringComparison.Ordinal);
+        Assert.DoesNotContain("canal", logged, StringComparison.Ordinal);
+        Assert.Equal(QuickCommands.JournalUsage, await handler.TryHandleAsync(Owner, "/journal", default));
     }
 }

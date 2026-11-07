@@ -9,6 +9,8 @@ public abstract record QuickCommand
 
     public sealed record Spent(decimal Amount, string? Currency, string? Description) : QuickCommand;
 
+    public sealed record Journal(string Text) : QuickCommand;
+
     public sealed record Today : QuickCommand;
 
     public sealed record Usage(string Message) : QuickCommand;
@@ -22,6 +24,8 @@ public static class QuickCommands
 {
     public const string CheckInUsage = "Check in with /checkin meditate (several habits: /checkin meditate, read).";
     public const string SpentUsage = "Log spending with /spent 12.50 lunch (also €12,50 or 12 usd).";
+    public const string JournalUsage = "Write to today's journal with /journal followed by what you want to say.";
+    public const int MaxJournalLength = 4000;
     public const decimal MaxAmount = 1_000_000m;
 
     public static QuickCommand? Parse(string text)
@@ -41,6 +45,10 @@ public static class QuickCommands
                 return habits.Length == 0 ? new QuickCommand.Usage(CheckInUsage) : new QuickCommand.CheckIn(habits);
             case "/spent":
                 return ParseSpent(rest);
+            case "/journal":
+                var entry = new string(rest.Where(c => c == '\n' || !char.IsControl(c)).ToArray()).Trim();
+                if (entry.Length == 0) return new QuickCommand.Usage(JournalUsage);
+                return new QuickCommand.Journal(entry.Length <= MaxJournalLength ? entry : entry[..MaxJournalLength].TrimEnd());
             default:
                 return null;
         }

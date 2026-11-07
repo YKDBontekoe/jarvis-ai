@@ -54,4 +54,14 @@ public sealed class QuickCommandTests
     [InlineData("/lists")]
     [InlineData("")]
     public void Other_messages_are_not_quick_commands(string text) => Assert.Null(QuickCommands.Parse(text));
+
+    [Fact]
+    public void A_journal_command_keeps_line_breaks_drops_control_characters_and_is_capped()
+    {
+        var entry = Assert.IsType<QuickCommand.Journal>(QuickCommands.Parse("/journal Good day.\nWalked a lot.\u0007"));
+        Assert.Equal("Good day.\nWalked a lot.", entry.Text);
+        Assert.Equal(QuickCommands.MaxJournalLength,
+            Assert.IsType<QuickCommand.Journal>(QuickCommands.Parse("/journal " + new string('x', 9000))).Text.Length);
+        Assert.Equal(QuickCommands.JournalUsage, Assert.IsType<QuickCommand.Usage>(QuickCommands.Parse("/journal   ")).Message);
+    }
 }

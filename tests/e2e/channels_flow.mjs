@@ -190,6 +190,14 @@ await check('check-in, spending and today commands work from WhatsApp without th
   await say(`/spent 7,40 espresso ${tag}`, `wamid.sp2-${tag}`, /same expense/);
   await say('/spent lunch', `wamid.sp3-${tag}`, /Log spending with/);
 
+  const journal = await say(`/journal Chat note ${tag}: calm walk`, `wamid.jr-${tag}`, /journal/);
+  assert.match(journal.text, /📓/);
+  const entries = (await call('/journal')).body;
+  assert.ok(entries.some(item => item.content.includes(`Chat note ${tag}`) && item.source === 'chat'), 'in the journal, from chat');
+  const audit = (await call('/audit?limit=20')).body ?? [];
+  assert.ok(JSON.stringify(audit).includes('journal'), 'audited');
+  assert.ok(!JSON.stringify(audit).includes(`Chat note ${tag}`), 'the audit log never holds the text');
+
   const today = await say('/today', `wamid.td-${tag}`, /min free/);
   assert.ok(today.text);
   await call(`/habits/${habit.body.id}`, { method: 'DELETE' });

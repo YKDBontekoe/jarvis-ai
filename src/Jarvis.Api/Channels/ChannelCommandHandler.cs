@@ -1,6 +1,9 @@
+using System.Text.Json;
+using Jarvis.Application.Audit;
 using Jarvis.Application.Channels;
 using Jarvis.Application.Expenses;
 using Jarvis.Application.Habits;
+using Jarvis.Application.Journal;
 using Jarvis.Application.Lists;
 using Jarvis.Application.Planner;
 using Jarvis.Application.Preferences;
@@ -20,6 +23,8 @@ public sealed class ChannelCommandHandler(
     IHabitService habits,
     IExpenseService expenses,
     IDayPlannerService planner,
+    IJournalService journal,
+    IAuditEventStore audit,
     TimeProvider? timeProvider = null)
 {
     private const string NothingToCheckIn = "Nothing to check in.";
@@ -58,10 +63,21 @@ public sealed class ChannelCommandHandler(
                     today, true, cancellationToken);
                 if (!created.Succeeded) return "I could not log that: " + created.Message;
                 var expense = created.Value!.Expense;
+                if (!created.Value.IsDuplicate) await AuditAsync(ownerId, "expenses", "expense.created", expense.Id, cancellationToken);
                 return created.Value.IsDuplicate
                     ? $"That looks like the same expense as one already logged today ({expense.Amount:0.00} {expense.Currency}); I did not add it twice."
                     : $"💶 Logged {expense.Amount:0.00} {expense.Currency}" +
                       (string.IsNullOrWhiteSpace(expense.Merchant) ? "" : $" at {expense.Merchant}") + $" under {expense.Category}.";
+            case QuickCommand.Journal entry:
+                var journalView = await preferences.GetAsync(ownerId, cancellationToken);
+                var journalZone = LocalClock.TryFind(journalView.HomeTimeZone, out var jz) ? jz : TimeZoneInfo.Utc;
+                var journalDay = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime((timeProvider ?? TimeProvider.System).GetUtcNow(), journalZone).DateTime);
+                var draft = new JournalDraft(journalDay, entry.Text, null, null, null, null, null, null, null, JournalSources.Chat);
+                var problems = JournalRules.Validate(draft, journalDay);
+                if (problems.Count > 0) return "I could not save that: " + string.Join(" ", problems.Values.SelectMany(x => x));
+                var (saved, merged) = await journal.MergeAsync(ownerId, draft, cancellationToken);
+                await AuditAsync(ownerId, "journal", merged ? "journal.updated" : "journal.created", saved.Id, cancellationToken);
+                return merged ? $"📓 Added to your journal for {saved.EntryDate:ddd d MMM}." : $"📓 Saved your journal entry for {saved.EntryDate:ddd d MMM}.";
             case QuickCommand.Today:
                 var day = await planner.GetTodayAsync(ownerId, null, cancellationToken);
                 var dayZone = LocalClock.TryFind(day.TimeZoneId, out var planZone) ? planZone : TimeZoneInfo.Utc;
@@ -70,6 +86,20 @@ public sealed class ChannelCommandHandler(
                     $"{TimeZoneInfo.ConvertTime(entry.StartAt, dayZone):HH:mm} {entry.Title}")) + $"\n{day.FreeMinutes} min free.";
             default:
                 return QuickCommands.CheckInUsage;
+        }
+    }
+
+    // The audit log records which record changed and that it came from chat, never amounts, shops or text.
+    private async Task AuditAsync(Guid ownerId, string tool, string action, Guid resourceId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await audit.AppendAsync(ownerId, tool, action, "low", true, null,
+                JsonSerializer.Serialize(new { resourceId, source = "channel" }), cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // An audit failure must not undo what the owner just did.
         }
     }
 
