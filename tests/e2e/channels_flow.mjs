@@ -50,6 +50,14 @@ function webhookPayload(from, text, id) {
         text: { body: text } }] } }] }] });
 }
 
+// A media message: type is image, audio, document...; fields are what the platform puts under that type.
+function mediaPayload(from, id, type, fields) {
+  return JSON.stringify({ object: 'whatsapp_business_account', entry: [{ id: 'WABA', changes: [{ field: 'messages',
+    value: { messaging_product: 'whatsapp', metadata: { phone_number_id: '106540352242922' },
+      messages: [{ from: from.replace('+', ''), id, timestamp: String(Date.now() / 1000 | 0), type,
+        [type]: fields }] } }] }] });
+}
+
 async function postWebhook(url, payload, secret = appSecret) {
   const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(payload).digest('hex');
   return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Hub-Signature-256': signature },
@@ -95,6 +103,47 @@ await check('an allowlisted WhatsApp message runs a Jarvis tool and replies', as
   assert.match(reply.text, /\*stretch\*/, 'Markdown bold is converted to WhatsApp bold');
   const reminders = (await call('/reminders')).body;
   assert.ok(reminders.some(reminder => reminder.title === 'stretch'));
+});
+
+await check('a WhatsApp photo reaches the model as an image, caption as the question', async () => {
+  const response = await postWebhook(whatsapp.webhookUrl, mediaPayload(owner, 'wamid.photo1', 'image',
+    { id: 'fake-photo-1', mime_type: 'image/png', caption: 'How many images do you see?' }));
+  assert.equal(response.status, 200);
+  const reply = await waitForReply('whatsapp', message => /I see \d+ image/.test(message.text));
+  assert.match(reply.text, /I see 1 image\(s\): image\/png/, reply.text);
+  assert.equal(reply.to, owner);
+  const files = (await call('/files')).body ?? [];
+  assert.ok(files.some(file => /^whatsapp-photo-.*\.png$/.test(file.fileName)), JSON.stringify(files.map(f => f.fileName)));
+});
+
+await check('a photo without a caption is still shown to the model', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  const response = await postWebhook(whatsapp.webhookUrl, mediaPayload(owner, 'wamid.photo2', 'image',
+    { id: 'fake-photo-2', mime_type: 'image/png' }));
+  assert.equal(response.status, 200);
+  // The fake model answers every other prompt with its canned reply; the point is that a reply comes at all.
+  const reply = await waitForReply('whatsapp', () => true);
+  assert.equal(reply.to, owner);
+});
+
+await check('voice notes and documents are answered honestly instead of being dropped', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  const response = await postWebhook(whatsapp.webhookUrl, mediaPayload(owner, 'wamid.voice1', 'audio',
+    { id: 'fake-voice-1', mime_type: 'audio/ogg; codecs=opus', voice: true }));
+  assert.equal(response.status, 200);
+  const reply = await waitForReply('whatsapp', message => /can read photos/.test(message.text));
+  assert.match(reply.text, /voice notes or audio/);
+});
+
+await check('a photo from a stranger is never downloaded', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  const filesBefore = ((await call('/files')).body ?? []).length;
+  const response = await postWebhook(whatsapp.webhookUrl, mediaPayload(stranger, 'wamid.photo3', 'image',
+    { id: 'fake-photo-3', mime_type: 'image/png', caption: 'hi' }));
+  assert.equal(response.status, 200);
+  await new Promise(resolve => setTimeout(resolve, 3000));
+  assert.equal((await sentMessages()).length, 0);
+  assert.equal(((await call('/files')).body ?? []).length, filesBefore);
 });
 
 await check('duplicate webhook deliveries are processed once', async () => {

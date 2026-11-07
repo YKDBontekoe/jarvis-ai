@@ -221,7 +221,7 @@ public sealed class ChannelLinkTests
         public Task<bool> DeleteAsync(Guid ownerId, Guid id, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<bool> EnqueueInboundAsync(Guid connectionId, string sender, string text, string externalId,
-            CancellationToken cancellationToken) => throw new NotSupportedException();
+            CancellationToken cancellationToken, string? mediaJson = null) => throw new NotSupportedException();
         public Task<IReadOnlyList<InboundChannelMessage>> ClaimPendingInboundAsync(int limit,
             CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task CompleteInboundAsync(Guid messageId, string? error, CancellationToken cancellationToken) =>

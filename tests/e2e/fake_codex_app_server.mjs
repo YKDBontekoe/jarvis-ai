@@ -86,7 +86,8 @@ async function runTurn(params) {
   // Images arrive as real image inputs next to the text. "How many images do you see?" answers with the count, which
   // lets a test prove that photos and image sources reach the model as pixels and not as extracted text.
   const images = params.input.filter(item => item.type === 'image');
-  const asked = prompt.split('\n').reverse().find(line => /how many images do you see/i.test(line));
+  // Only the latest user message counts: an older "how many images" line stays in the history of a chat.
+  const asked = /how many images do you see/i.test(parseConversation(prompt).request);
   const output = JSON.stringify(asked
     ? text(`I see ${images.length} image(s): ${images.map(image => (image.url?.match(/^data:([^;]+);/)?.[1] ?? 'unknown')).join(', ')}.`)
     : plan(prompt));

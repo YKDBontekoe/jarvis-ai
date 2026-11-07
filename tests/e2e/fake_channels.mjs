@@ -25,6 +25,23 @@ const server = http.createServer(async (request, response) => {
     sent.push({ channel: 'whatsapp', from: graph[1], to: '+' + body.to, text: body.text?.body ?? '' });
     return json(response, 200, { messaging_product: 'whatsapp', messages: [{ id: 'wamid.' + sent.length }] });
   }
+  // Media: the Graph lookup resolves a media id to a URL on this server, and the URL serves the bytes. Both need the
+  // access token, like the real API.
+  const lookup = url.pathname.match(/^\/v\d+\.\d+\/(fake-[a-z0-9-]+)$/);
+  if (lookup && request.method === 'GET') {
+    if (!/^Bearer EAA/.test(request.headers.authorization ?? ''))
+      return json(response, 401, { error: { message: 'Invalid OAuth access token.' } });
+    const big = lookup[1].startsWith('fake-big');
+    return json(response, 200, { id: lookup[1], url: `http://localhost:${PORT}/media/${lookup[1]}`,
+      mime_type: 'image/png', file_size: big ? 50_000_000 : QR_PNG.length });
+  }
+  const media = url.pathname.match(/^\/media\/(fake-[a-z0-9-]+)$/);
+  if (media && request.method === 'GET') {
+    if (!/^Bearer EAA/.test(request.headers.authorization ?? ''))
+      return json(response, 401, { error: { message: 'Invalid OAuth access token.' } });
+    response.writeHead(200, { 'Content-Type': 'image/png' });
+    return response.end(QR_PNG);
+  }
   if (url.pathname === '/v1/accounts') return json(response, 200, [SIGNAL_ACCOUNT]);
   if (url.pathname === '/v1/qrcodelink') {
     response.writeHead(200, { 'Content-Type': 'image/png' });

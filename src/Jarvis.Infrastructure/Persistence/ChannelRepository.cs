@@ -45,6 +45,9 @@ public sealed class ChannelMessageEntity
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? ProcessedAt { get; set; }
     public DateTimeOffset? LeaseUntil { get; set; }
+
+    /// <summary>Photos and other media that came with an inbound message, as JSON (<c>ChannelMediaRef</c>).</summary>
+    public string? MediaJson { get; set; }
 }
 
 public sealed class ChannelThreadEntity
@@ -112,11 +115,11 @@ public sealed class ChannelRepository(JarvisDbContext db) : IChannelRepository
             .ExecuteDeleteAsync(cancellationToken) > 0;
 
     public async Task<bool> EnqueueInboundAsync(Guid connectionId, string sender, string text, string externalId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? mediaJson = null)
     {
         var inserted = await db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO channel_messages ("Id", connection_id, direction, peer, text, external_id, status, created_at)
-            VALUES ({Guid.CreateVersion7()}, {connectionId}, 'in', {sender}, {text}, {externalId}, 'pending', {DateTimeOffset.UtcNow})
+            INSERT INTO channel_messages ("Id", connection_id, direction, peer, text, external_id, status, created_at, media_json)
+            VALUES ({Guid.CreateVersion7()}, {connectionId}, 'in', {sender}, {text}, {externalId}, 'pending', {DateTimeOffset.UtcNow}, {mediaJson})
             ON CONFLICT (connection_id, external_id) WHERE external_id IS NOT NULL DO NOTHING
             """, cancellationToken);
         if (inserted > 0)
@@ -147,7 +150,7 @@ public sealed class ChannelRepository(JarvisDbContext db) : IChannelRepository
             .ToDictionaryAsync(x => x.Id, cancellationToken);
         return claimed.Where(message => connections.ContainsKey(message.ConnectionId))
             .Select(message => new InboundChannelMessage(message.Id, connections[message.ConnectionId].ToRecord(),
-                message.Peer, message.Text))
+                message.Peer, message.Text, message.MediaJson))
             .ToArray();
     }
 

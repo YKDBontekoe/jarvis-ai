@@ -4,6 +4,7 @@ using Jarvis.Application.Approvals;
 using Jarvis.Application.Audit;
 using Jarvis.Application.Channels;
 using Jarvis.Application.Conversations;
+using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
 
 namespace Jarvis.Api.Channels;
@@ -17,6 +18,26 @@ public sealed class ChannelMessenger(
 {
     public static string SecretsProvider(Guid connectionId) =>
         IntegrationCredentialProviders.ChannelPrefix + connectionId.ToString("N");
+
+    /// <summary>Downloads one media item that arrived on this connection, or null when it cannot be had.</summary>
+    public async Task<DownloadedMedia?> FetchMediaAsync(ChannelConnectionRecord connection, string mediaId,
+        long maxBytes, CancellationToken cancellationToken)
+    {
+        var transport = transports.SingleOrDefault(item => item.Kind == connection.Kind);
+        if (transport is null) return null;
+        var secrets = await credentials.GetSecretsAsync(connection.OwnerId, SecretsProvider(connection.Id),
+            cancellationToken);
+        try
+        {
+            return await transport.FetchMediaAsync(connection, secrets, mediaId, maxBytes, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(exception, "Could not download media for a {Kind} connection {ConnectionId}.",
+                connection.Kind, connection.Id);
+            return null;
+        }
+    }
 
     public async Task<bool> SendAsync(ChannelConnectionRecord connection, string recipient, string markdown,
         CancellationToken cancellationToken)
@@ -56,6 +77,7 @@ public sealed class ChannelMessageRouter(
     ApprovalDecisionService decisions,
     ChannelMessenger messenger,
     IAuditEventStore audit,
+    IFileService files,
     ILogger<ChannelMessageRouter> logger)
 {
     internal const string Help = """
@@ -85,9 +107,31 @@ public sealed class ChannelMessageRouter(
         }
 
         var text = message.Text.Trim();
-        if (text.Length == 0) return;
         if (text.Length > 32_000) text = text[..32_000];
         var ownerId = connection.OwnerId;
+
+        // Photos go to the model as real images; other media is answered honestly instead of being dropped.
+        var media = ChannelMedia.Parse(message.MediaJson);
+        IReadOnlyList<MessageAttachment>? attachments = null;
+        if (media.Count > 0)
+        {
+            if (ChannelMedia.UnreadableReply(media) is { } unreadable)
+                await messenger.SendAsync(connection, sender, unreadable, cancellationToken);
+            var stored = await StorePhotosAsync(connection, media, cancellationToken);
+            if (stored.Count == 0)
+            {
+                if (media.Any(ChannelMedia.IsPhoto))
+                    await messenger.SendAsync(connection, sender,
+                        "I couldn't download that photo. Please send it again.", cancellationToken);
+                if (text.Length == 0) return;
+            }
+            else
+            {
+                attachments = stored;
+                if (text.Length == 0) text = MessageAttachments.DefaultContent(stored.Count);
+            }
+        }
+        if (text.Length == 0) return;
 
         if (text.Equals("/help", StringComparison.OrdinalIgnoreCase))
         {
@@ -136,14 +180,46 @@ public sealed class ChannelMessageRouter(
         }
         else
         {
-            result = await turns.SendAsync(ownerId, conversationId, text, cancellationToken);
+            result = await turns.SendAsync(ownerId, conversationId, text, cancellationToken, attachments: attachments);
             if (result is ConversationTurnResult.NotFound)
             {
                 conversationId = await StartConversationAsync(connection, sender, cancellationToken);
-                result = await turns.SendAsync(ownerId, conversationId, text, cancellationToken);
+                result = await turns.SendAsync(ownerId, conversationId, text, cancellationToken,
+                    attachments: attachments);
             }
         }
         await messenger.SendAsync(connection, sender, Describe(result), cancellationToken);
+    }
+
+    /// <summary>
+    /// Downloads the readable photos of a message and stores each as one of the owner's files, through the same
+    /// type check, size limit and virus scan as a photo sent from the app. A photo that fails any step is skipped.
+    /// </summary>
+    private async Task<IReadOnlyList<MessageAttachment>> StorePhotosAsync(ChannelConnectionRecord connection,
+        IReadOnlyList<ChannelMediaRef> media, CancellationToken cancellationToken)
+    {
+        var stored = new List<MessageAttachment>();
+        foreach (var photo in media.Where(ChannelMedia.IsPhoto).Take(ChannelMedia.MaxPhotos))
+        {
+            var downloaded = await messenger.FetchMediaAsync(connection, photo.Id, MessageAttachments.MaxImageBytes,
+                cancellationToken);
+            if (downloaded is null) continue;
+            var type = ChannelMedia.NormalizeMime(photo.Mime);
+            var name = $"{ChannelKinds.Label(connection.Kind).ToLowerInvariant()}-photo-" +
+                       $"{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{stored.Count + 1}{ChannelMedia.Extension(type)}";
+            try
+            {
+                using var content = new MemoryStream(downloaded.Content);
+                var file = await files.UploadAsync(connection.OwnerId, name, type, content.Length, content,
+                    cancellationToken);
+                stored.Add(new MessageAttachment(file.Id, file.FileName, file.ContentType));
+            }
+            catch (Exception exception) when (exception is ArgumentException or MalwareDetectedException)
+            {
+                logger.LogWarning("A {Kind} photo was refused: {Reason}", connection.Kind, exception.GetType().Name);
+            }
+        }
+        return stored;
     }
 
     internal static string Describe(ConversationTurnResult result) => result switch
