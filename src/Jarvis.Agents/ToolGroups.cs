@@ -50,6 +50,9 @@ public static partial class ToolGroups
         new("file-cleanup", "Delete one of the user's files after approval",
             ["DeleteFile"],
             FileCleanupKeywords()),
+        new("lists", "Plain lists such as shopping or packing: show, add items, tick them off, clear the ticked ones",
+            ["GetLists", "AddToList", "TickListItems", "ClearTickedListItems"],
+            ListKeywords()),
         new("people", "Contacts the user keeps up with: details, birthdays, logging contact, relationship radar",
             ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar", "GetPersonFollowThrough"],
             PeopleKeywords()),
@@ -274,6 +277,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(plan (my|the|for)|day plan|today'?s plan|my day|schedule (my|the) day|agenda|to-?do|planning|dagplan|mijn dag|vandaag plannen)", KeywordOptions)]
     private static partial Regex PlannerKeywords();
+
+    [GeneratedRegex(@"\b(shopping list|grocery list|groceries|packing list|to-?buy|(add|put) .{1,60} (to|on) (my|the) .{0,20}list|(my|the) .{0,20}list|boodschappen|winkellijst|inpaklijst|lijstje)", KeywordOptions)]
+    private static partial Regex ListKeywords();
 
     [GeneratedRegex(@"\b(delete|remove|get rid of|throw away|verwijder|wis)\b.{0,40}\b(file|document|pdf|upload|photo|bestand|foto)", KeywordOptions)]
     private static partial Regex FileCleanupKeywords();

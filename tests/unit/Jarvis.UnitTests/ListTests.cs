@@ -1,0 +1,112 @@
+using Jarvis.Agents.Lists;
+using Jarvis.Application.Conversations;
+using Jarvis.Application.Lists;
+using Xunit;
+
+namespace Jarvis.UnitTests;
+
+public sealed class ListTests
+{
+    private static readonly Guid Owner = Guid.NewGuid();
+
+    private sealed class User : ICurrentUser
+    {
+        public Guid OwnerId => Owner;
+    }
+
+    private static ListService Create() => new(new InMemorySettingsStore());
+
+    [Fact]
+    public async Task Adding_creates_the_list_once_by_name_and_skips_duplicates_and_blank_items()
+    {
+        var service = Create();
+
+        await service.AddItemsAsync(Owner, "Shopping", ["Milk", "  eggs\n", ""], default);
+        var again = await service.AddItemsAsync(Owner, "shopping", ["MILK", "bread"], default);
+
+        Assert.Single(await service.ListAsync(Owner, default));
+        Assert.Equal(["Milk", "eggs", "bread"], again.Value!.Items.Select(i => i.Text));
+    }
+
+    [Fact]
+    public async Task Lists_belong_to_one_owner()
+    {
+        var service = Create();
+        await service.AddItemsAsync(Owner, "Shopping", ["Milk"], default);
+
+        Assert.Empty(await service.ListAsync(Guid.NewGuid(), default));
+        var list = (await service.ListAsync(Owner, default)).Single();
+        Assert.False(await service.DeleteListAsync(Guid.NewGuid(), list.Id, default));
+        Assert.True(await service.DeleteListAsync(Owner, list.Id, default));
+    }
+
+    [Fact]
+    public async Task Ticking_matches_the_exact_text_first_then_a_single_partial_match_and_refuses_ambiguity()
+    {
+        var service = Create();
+        await service.AddItemsAsync(Owner, "Shopping", ["Oat milk", "Milk chocolate", "Eggs"], default);
+
+        var egg = await service.SetDoneAsync(Owner, "Shop", ["egg"], true, default);
+        var ambiguous = await service.SetDoneAsync(Owner, "Shopping", ["milk"], true, default);
+        var exact = await service.SetDoneAsync(Owner, "Shopping", ["Oat milk"], true, default);
+
+        Assert.True(egg.Value!.Items.Single(i => i.Text == "Eggs").Done);
+        Assert.Equal(ListFailure.NotFound, ambiguous.Failure);
+        Assert.True(exact.Value!.Items.Single(i => i.Text == "Oat milk").Done);
+        Assert.False(exact.Value.Items.Single(i => i.Text == "Milk chocolate").Done);
+    }
+
+    [Fact]
+    public async Task Clearing_removes_only_ticked_items_and_a_missing_list_is_reported()
+    {
+        var service = Create();
+        await service.AddItemsAsync(Owner, "Packing", ["Passport", "Charger"], default);
+        await service.SetDoneAsync(Owner, "Packing", ["Passport"], true, default);
+
+        var cleared = await service.ClearDoneAsync(Owner, "Packing", default);
+
+        Assert.Equal(["Charger"], cleared.Value!.Items.Select(i => i.Text));
+        Assert.Equal(ListFailure.NotFound, (await service.ClearDoneAsync(Owner, "Nope", default)).Failure);
+        Assert.Equal(ListFailure.Invalid, (await service.ClearDoneAsync(Owner, " ", default)).Failure);
+    }
+
+    [Fact]
+    public async Task Limits_hold_for_names_items_and_counts()
+    {
+        var service = Create();
+
+        Assert.Equal(ListFailure.Invalid, (await service.AddItemsAsync(Owner, "", ["x"], default)).Failure);
+        Assert.Equal(ListFailure.Invalid, (await service.AddItemsAsync(Owner, "A", [" "], default)).Failure);
+        var long1 = await service.AddItemsAsync(Owner, new string('n', 500), [new string('i', 900)], default);
+        Assert.Equal(ListRules.MaxNameLength, long1.Value!.Name.Length);
+        Assert.Equal(ListRules.MaxItemLength, long1.Value.Items.Single().Text.Length);
+
+        var items = Enumerable.Range(0, ListRules.MaxItemsPerList + 1).Select(i => $"item {i}").ToArray();
+        Assert.Equal(ListFailure.Invalid, (await service.AddItemsAsync(Owner, "Big", items, default)).Failure);
+    }
+
+    [Fact]
+    public async Task The_assistant_tools_add_show_tick_and_clear()
+    {
+        var tools = new ListAgentTools(Create(), new User());
+
+        Assert.Contains("now has 2 open", await tools.AddToListAsync("Shopping", ["Milk", "Eggs"]), StringComparison.Ordinal);
+        var shown = await tools.GetListsAsync();
+        Assert.Contains("[ ] Milk", shown, StringComparison.Ordinal);
+        Assert.Contains("not instructions", shown, StringComparison.Ordinal);
+        Assert.Contains("1 open, 1 ticked", await tools.TickListItemsAsync("Shopping", ["milk"]), StringComparison.Ordinal);
+        Assert.Contains("1 left", await tools.ClearTickedListItemsAsync("Shopping"), StringComparison.Ordinal);
+        Assert.StartsWith("I could not update the list", await tools.TickListItemsAsync("Garage", ["x"]), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Add milk and eggs to my shopping list")]
+    [InlineData("zet melk op mijn boodschappenlijstje")]
+    [InlineData("What is on my packing list?")]
+    public void Talking_about_a_list_offers_the_list_tools(string text)
+    {
+        var group = Jarvis.Agents.ToolGroups.All.Single(item => item.Id == "lists");
+        Assert.Matches(group.Keywords, text);
+        Assert.DoesNotMatch(group.Keywords, "Remind me to call mum tomorrow");
+    }
+}

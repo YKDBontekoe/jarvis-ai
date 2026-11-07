@@ -16,6 +16,7 @@ const featureAliases = <String, List<String>>{
     'herinneringen',
     'wekker',
   ],
+  'lists': ['shopping', 'groceries', 'packing', 'checklist', 'boodschappen', 'lijstje'],
   'habits': ['routines', 'streak', 'gewoonte', 'gewoontes', 'daily check-in'],
   'journal': ['diary', 'dagboek', 'log', 'write', 'schrijven', 'gratitude'],
   'decisions': [

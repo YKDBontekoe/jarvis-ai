@@ -375,6 +375,7 @@ void main() {
     (13, 'finance'),
     (14, 'people'),
     (15, 'journal'),
+    (16, 'lists'),
   ]) {
     screenshotTest('page $label', (tester) async {
       usePhone(tester);

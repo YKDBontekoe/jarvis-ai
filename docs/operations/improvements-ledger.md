@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 51 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 56 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -84,6 +84,11 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 
 50. Biweekly ("every other week") reminders, on one or several weekdays. The first occurrence sets which weeks count, so no schema change or migration was needed; the assistant's reminder tool accepts `biweekly`. Verified through the API and with unit tests for single-day, multi-day, end-date and first-occurrence cases.
 51. The app's reminder editor offers "Every 2 weeks" with the weekday chips, and repeat labels read "Every other Mon, Fri".
+52. Plain lists (shopping, packing): service stored in owner settings (no migration), owner-scoped, with duplicate skipping, length and count limits, and exact-then-single-partial matching. Unit tests (9).
+53. `/api/v1/lists` endpoints (list, add items, tick, clear ticked, delete) and `tests/e2e/lists_flow.mjs`, which passes against the running stack.
+54. Assistant tools `GetLists`, `AddToList`, `TickListItems`, `ClearTickedListItems`, offered when a message talks about a shopping, grocery or packing list (English and Dutch).
+55. A Lists screen in the app (tick, add, clear ticked, delete with confirm, empty state), with widget tests and a screenshot case.
+56. A Lists tile for Home, a quick command and feature-search keywords so the screen is easy to reach.
 
 Seen but left alone: Home lists the five oldest-due promises, so with five or more overdue promises one due today is not on Home. That may be intended (overdue first), so it is a question for the owner, not a fix.
 
@@ -92,7 +97,6 @@ Seen but left alone: Home lists the five oldest-due promises, so with five or mo
 Found by asking the real model 20 everyday requests. Still open:
 
 - the day planner covers only today;
-- a shopping list;
 - pausing (not archiving) a habit.
 
 The new tools in items 38 to 47 have unit tests only; they were not yet run against the real model because the Codex plan was out of quota.

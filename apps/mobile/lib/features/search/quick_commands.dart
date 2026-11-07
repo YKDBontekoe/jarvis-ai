@@ -96,6 +96,12 @@ const quickCommands = [
     keywords: ['habits', 'habit', 'streak', 'gewoonte', 'gewoontes'],
   ),
   QuickCommand(
+    label: 'Go to Lists',
+    icon: PhosphorIconsRegular.listChecks,
+    destination: 'lists',
+    keywords: ['lists', 'list', 'shopping', 'groceries', 'packing', 'boodschappen'],
+  ),
+  QuickCommand(
     label: 'Go to Missions',
     icon: PhosphorIconsRegular.flowArrow,
     destination: 'missions',

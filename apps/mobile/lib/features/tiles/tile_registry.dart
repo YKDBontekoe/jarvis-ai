@@ -89,6 +89,17 @@ final List<TileSpec> tileSpecs = [
     fallback: 'Build a streak',
   ),
   const TileSpec(
+    id: 'lists',
+    description: 'Shopping, packing and other lists you tick off.',
+    name: 'Lists',
+    icon: PhosphorIconsRegular.listChecks,
+    category: TileCategory.plan,
+    sizes: [_icon, _strip, _square],
+    destination: 'lists',
+    load: _lists,
+    fallback: 'Shopping, packing',
+  ),
+  const TileSpec(
     id: 'journal',
     description: 'Write about your day and record your mood.',
     name: 'Journal',
@@ -743,6 +754,21 @@ Future<TileData?> _habits(TileEnv env) async {
           actions: [doneToday(habit) ? uncheck : check],
         ),
     ],
+  );
+}
+
+Future<TileData?> _lists(TileEnv env) async {
+  final response = await env.http.get<dynamic>('/api/v1/lists');
+  final lists = jsonMaps(response.data);
+  if (lists.isEmpty) return const TileData(subtitle: 'Start a shopping list');
+  var open = 0;
+  for (final list in lists) {
+    open += jsonMaps(list['items']).where((i) => !asJsonBool(i['done'])).length;
+  }
+  return TileData(
+    stat: '$open',
+    unit: open == 1 ? 'open item' : 'open items',
+    subtitle: '${lists.length} ${lists.length == 1 ? 'list' : 'lists'}',
   );
 }
 
