@@ -205,4 +205,11 @@ public sealed class ChannelMediaTests
         Assert.Equal("Plan.pdf", ChannelMedia.Parse(json)[0].FileName);
         Assert.True(ChannelMedia.IsDocument(ChannelMedia.Parse(json)[0]));
     }
+
+    [Fact]
+    public void The_help_text_tells_the_owner_photos_and_files_work_here()
+    {
+        Assert.Contains("photo", Jarvis.Api.Channels.ChannelMessageRouter.Help, StringComparison.Ordinal);
+        Assert.Contains("PDF", Jarvis.Api.Channels.ChannelMessageRouter.Help, StringComparison.Ordinal);
+    }
 }

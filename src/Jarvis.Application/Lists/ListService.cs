@@ -67,6 +67,22 @@ public sealed class ListService(IOwnerSettingsStore settings, TimeProvider? time
 {
     private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
 
+    // The lists are one stored document, changed by reading and writing it back. The app and the assistant can edit
+    // at the same moment, so changes for one owner take turns instead of one overwriting the other.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, SemaphoreSlim> Gates = new();
+
+    private static async Task<IDisposable> LockAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        var gate = Gates.GetOrAdd(ownerId, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(cancellationToken);
+        return new Release(gate);
+    }
+
+    private sealed class Release(SemaphoreSlim gate) : IDisposable
+    {
+        public void Dispose() => gate.Release();
+    }
+
     public async Task<IReadOnlyList<ListRecord>> ListAsync(Guid ownerId, CancellationToken cancellationToken) =>
         (await LoadAsync(ownerId, cancellationToken)).OrderByDescending(l => l.UpdatedAt).ToList();
 
@@ -77,6 +93,7 @@ public sealed class ListService(IOwnerSettingsStore settings, TimeProvider? time
         if (name is null) return ListOperation<ListRecord>.Invalid("A list needs a name.");
         var texts = (items ?? []).Select(t => ListRules.Clean(t, ListRules.MaxItemLength)).OfType<string>().ToList();
         if (texts.Count == 0) return ListOperation<ListRecord>.Invalid("There is nothing to add.");
+        using var turn = await LockAsync(ownerId, cancellationToken);
 
         var all = (await LoadAsync(ownerId, cancellationToken)).ToList();
         var now = clock.GetUtcNow();
@@ -105,6 +122,7 @@ public sealed class ListService(IOwnerSettingsStore settings, TimeProvider? time
     public async Task<ListOperation<ListRecord>> SetDoneAsync(Guid ownerId, string listName,
         IReadOnlyList<string> items, bool done, CancellationToken cancellationToken)
     {
+        using var turn = await LockAsync(ownerId, cancellationToken);
         var all = (await LoadAsync(ownerId, cancellationToken)).ToList();
         var found = Find(all, listName);
         if (found.Failure != ListFailure.None) return new ListOperation<ListRecord>(null, found.Failure, found.Message);
@@ -131,6 +149,7 @@ public sealed class ListService(IOwnerSettingsStore settings, TimeProvider? time
     public async Task<ListOperation<ListRecord>> ClearDoneAsync(Guid ownerId, string listName,
         CancellationToken cancellationToken)
     {
+        using var turn = await LockAsync(ownerId, cancellationToken);
         var all = (await LoadAsync(ownerId, cancellationToken)).ToList();
         var found = Find(all, listName);
         if (found.Failure != ListFailure.None) return new ListOperation<ListRecord>(null, found.Failure, found.Message);
@@ -144,6 +163,7 @@ public sealed class ListService(IOwnerSettingsStore settings, TimeProvider? time
 
     public async Task<bool> DeleteListAsync(Guid ownerId, Guid listId, CancellationToken cancellationToken)
     {
+        using var turn = await LockAsync(ownerId, cancellationToken);
         var all = (await LoadAsync(ownerId, cancellationToken)).ToList();
         if (all.RemoveAll(l => l.Id == listId) == 0) return false;
         await SaveAsync(ownerId, all, cancellationToken);

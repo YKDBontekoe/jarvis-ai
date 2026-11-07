@@ -109,4 +109,34 @@ public sealed class ListTests
         Assert.Matches(group.Keywords, text);
         Assert.DoesNotMatch(group.Keywords, "Remind me to call mum tomorrow");
     }
+
+    /// <summary>A store that lets other work run between a read and the write that follows it.</summary>
+    private sealed class SlowStore : Jarvis.Application.Settings.IOwnerSettingsStore
+    {
+        private readonly InMemorySettingsStore _inner = new();
+
+        public async Task<T?> GetAsync<T>(Guid ownerId, string section, CancellationToken cancellationToken) where T : class
+        {
+            var value = await _inner.GetAsync<T>(ownerId, section, cancellationToken);
+            await Task.Delay(5, cancellationToken);
+            return value;
+        }
+
+        public Task SaveAsync<T>(Guid ownerId, string section, T value, CancellationToken cancellationToken) where T : class =>
+            _inner.SaveAsync(ownerId, section, value, cancellationToken);
+
+        public Task<IReadOnlyList<Guid>> ListOwnersAsync(string section, CancellationToken cancellationToken) =>
+            _inner.ListOwnersAsync(section, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Edits_made_at_the_same_moment_all_land()
+    {
+        // The app and the assistant can add to a list at once; without taking turns one add overwrote the other.
+        var service = new ListService(new SlowStore());
+
+        await Task.WhenAll(Enumerable.Range(0, 20).Select(i => service.AddItemsAsync(Owner, "Shopping", [$"item {i}"], default)));
+
+        Assert.Equal(20, (await service.ListAsync(Owner, default)).Single().Items.Count);
+    }
 }

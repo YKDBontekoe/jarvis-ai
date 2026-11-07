@@ -86,6 +86,7 @@ public sealed class ChannelMessageRouter(
         I'm Jarvis. Message me like you would in the app.
         • /new — start a fresh conversation
         • /status — what I'm waiting on
+        • Send a photo (JPEG, PNG, WebP) or a file (PDF, Word, text) and ask about it
         • YES or NO — answer an approval request from this chat
         Approvals from app chats, tasks and automations can only be decided in the Jarvis app.
         """;
