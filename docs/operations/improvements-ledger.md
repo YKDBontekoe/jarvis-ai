@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 47 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 49 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -74,6 +74,13 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 45. Delete a project from chat (`DeleteProject`), after approval; its chats, files and tasks stay.
 46. Delete a file from chat (`DeleteFile`), after approval; only offered when the message talks about deleting a file, and never in background tasks.
 47. Each of the four is owner-scoped and the approval wrapper is checked in tests.
+
+## Fourth batch: found by running the old flows against a busy database
+
+48. A story outline takes turns between kinds, newest first, so a busy week of tasks and decisions no longer pushes every journal moment out of a recap. Found by `story_flow` against a database with many earlier runs; unit test added.
+49. `meeting_flow` and `story_flow` no longer break on leftovers from earlier runs (they matched the wrong, older record, and assumed the outline is never capped).
+
+Seen but left alone: Home lists the five oldest-due promises, so with five or more overdue promises one due today is not on Home. That may be intended (overdue first), so it is a question for the owner, not a fix.
 
 ## Gaps found but not built
 

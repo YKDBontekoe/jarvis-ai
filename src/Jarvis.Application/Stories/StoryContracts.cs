@@ -113,9 +113,7 @@ public static class StoryBuilder
     {
         var list = events.ToArray();
         var counts = list.GroupBy(e => e.Kind).ToDictionary(g => g.Key, g => g.Count());
-        var items = list
-            .OrderBy(e => Priority.GetValueOrDefault(e.Kind, 3)).ThenBy(e => e.At)
-            .Take(StoryRules.MaxItems)
+        var items = Pick(list)
             .OrderBy(e => e.Date).ThenBy(e => e.At)
             .Select((e, index) =>
             {
@@ -124,6 +122,24 @@ public static class StoryBuilder
                     e.TargetId is { } id ? $"{e.Kind}:{id}" : $"{e.Kind}:{e.Id}");
             }).ToArray();
         return (items, counts);
+    }
+
+    /// <summary>
+    /// Takes turns between the kinds, newest first within each, so a busy week of tasks and decisions cannot push every
+    /// journal moment out of the story (it used to fill the limit with the oldest decisions and tasks first).
+    /// </summary>
+    internal static IEnumerable<TimelineEvent> Pick(IReadOnlyCollection<TimelineEvent> events)
+    {
+        var queues = events.GroupBy(e => e.Kind)
+            .OrderBy(g => Priority.GetValueOrDefault(g.Key, 3)).ThenBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => new Queue<TimelineEvent>(g.OrderByDescending(e => e.At)))
+            .ToList();
+        var chosen = new List<TimelineEvent>();
+        while (chosen.Count < StoryRules.MaxItems && queues.Any(q => q.Count > 0))
+            foreach (var queue in queues)
+                if (chosen.Count < StoryRules.MaxItems && queue.Count > 0)
+                    chosen.Add(queue.Dequeue());
+        return chosen;
     }
 
     private static string Describe(TimelineEvent e) =>
