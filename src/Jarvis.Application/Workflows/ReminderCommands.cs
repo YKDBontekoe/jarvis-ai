@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Jarvis.Domain.Workflows;
 
 namespace Jarvis.Application.Workflows;
 
@@ -11,6 +12,9 @@ public abstract record ReminderCommand
 
     /// <summary>At a local clock time, today if it is still ahead, else tomorrow; or on the next day when <paramref name="Tomorrow"/>.</summary>
     public sealed record At(TimeOnly Time, bool Tomorrow, string Title) : ReminderCommand;
+
+    /// <summary>A repeating reminder: every day, every weekday, or on one weekday every week or every other week.</summary>
+    public sealed record Every(string Recurrence, int Weekdays, TimeOnly Time, string Title) : ReminderCommand;
 
     public sealed record List : ReminderCommand;
 
@@ -25,6 +29,7 @@ public static partial class ReminderCommands
 {
     public const string UsageText =
         "Reminders: /remind in 30m call mum, /remind at 18:30 pick up the kids, /remind tomorrow 9:00 dentist, " +
+        "/remind every monday 9:00 bins, /remind every other friday 17:00 report, /remind every day 8:00 pills, " +
         "/reminders shows what is coming. Use m, h or d after the number.";
 
     public const int MaxTitleLength = 200;
@@ -41,6 +46,27 @@ public static partial class ReminderCommands
         if (command == "/reminders") return new ReminderCommand.List();
         if (command != "/remind") return null;
 
+        if (EveryPattern().Match(rest) is { Success: true } every)
+        {
+            var everyTitle = CleanTitle(every.Groups["t"].Value);
+            var everyTime = every.Groups["h"].Success
+                ? ParseTime(every.Groups["h"].Value, every.Groups["m"].Value)
+                : DefaultMorning;
+            var what = every.Groups["w"].Value.ToLowerInvariant();
+            var other = every.Groups["o"].Success;
+            if (everyTitle is null || everyTime is null) return new ReminderCommand.Usage(UsageText);
+            (string Recurrence, int Weekdays)? rule = what switch
+            {
+                "day" or "days" or "daily" => other ? null : (Reminder.RecurrenceDaily, 0),
+                "weekday" or "weekdays" => other ? null : (Reminder.RecurrenceWeekdays, 0),
+                _ => WeekdayBit(what) is { } bit
+                    ? (other ? Reminder.RecurrenceBiweekly : Reminder.RecurrenceWeekly, bit)
+                    : null,
+            };
+            return rule is { } known
+                ? new ReminderCommand.Every(known.Recurrence, known.Weekdays, everyTime.Value, everyTitle)
+                : new ReminderCommand.Usage(UsageText);
+        }
         if (InPattern().Match(rest) is { Success: true } relative)
         {
             var amount = int.Parse(relative.Groups["n"].Value, CultureInfo.InvariantCulture);
@@ -87,6 +113,10 @@ public static partial class ReminderCommands
                 if (moment <= utcNow && !at.Tomorrow)
                     moment = LocalClock.Resolve(date.AddDays(1).ToDateTime(at.Time), zone);
                 return moment;
+            case ReminderCommand.Every every:
+                var rule = ReminderSchedule.Normalize(every.Recurrence, every.Weekdays, zone.Id, every.Time, null);
+                return ReminderSchedule.NextOnOrAfter(utcNow, rule)
+                    ?? throw new ArgumentException("That repeat does not fire again.");
             default:
                 throw new ArgumentException("Not a reminder with a time.", nameof(command));
         }
@@ -96,7 +126,32 @@ public static partial class ReminderCommands
     {
         ReminderCommand.After after => after.Title,
         ReminderCommand.At at => at.Title,
+        ReminderCommand.Every every => every.Title,
         _ => string.Empty,
+    };
+
+    private static int? WeekdayBit(string name)
+    {
+        name = name.TrimEnd('s');
+        return name switch
+        {
+            "mon" or "monday" => ReminderWeekdays.Monday,
+            "tue" or "tues" or "tuesday" => ReminderWeekdays.Tuesday,
+            "wed" or "wednesday" => ReminderWeekdays.Wednesday,
+            "thu" or "thur" or "thurs" or "thursday" => ReminderWeekdays.Thursday,
+            "fri" or "friday" => ReminderWeekdays.Friday,
+            "sat" or "saturday" => ReminderWeekdays.Saturday,
+            "sun" or "sunday" => ReminderWeekdays.Sunday,
+            _ => null,
+        };
+    }
+
+    /// <summary>The recurrence a command creates, for the reply and the stored reminder.</summary>
+    public static CreateReminderRequest ToRequest(ReminderCommand command, DateTimeOffset due, string zoneId) => command switch
+    {
+        ReminderCommand.Every every => new CreateReminderRequest(every.Title, due, every.Recurrence, every.Weekdays, zoneId,
+            null, every.Time),
+        _ => new CreateReminderRequest(Title(command), due, null, 0, zoneId),
     };
 
     private static string? CleanTitle(string raw)
@@ -114,6 +169,10 @@ public static partial class ReminderCommands
             return null;
         return new TimeOnly(h, m);
     }
+
+    [GeneratedRegex(@"^every\s+(?<o>other\s+)?(?<w>[a-z]+)\s+(?:(?:at\s+)?(?<h>\d{1,2})(?:[:.](?<m>\d{2}))?\s+)?(?<t>.+)$",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex EveryPattern();
 
     [GeneratedRegex(@"^in\s+(?<n>\d{1,4})\s*(?<u>minutes?|mins?|m|hours?|hrs?|h|days?|d)\b\s*(?<t>.*)$",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant)]

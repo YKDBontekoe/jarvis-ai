@@ -71,4 +71,48 @@ public sealed class ReminderCommandTests
         var capped = Assert.IsType<ReminderCommand.After>(ReminderCommands.Parse("/remind in 5m " + new string('x', 500) + "\u0007"));
         Assert.Equal(ReminderCommands.MaxTitleLength, capped.Title.Length);
     }
+
+    [Theory]
+    [InlineData("/remind every monday 9:00 put the bins out", "weekly", 1, 9, 0, "put the bins out")]
+    [InlineData("/remind every Fri at 17.30 send the report", "weekly", 16, 17, 30, "send the report")]
+    [InlineData("/remind every other friday 17:00 report", "biweekly", 16, 17, 0, "report")]
+    [InlineData("/remind every day 8:00 take pills", "daily", 0, 8, 0, "take pills")]
+    [InlineData("/remind every weekday stand-up notes", "weekdays", 0, 9, 0, "stand-up notes")]
+    [InlineData("/remind every sundays call mum", "weekly", 64, 9, 0, "call mum")]
+    public void Repeating_reminders_are_read(string text, string recurrence, int weekdays, int hour, int minute, string title)
+    {
+        var every = Assert.IsType<ReminderCommand.Every>(ReminderCommands.Parse(text));
+
+        Assert.Equal(recurrence, every.Recurrence);
+        Assert.Equal(weekdays, every.Weekdays);
+        Assert.Equal(new TimeOnly(hour, minute), every.Time);
+        Assert.Equal(title, every.Title);
+    }
+
+    [Theory]
+    [InlineData("/remind every blursday 9:00 nothing")]
+    [InlineData("/remind every other day 9:00 nothing")]
+    [InlineData("/remind every monday")]
+    [InlineData("/remind every monday 25:00 nothing")]
+    public void Unreadable_repeats_explain_the_format(string text) =>
+        Assert.Equal(ReminderCommands.UsageText, Assert.IsType<ReminderCommand.Usage>(ReminderCommands.Parse(text)).Message);
+
+    [Fact]
+    public void The_first_repeat_is_the_next_matching_moment_in_the_owners_zone_and_the_request_carries_the_rule()
+    {
+        // Saturday 7 November 2026, 21:30 in Amsterdam.
+        var monday = Assert.IsType<ReminderCommand.Every>(ReminderCommands.Parse("/remind every monday 9:00 bins"));
+        var later = Assert.IsType<ReminderCommand.Every>(ReminderCommands.Parse("/remind every day 22:00 pills"));
+
+        var first = ReminderCommands.Resolve(monday, Now, Amsterdam);
+        var tonight = ReminderCommands.Resolve(later, Now, Amsterdam);
+        var request = ReminderCommands.ToRequest(monday, first, Amsterdam.Id);
+
+        Assert.Equal(new DateTimeOffset(2026, 11, 9, 9, 0, 0, TimeSpan.FromHours(1)), first);
+        Assert.Equal(new DateTimeOffset(2026, 11, 7, 22, 0, 0, TimeSpan.FromHours(1)), tonight);
+        Assert.Equal("weekly", request.Recurrence);
+        Assert.Equal(1, request.Weekdays);
+        Assert.Equal(new TimeOnly(9, 0), request.LocalTime);
+        Assert.Equal(Amsterdam.Id, request.TimeZoneId);
+    }
 }

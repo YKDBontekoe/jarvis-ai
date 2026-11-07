@@ -216,6 +216,13 @@ await check('reminder commands work from WhatsApp without the model', async () =
   assert.ok(stored, 'the reminder is in the app too');
   const due = new Date(stored.dueAt).getTime() - Date.now();
   assert.ok(due > 40 * 60_000 && due < 50 * 60_000, `due in about 45 minutes, got ${due / 60000}`);
+  const repeating = await say(`/remind every other friday 17:00 report ${tag}`, `wamid.rep-${tag}`, /every other Friday/);
+  assert.match(repeating.text, /17:00/);
+  const series = (await call('/reminders')).body.find(item => item.title === `report ${tag}`);
+  assert.ok(series, 'the repeating reminder is in the app too');
+  assert.equal(series.recurrence, 'biweekly');
+  assert.equal(series.weekdays, 16);
+  await call(`/reminders/${series.id}`, { method: 'DELETE' });
   const listed = await say('/reminders', `wamid.rems-${tag}`, new RegExp(`call mum ${tag}`));
   assert.ok(listed.text);
   const usage = await say('/remind soon', `wamid.remx-${tag}`, /\/remind in 30m/);

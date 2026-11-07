@@ -125,8 +125,9 @@ public sealed class ChannelCommandHandler(
                 {
                     var due = ReminderCommands.Resolve(command, now, zone);
                     var created = await reminders.CreateAsync(ownerId,
-                        new CreateReminderRequest(ReminderCommands.Title(command), due, null, 0, zone.Id), cancellationToken);
-                    return $"⏰ Reminder set for {TimeZoneInfo.ConvertTime(created.DueAt, zone):ddd d MMM HH:mm}: {created.Title}";
+                        ReminderCommands.ToRequest(command, due, zone.Id), cancellationToken);
+                    var repeat = command is ReminderCommand.Every ? " (" + ReminderSchedule.Describe(created) + ")" : "";
+                    return $"⏰ Reminder set for {TimeZoneInfo.ConvertTime(created.DueAt, zone):ddd d MMM HH:mm}{repeat}: {created.Title}";
                 }
                 catch (Exception exception) when (exception is ArgumentException)
                 {
