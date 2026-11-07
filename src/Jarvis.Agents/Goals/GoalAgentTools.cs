@@ -12,6 +12,7 @@ internal sealed class GoalToolContributor(IGoalService goals, ICurrentUser curre
     {
         var tools = new GoalAgentTools(goals, currentUser);
         yield return AIFunctionFactory.Create(tools.GetGoalsAsync);
+        yield return AIFunctionFactory.Create(tools.CreateGoalAsync);
         yield return AIFunctionFactory.Create(tools.AddGoalCheckInAsync);
         yield return AIFunctionFactory.Create(tools.ProposeGoalPlanAsync);
     }
@@ -40,6 +41,35 @@ internal sealed class GoalAgentTools(IGoalService goals, ICurrentUser currentUse
             text.AppendLine();
         }
         return text.ToString();
+    }
+
+    [Description("Create a goal when the user asks for one in their own words (\"set a goal: run a 10k by the end of March\"). Use their wording for the title. Pass motivation, target, horizon and minutes only if they said them; never invent a goal from something they merely mentioned, and never pad it with a plan: proposing a plan is a separate step they accept in the app.")]
+    public async Task<string> CreateGoalAsync(
+        [Description("The goal in a few words, as the user said it, such as 'Run a 10k'.")] string title,
+        [Description("Why it matters to them, only if they said.")] string? motivation = null,
+        [Description("What done looks like, such as '10 km without stopping', only if they said.")] string? target = null,
+        [Description("The date they want it done by, YYYY-MM-DD, only if they gave one. Resolve 'end of March' to the next 31 March.")] string? horizon = null,
+        [Description("Minutes per week they want to give it, only if they said.")] int? weeklyMinutes = null,
+        [Description("Days between check-ins, only if they said.")] int? checkInEveryDays = null,
+        CancellationToken cancellationToken = default)
+    {
+        DateOnly? due = null;
+        if (!string.IsNullOrWhiteSpace(horizon))
+        {
+            if (!DateOnly.TryParseExact(horizon.Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsed))
+                return "I could not read that date. Use YYYY-MM-DD, or leave the date out.";
+            due = parsed;
+        }
+        var result = await goals.CreateAsync(currentUser.OwnerId,
+            new GoalInput(title, motivation, due, target, checkInEveryDays, weeklyMinutes, null, null, null, null),
+            cancellationToken);
+        return result.Failure switch
+        {
+            GoalFailure.None => $"Goal created: \"{result.Value!.Goal.Title}\" [goal:{result.Value.Goal.Id}]" +
+                                (result.Value.Goal.Horizon is { } h ? $", due {h:yyyy-MM-dd}." : "."),
+            _ => $"I could not create the goal: {result.Message}"
+        };
     }
 
     [Description("Record a check-in on a goal in the user's own words: what moved (even if small), what got in the way, and what to adjust. Only call it when the user told you this; never invent progress. Feeling is on_track, slipping or stuck.")]

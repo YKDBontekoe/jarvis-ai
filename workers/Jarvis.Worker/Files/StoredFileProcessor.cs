@@ -72,6 +72,12 @@ internal sealed class StoredFileProcessor(IOptions<FileProcessingOptions> option
         {
             throw;
         }
+        catch (InvalidDataException)
+        {
+            // The file itself cannot be read (corrupt, not the type it claims, or too large to read safely). Another
+            // attempt would fail the same way, so say so now instead of after the retries.
+            await files.SetProcessingStatusAsync(input.FileId, input.OwnerId, "failed", CancellationToken.None);
+        }
         catch
         {
             if (activityAttempt >= Jarvis.Workflows.FileProcessingWorkflow.MaximumProcessingAttempts)
@@ -107,7 +113,14 @@ internal sealed class StoredFileProcessor(IOptions<FileProcessingOptions> option
             return new ExtractedText(output.ToString(), pageStarts, cutOff);
         }
 
-        if (!file.ContentType.StartsWith("text/", StringComparison.Ordinal) && file.ContentType != "application/json")
+        if (OfficeText.IsOffice(file.ContentType))
+        {
+            var office = OfficeText.Extract(content, file.ContentType, Options.MaxExtractedCharacters + 1);
+            return new ExtractedText(office, null, office.Length > Options.MaxExtractedCharacters);
+        }
+
+        if (!file.ContentType.StartsWith("text/", StringComparison.Ordinal) &&
+            file.ContentType is not ("application/json" or "application/yaml"))
             return new ExtractedText(string.Empty, null, false);
         using var reader = new StreamReader(content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false,
             throwOnInvalidBytes: false), detectEncodingFromByteOrderMarks: true,

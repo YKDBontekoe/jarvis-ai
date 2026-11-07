@@ -485,4 +485,63 @@ public sealed class GoalTests
     {
         public Guid OwnerId => Owner;
     }
+
+    private sealed class GoalUser : ICurrentUser
+    {
+        public Guid OwnerId => Owner;
+    }
+
+    [Fact]
+    public async Task The_assistant_can_create_a_goal_the_owner_asked_for_and_it_is_theirs_alone()
+    {
+        // Found on the real model: "Set a goal: run a 10k by the end of March" ended in "I can't create goals yet",
+        // although the app has goals, because the assistant had tools to read and check in on them but not to add one.
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+
+        var reply = await tools.CreateGoalAsync("Run a 10k", motivation: "Feel fit", target: "10 km without stopping",
+            horizon: "2027-03-31", weeklyMinutes: 90);
+
+        Assert.StartsWith("Goal created: \"Run a 10k\"", reply, StringComparison.Ordinal);
+        Assert.Contains("due 2027-03-31", reply, StringComparison.Ordinal);
+        var stored = Assert.Single(await s.Service.ListAsync(Owner, false, default));
+        Assert.Equal("Run a 10k", stored.Title);
+        Assert.Empty(await s.Service.ListAsync(Guid.NewGuid(), false, default));
+    }
+
+    [Theory]
+    [InlineData("31/03/2027")]
+    [InlineData("next March")]
+    [InlineData("2027-13-40")]
+    public async Task A_date_the_assistant_cannot_read_is_refused_without_creating_anything(string horizon)
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+
+        var reply = await tools.CreateGoalAsync("Run a 10k", horizon: horizon);
+
+        Assert.Contains("YYYY-MM-DD", reply, StringComparison.Ordinal);
+        Assert.Empty(await s.Service.ListAsync(Owner, false, default));
+    }
+
+    [Fact]
+    public async Task A_goal_without_a_usable_title_is_refused_with_the_reason()
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+
+        var reply = await tools.CreateGoalAsync("   ");
+
+        Assert.StartsWith("I could not create the goal", reply, StringComparison.Ordinal);
+        Assert.Empty(await s.Service.ListAsync(Owner, false, default));
+    }
+
+    [Fact]
+    public void Creating_a_goal_is_offered_with_the_other_goal_tools()
+    {
+        var group = Jarvis.Agents.ToolGroups.All.Single(item => item.Id == "goals");
+
+        Assert.Contains("CreateGoal", group.Tools);
+        Assert.Matches(group.Keywords, "Set a goal: run a 10k by the end of March");
+    }
 }
