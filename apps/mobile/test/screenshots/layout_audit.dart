@@ -56,6 +56,7 @@ const destinations = [
   'today',
   'expenses',
   'habits',
+  'lists',
   'people',
   'approvals',
   'reminders',
