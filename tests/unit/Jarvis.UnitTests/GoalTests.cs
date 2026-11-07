@@ -544,4 +544,61 @@ public sealed class GoalTests
         Assert.Contains("CreateGoal", group.Tools);
         Assert.Matches(group.Keywords, "Set a goal: run a 10k by the end of March");
     }
+
+    [Fact]
+    public async Task The_assistant_can_pause_and_resume_a_goal_and_only_what_was_asked_changes()
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+        var created = (await s.Service.CreateAsync(Owner,
+            new GoalInput("Run a 10k", null, null, "10 km", null, null, null, null, null, null), default)).Value!.Goal;
+
+        var paused = await tools.UpdateGoalAsync(created.Id.ToString(), status: "Paused");
+        var afterPause = (await s.Service.GetAsync(Owner, created.Id, default))!.Goal;
+
+        Assert.Contains("is paused", paused, StringComparison.Ordinal);
+        Assert.Equal(GoalStatuses.Paused, afterPause.Status);
+        Assert.Equal("Run a 10k", afterPause.Title);
+        Assert.Equal("10 km", afterPause.Target);
+
+        await tools.UpdateGoalAsync(created.Id.ToString(), status: "active", horizon: "2027-06-30");
+        var resumed = (await s.Service.GetAsync(Owner, created.Id, default))!.Goal;
+        Assert.Equal(GoalStatuses.Active, resumed.Status);
+        Assert.Equal(new DateOnly(2027, 6, 30), resumed.Horizon);
+    }
+
+    [Theory]
+    [InlineData("deleted")]
+    [InlineData("done-ish")]
+    public async Task An_unknown_goal_state_is_refused_and_nothing_changes(string status)
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+        var created = (await s.Service.CreateAsync(Owner,
+            new GoalInput("Read more", null, null, null, null, null, null, null, null, null), default)).Value!.Goal;
+
+        var reply = await tools.UpdateGoalAsync(created.Id.ToString(), status: status);
+
+        Assert.StartsWith("Status must be one of", reply, StringComparison.Ordinal);
+        Assert.Equal(GoalStatuses.Active, (await s.Service.GetAsync(Owner, created.Id, default))!.Goal.Status);
+    }
+
+    [Fact]
+    public async Task Updating_with_nothing_to_change_or_a_goal_that_is_not_the_owners_does_nothing()
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+        var created = (await s.Service.CreateAsync(Guid.NewGuid(),
+            new GoalInput("Someone else's", null, null, null, null, null, null, null, null, null), default)).Value!.Goal;
+
+        Assert.StartsWith("Nothing to change", await tools.UpdateGoalAsync(created.Id.ToString()), StringComparison.Ordinal);
+        Assert.Equal("I could not find that goal.", await tools.UpdateGoalAsync(created.Id.ToString(), status: "archived"));
+        Assert.Equal("That goal ID is not valid. Call GetGoals first.", await tools.UpdateGoalAsync("nope", status: "paused"));
+    }
+
+    [Fact]
+    public void Updating_a_goal_is_offered_with_the_other_goal_tools()
+    {
+        Assert.Contains("UpdateGoal", Jarvis.Agents.ToolGroups.All.Single(item => item.Id == "goals").Tools);
+    }
 }

@@ -13,6 +13,7 @@ internal sealed class GoalToolContributor(IGoalService goals, ICurrentUser curre
         var tools = new GoalAgentTools(goals, currentUser);
         yield return AIFunctionFactory.Create(tools.GetGoalsAsync);
         yield return AIFunctionFactory.Create(tools.CreateGoalAsync);
+        yield return AIFunctionFactory.Create(tools.UpdateGoalAsync);
         yield return AIFunctionFactory.Create(tools.AddGoalCheckInAsync);
         yield return AIFunctionFactory.Create(tools.ProposeGoalPlanAsync);
     }
@@ -69,6 +70,43 @@ internal sealed class GoalAgentTools(IGoalService goals, ICurrentUser currentUse
             GoalFailure.None => $"Goal created: \"{result.Value!.Goal.Title}\" [goal:{result.Value.Goal.Id}]" +
                                 (result.Value.Goal.Horizon is { } h ? $", due {h:yyyy-MM-dd}." : "."),
             _ => $"I could not create the goal: {result.Message}"
+        };
+    }
+
+    [Description("Change a goal the user asked you to change: pause it, resume it, mark it achieved, archive it, or reword it, move its date or change its target. Pass only what they asked to change. Never archive or pause a goal on your own because it looks neglected. Deleting a goal is not possible here.")]
+    public async Task<string> UpdateGoalAsync(
+        [Description("The goal's ID from GetGoals.")] string goalId,
+        [Description("active, paused, achieved or archived. Only if the user asked to change the state.")] string? status = null,
+        [Description("A new title, only if the user asked to reword it.")] string? title = null,
+        [Description("A new target, only if the user said.")] string? target = null,
+        [Description("A new date, YYYY-MM-DD, only if the user gave one.")] string? horizon = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(goalId, out var id)) return "That goal ID is not valid. Call GetGoals first.";
+        var normalizedStatus = status?.Trim().ToLowerInvariant();
+        if (normalizedStatus is { Length: > 0 } && !GoalStatuses.All.Contains(normalizedStatus))
+            return $"Status must be one of: {string.Join(", ", GoalStatuses.All)}.";
+        DateOnly? due = null;
+        if (!string.IsNullOrWhiteSpace(horizon))
+        {
+            if (!DateOnly.TryParseExact(horizon.Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsed))
+                return "I could not read that date. Use YYYY-MM-DD, or leave the date out.";
+            due = parsed;
+        }
+        if (normalizedStatus is not { Length: > 0 } && string.IsNullOrWhiteSpace(title) &&
+            string.IsNullOrWhiteSpace(target) && due is null)
+            return "Nothing to change. Say what should change: the state, title, target or date.";
+        var result = await goals.UpdateAsync(currentUser.OwnerId, id,
+            new GoalInput(string.IsNullOrWhiteSpace(title) ? null : title, null, due,
+                string.IsNullOrWhiteSpace(target) ? null : target, null, null,
+                normalizedStatus is { Length: > 0 } ? normalizedStatus : null, null, null, null),
+            cancellationToken);
+        return result.Failure switch
+        {
+            GoalFailure.None => $"Goal updated: \"{result.Value!.Goal.Title}\" is {result.Value.Goal.Status}.",
+            GoalFailure.NotFound => "I could not find that goal.",
+            _ => $"I could not update the goal: {result.Message}"
         };
     }
 
