@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 75 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 78 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -108,6 +108,9 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 73. `/lists` and `/list <name>` on WhatsApp and Signal show your lists instantly, without waiting for the model.
 74. `/add shopping: milk, eggs` and `/done shopping: milk` add and tick items from chat; a malformed command explains how to write it.
 75. These are listed in `/help`, unit tested (parsing, usage, rendering) and run end to end in `channels_flow.mjs` (23 checks), including that the same list shows up in the app.
+76. `/remind in 30m call mum` (also h and d) sets a reminder from WhatsApp or Signal without a model turn, in the owner's home zone.
+77. `/remind at 18:30 …` (today if still ahead, otherwise tomorrow) and `/remind tomorrow 9:00 …` (9:00 when no time is given).
+78. `/reminders` lists what is coming; a command that cannot be read answers with the format. 19 unit tests, and `channels_flow.mjs` (24 checks) confirms the reminder lands in the app about 45 minutes ahead.
 
 A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 

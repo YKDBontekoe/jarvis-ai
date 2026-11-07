@@ -8,6 +8,8 @@ using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
 using Jarvis.Application.Lists;
+using Jarvis.Application.Preferences;
+using Jarvis.Application.Workflows;
 
 namespace Jarvis.Api.Channels;
 
@@ -82,12 +84,16 @@ public sealed class ChannelMessageRouter(
     IFileService files,
     IConversationFileContextRepository fileContext,
     IListService lists,
-    ILogger<ChannelMessageRouter> logger)
+    IReminderService reminders,
+    IOwnerPreferenceService preferences,
+    ILogger<ChannelMessageRouter> logger,
+    TimeProvider? timeProvider = null)
 {
     internal const string Help = """
         I'm Jarvis. Message me like you would in the app.
         • /new — start a fresh conversation
         • /status — what I'm waiting on
+        • /remind in 30m call mum, /remind at 18:30 …, /remind tomorrow 9:00 …, /reminders — quick reminders
         • /lists, /list shopping, /add shopping: milk, eggs, /done shopping: milk — your lists
         • Send a photo (JPEG, PNG, WebP) or a file (PDF, Word, text) and ask about it
         • YES or NO — answer an approval request from this chat
@@ -147,6 +153,12 @@ public sealed class ChannelMessageRouter(
         if (text.Equals("/help", StringComparison.OrdinalIgnoreCase))
         {
             await messenger.SendAsync(connection, sender, Help, cancellationToken);
+            return;
+        }
+        if (ReminderCommands.Parse(text) is { } reminderCommand)
+        {
+            await messenger.SendAsync(connection, sender,
+                await RunReminderCommandAsync(ownerId, reminderCommand, cancellationToken), cancellationToken);
             return;
         }
         if (ListCommands.Parse(text) is { } listCommand)
@@ -239,6 +251,38 @@ public sealed class ChannelMessageRouter(
             }
         }
         return stored;
+    }
+
+    private async Task<string> RunReminderCommandAsync(Guid ownerId, ReminderCommand command,
+        CancellationToken cancellationToken)
+    {
+        var view = await preferences.GetAsync(ownerId, cancellationToken);
+        var zone = LocalClock.TryFind(view.HomeTimeZone, out var found) ? found : TimeZoneInfo.Utc;
+        var now = (timeProvider ?? TimeProvider.System).GetUtcNow();
+        switch (command)
+        {
+            case ReminderCommand.Usage usage:
+                return usage.Message;
+            case ReminderCommand.List:
+                var pending = (await reminders.ListAsync(ownerId, cancellationToken))
+                    .Where(item => item.Status == "pending" && item.Place is null).OrderBy(item => item.DueAt).Take(8).ToList();
+                return pending.Count == 0
+                    ? "Nothing is coming up. Try /remind in 30m call mum"
+                    : string.Join("\n", pending.Select(item =>
+                        $"• {TimeZoneInfo.ConvertTime(item.DueAt, zone):ddd d MMM HH:mm} {item.Title}"));
+            default:
+                try
+                {
+                    var due = ReminderCommands.Resolve(command, now, zone);
+                    var created = await reminders.CreateAsync(ownerId,
+                        new CreateReminderRequest(ReminderCommands.Title(command), due, null, 0, zone.Id), cancellationToken);
+                    return $"⏰ Reminder set for {TimeZoneInfo.ConvertTime(created.DueAt, zone):ddd d MMM HH:mm}: {created.Title}";
+                }
+                catch (Exception exception) when (exception is ArgumentException)
+                {
+                    return "I could not set that reminder: " + exception.Message;
+                }
+        }
     }
 
     private async Task<string> RunListCommandAsync(Guid ownerId, ListCommand command, CancellationToken cancellationToken)

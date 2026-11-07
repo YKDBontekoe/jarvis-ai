@@ -169,6 +169,26 @@ await check('a shared WhatsApp location pin is understood instead of dropped', a
   assert.equal(reply.to, owner);
 });
 
+await check('reminder commands work from WhatsApp without the model', async () => {
+  const tag = Date.now().toString(36);
+  const say = async (text, id, expected) => {
+    await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+    await postWebhook(whatsapp.webhookUrl, webhookPayload(owner, text, id));
+    return waitForReply('whatsapp', message => expected.test(message.text));
+  };
+  const set = await say(`/remind in 45m call mum ${tag}`, `wamid.rem-${tag}`, /Reminder set/);
+  assert.match(set.text, new RegExp(`call mum ${tag}`));
+  const stored = (await call('/reminders')).body.find(item => item.title === `call mum ${tag}`);
+  assert.ok(stored, 'the reminder is in the app too');
+  const due = new Date(stored.dueAt).getTime() - Date.now();
+  assert.ok(due > 40 * 60_000 && due < 50 * 60_000, `due in about 45 minutes, got ${due / 60000}`);
+  const listed = await say('/reminders', `wamid.rems-${tag}`, new RegExp(`call mum ${tag}`));
+  assert.ok(listed.text);
+  const usage = await say('/remind soon', `wamid.remx-${tag}`, /\/remind in 30m/);
+  assert.ok(usage.text);
+  await call(`/reminders/${stored.id}`, { method: 'DELETE' });
+});
+
 await check('list commands work from WhatsApp without the model', async () => {
   const tag = Date.now().toString(36);
   const say = async (text, id, expected) => {
