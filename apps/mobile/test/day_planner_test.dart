@@ -274,4 +274,65 @@ void main() {
     expect(find.byKey(const Key('planner-calendar-down')), findsOneWidget);
     expect(find.textContaining('Nothing scheduled yet'), findsOneWidget);
   });
+
+  testWidgets('the next day opens a read-only agenda and back to today returns', (
+    tester,
+  ) async {
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final key =
+        '${tomorrow.year}-${tomorrow.month.toString().padLeft(2, '0')}-${tomorrow.day.toString().padLeft(2, '0')}';
+    http.on('GET', _base, _day(items: [_item('t1', 'Write report')]));
+    http.on(
+      'GET',
+      '/api/v1/planner/day',
+      {
+        ..._day(entries: [
+          {
+            'kind': 'event',
+            'id': null,
+            'title': 'Dentist',
+            'startAt': _iso(tomorrow),
+            'endAt': _iso(tomorrow.add(const Duration(hours: 1))),
+            'done': false,
+          },
+        ]),
+        'date': key,
+      },
+    );
+    await show(tester, DayPlannerScreen(http: http.client()));
+    expect(find.text('To-dos'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('planner-next-day')));
+    await tester.pumpAndSettle();
+
+    final request = http.sent('GET', '/api/v1/planner/day').single;
+    expect(request.query['date'], key);
+    expect(find.text('Dentist'), findsOneWidget);
+    expect(find.byKey(const Key('planner-readonly-note')), findsOneWidget);
+    expect(find.text('To-dos'), findsNothing);
+    expect(find.byKey(const Key('planner-today')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('planner-today')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('To-dos'), findsOneWidget);
+    expect(find.byKey(const Key('planner-readonly-note')), findsNothing);
+  });
+
+  testWidgets('you cannot go past a week back from the previous-day button', (
+    tester,
+  ) async {
+    http.on('GET', _base, _day());
+    http.on('GET', '/api/v1/planner/day', _day());
+    await show(tester, DayPlannerScreen(http: http.client()));
+
+    for (var i = 0; i < 9; i++) {
+      await tester.tap(find.byKey(const Key('planner-prev-day')), warnIfMissed: false);
+      await tester.pumpAndSettle();
+    }
+
+    expect(http.sent('GET', '/api/v1/planner/day').length, 7);
+    final button = tester.widget<IconButton>(find.byKey(const Key('planner-prev-day')));
+    expect(button.onPressed, isNull);
+  });
 }
