@@ -12,6 +12,7 @@ internal sealed class PlannerToolContributor(IDayPlannerService planner, ICurren
     {
         var tools = new PlannerAgentTools(planner, currentUser);
         yield return AIFunctionFactory.Create(tools.GetTodayPlanAsync);
+        yield return AIFunctionFactory.Create(tools.GetDayAgendaAsync);
         yield return AIFunctionFactory.Create(tools.AddToDayPlanAsync);
         yield return AIFunctionFactory.Create(tools.PlanMyDayAsync);
         yield return AIFunctionFactory.Create(tools.CompleteDayPlanItemAsync);

@@ -19,6 +19,23 @@ internal sealed class PlannerAgentTools(IDayPlannerService planner, ICurrentUser
         return Describe(today);
     }
 
+    [Description("Show another day's agenda (up to a week back and three months ahead): calendar events, reminders and the free time between them. Use it for \"what is on Friday?\" or \"am I free next Tuesday?\". It is read-only; to-dos and focus blocks exist for today only. Resolve words like 'tomorrow' or 'next Friday' to a date from the current time in context.")]
+    public async Task<string> GetDayAgendaAsync(
+        [Description("The day as YYYY-MM-DD.")] string date,
+        CancellationToken cancellationToken = default)
+    {
+        if (!DateOnly.TryParseExact(date?.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            return "I could not read that date. Use YYYY-MM-DD.";
+        try
+        {
+            return Describe(await planner.GetAgendaAsync(currentUser.OwnerId, day, null, cancellationToken));
+        }
+        catch (ArgumentException exception)
+        {
+            return exception.Message;
+        }
+    }
+
     [Description("Add a to-do to today's plan with an estimate in minutes (5 to 480, default 30). It is not on the timeline until PlanMyDay places it. Use this for things the user wants to get done today, not for reminders at a fixed time.")]
     public async Task<string> AddToDayPlanAsync(
         [Description("Short title of the to-do. May be empty when commitmentId is given.")] string title = "",

@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 67 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 70 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -100,6 +100,9 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 65. A location pin shared on WhatsApp reaches the assistant as one line of text (coordinates, and the place's name and address marked as not instructions) instead of being dropped; `channels_flow.mjs` now has 22 checks.
 66. Contact cards shared on WhatsApp reach the assistant as a marked line (name and up to three numbers per card, five cards at most, flattened); unit tested only.
 67. The Lists screen is in the layout audit, which renders every screen at large text, narrow width and dark mode; it passes.
+68. A read-only agenda for any day from a week back to three months ahead (`GET /planner/day?date=`), built from the calendar, reminders and free time; nothing is saved and today's to-dos are untouched. Checked on the running API (200 in range, 400 for a bad date and for a date out of range).
+69. The assistant can answer "what is on Friday?" and "am I free next Tuesday?" with `GetDayAgenda`, and the planner group is offered for those questions in English and Dutch.
+70. Unit tests for both, including that another day's agenda leaves today's plan alone.
 
 A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 
@@ -109,7 +112,7 @@ Seen but left alone: Home lists the five oldest-due promises, so with five or mo
 
 Found by asking the real model 20 everyday requests. Still open:
 
-- the day planner covers only today;
+- planning (placing to-dos) for days other than today; the agenda for other days is read-only;
 - pausing (not archiving) a habit.
 
 The new tools in items 38 to 47 have unit tests only; they were not yet run against the real model because the Codex plan was out of quota.

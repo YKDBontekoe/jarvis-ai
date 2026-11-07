@@ -18,6 +18,22 @@ internal static class PlannerEndpoints
             Results.Ok(await service.GetTodayAsync(currentUser.OwnerId, timeZone, ct)))
             .WithName("GetDayPlan");
 
+        api.MapGet("/planner/day", async (string? date, IDayPlannerService service, ICurrentUser currentUser,
+            string? timeZone, CancellationToken ct) =>
+        {
+            if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var day))
+                return EndpointHelpers.Invalid("date", "Use the date format YYYY-MM-DD.");
+            try
+            {
+                return Results.Ok(await service.GetAgendaAsync(currentUser.OwnerId, day, timeZone, ct));
+            }
+            catch (ArgumentException exception)
+            {
+                return EndpointHelpers.Invalid("date", exception.Message);
+            }
+        }).WithName("GetDayAgenda");
+
         planner.MapPost("/items", async (AddDayPlanItemRequest request, IDayPlannerService service,
             ICurrentUser currentUser, string? timeZone, CancellationToken ct) =>
         {

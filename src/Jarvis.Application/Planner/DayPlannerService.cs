@@ -42,6 +42,23 @@ public sealed class DayPlannerService(
         return await BuildAsync(ownerId, day, cancellationToken);
     }
 
+    public const int AgendaDaysBack = 7;
+    public const int AgendaDaysAhead = 90;
+
+    public async Task<DayTimelineDto> GetAgendaAsync(Guid ownerId, DateOnly date, string? timeZoneId,
+        CancellationToken cancellationToken)
+    {
+        var today = await LoadDayAsync(ownerId, timeZoneId, cancellationToken);
+        var current = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), today.Zone).DateTime);
+        if (date < current.AddDays(-AgendaDaysBack) || date > current.AddDays(AgendaDaysAhead))
+            throw new ArgumentException(
+                $"Pick a day between {AgendaDaysBack} days ago and {AgendaDaysAhead} days ahead.");
+        if (date == current) return await BuildAsync(ownerId, today, cancellationToken);
+        // Not saved: this is a look at another day, so the to-do list and today's blocks stay as they are.
+        var other = today with { State = today.State with { Date = date, Items = [], PlannedAt = null }, Changed = false };
+        return await BuildAsync(ownerId, other, cancellationToken);
+    }
+
     public async Task<DayPlanItemDto> AddItemAsync(Guid ownerId, AddDayPlanItemRequest request, string? timeZoneId,
         CancellationToken cancellationToken)
     {

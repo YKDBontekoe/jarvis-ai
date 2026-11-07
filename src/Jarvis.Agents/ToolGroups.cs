@@ -41,8 +41,8 @@ public static partial class ToolGroups
              "GradeFlashcard", "AddFlashcards", "ClipUrlToLibrary", "StartDeepResearch", "TeachFromLibraryItem",
              "CheckLessonAnswer"],
             LibraryKeywords()),
-        new("planner", "Today's day plan: show it, plan the day, add, complete or remove items",
-            ["GetTodayPlan", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
+        new("planner", "Today's day plan: show it, plan the day, add, complete or remove items; another day's agenda",
+            ["GetTodayPlan", "GetDayAgenda", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
             PlannerKeywords()),
         new("calendar", "The user's upcoming calendar events from their connected calendar link",
             ["GetCalendarEvents"],
@@ -275,7 +275,7 @@ public static partial class ToolGroups
     [GeneratedRegex(@"\b(library|article|read later|saved? (this|it|link)|clip|bookmark|flashcard|study|quiz me|teach me|lesson|explain this article|leer me|les over|deep research|research report|digest|bibliotheek|artikel|opslaan|onderzoek)", KeywordOptions)]
     private static partial Regex LibraryKeywords();
 
-    [GeneratedRegex(@"\b(plan (my|the|for)|day plan|today'?s plan|my day|schedule (my|the) day|agenda|to-?do|planning|dagplan|mijn dag|vandaag plannen)", KeywordOptions)]
+    [GeneratedRegex(@"\b(plan (my|the|for)|day plan|today'?s plan|my day|schedule (my|the) day|agenda|to-?do|planning|dagplan|mijn dag|vandaag plannen|am i free|free (on|next|tomorrow)|what'?s on (tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next)|tomorrow'?s (plan|schedule)|ben ik vrij|morgen (staat|plan))", KeywordOptions)]
     private static partial Regex PlannerKeywords();
 
     [GeneratedRegex(@"\b(shopping list|grocery list|groceries|packing list|to-?buy|(add|put) .{1,60} (to|on) (my|the) .{0,20}list|(my|the) .{0,20}list|boodschappen|winkellijst|inpaklijst|lijstje)", KeywordOptions)]

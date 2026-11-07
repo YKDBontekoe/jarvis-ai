@@ -75,6 +75,7 @@ Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, 
 | Method | Path |
 |--------|------|
 | GET/POST/DELETE | `/lists` (GET all lists), `POST /lists/items` (`list`, `items`; creates the list by name, skips duplicates), `POST /lists/done` (`list`, `items`, `done`), `POST /lists/clear-done` (`list`), `DELETE /lists/{id}`. Stored in owner settings (`lists`); at most 50 lists of 200 items; a list name that matches more than one list answers 409 |
+| GET | `/planner/day?date=YYYY-MM-DD` (read-only agenda for another day, 7 days back to 90 ahead: calendar events, reminders, free time; to-dos and focus blocks are today only; 400 outside the range) |
 | GET | `/planner/today` (timeline of calendar events, reminders and focus blocks; to-dos; free slots) |
 | POST | `/planner/today/items` (`title` ≤ 200, `minutes` 5–480, default 30; optional `sourceRef` `commitment:<id>` plans an open, accepted promise: the title defaults to its description and planning it again returns the same to-do; items carry `sourceRef`) |
 | PATCH/DELETE | `/planner/today/items/{id}` (PATCH: `title`, `minutes`, `done`) |

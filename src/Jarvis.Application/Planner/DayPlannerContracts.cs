@@ -79,6 +79,13 @@ public interface IDayPlannerService
     /// <summary>Today's timeline in <paramref name="timeZoneId"/>, or the owner's saved zone when it is null.</summary>
     Task<DayTimelineDto> GetTodayAsync(Guid ownerId, string? timeZoneId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// A read-only look at another day (up to a week back, three months ahead): calendar events, reminders and the
+    /// free time between them. To-dos and focus blocks belong to today only, so they are empty; nothing is saved.
+    /// </summary>
+    Task<DayTimelineDto> GetAgendaAsync(Guid ownerId, DateOnly date, string? timeZoneId,
+        CancellationToken cancellationToken);
+
     Task<DayPlanItemDto> AddItemAsync(Guid ownerId, AddDayPlanItemRequest request, string? timeZoneId,
         CancellationToken cancellationToken);
 

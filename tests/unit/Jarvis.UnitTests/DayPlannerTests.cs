@@ -301,6 +301,58 @@ public sealed class DayPlannerTests
         // The fake service has no Complete handler, so any attempt to close the promise would throw above.
     }
 
+    [Fact]
+    public async Task Another_days_agenda_shows_its_events_and_reminders_and_free_time_without_touching_today()
+    {
+        var (service, reminders, calendar, _) = Create(Morning);
+        await service.AddItemAsync(Owner, new AddDayPlanItemRequest("Write report", 60), Amsterdam, default);
+        var friday = new DateOnly(2026, 10, 9);
+        DateTimeOffset At(int hour) => new DateTimeOffset(2026, 10, 9, hour, 0, 0, TimeSpan.FromHours(2)).ToUniversalTime();
+        calendar.Events.Add(new CalendarEventRecord("Dentist", At(10), At(11)));
+        reminders.Items.Add(new ReminderRecord(Guid.NewGuid(), Owner, "Call Sam", At(15), "wf", "pending", Morning, null));
+
+        var agenda = await service.GetAgendaAsync(Owner, friday, Amsterdam, default);
+        var today = await service.GetTodayAsync(Owner, Amsterdam, default);
+
+        Assert.Equal(friday, agenda.Date);
+        Assert.Equal(["Dentist", "Call Sam"], agenda.Entries.Select(entry => entry.Title));
+        Assert.Empty(agenda.Items);
+        Assert.True(agenda.FreeMinutes > 0);
+        Assert.Equal(new DateOnly(2026, 10, 2), today.Date);
+        Assert.Equal(["Write report"], today.Items.Select(item => item.Title));
+    }
+
+    [Theory]
+    [InlineData(-8)]
+    [InlineData(91)]
+    public async Task An_agenda_too_far_away_is_refused(int days)
+    {
+        var (service, _, _, _) = Create(Morning);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.GetAgendaAsync(Owner, new DateOnly(2026, 10, 2).AddDays(days), Amsterdam, default));
+    }
+
+    [Fact]
+    public async Task Asking_the_assistant_for_a_day_reads_the_date_and_reports_bad_input_and_todays_date_matches_the_plan()
+    {
+        var (service, _, calendar, _) = Create(Morning);
+        calendar.Events.Add(new CalendarEventRecord("Dentist", new DateTimeOffset(2026, 10, 3, 10, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 10, 3, 11, 0, 0, TimeSpan.FromHours(2))));
+        var tools = new PlannerAgentTools(service, new FixedUser());
+
+        var reply = await tools.GetDayAgendaAsync("2026-10-03");
+
+        Assert.Contains("Day plan for Saturday 2026-10-03", reply, StringComparison.Ordinal);
+        Assert.Contains("Dentist", reply, StringComparison.Ordinal);
+        Assert.Equal("I could not read that date. Use YYYY-MM-DD.", await tools.GetDayAgendaAsync("next friday"));
+        Assert.StartsWith("Pick a day between", await tools.GetDayAgendaAsync("2030-01-01"), StringComparison.Ordinal);
+        var group = Jarvis.Agents.ToolGroups.All.Single(item => item.Id == "planner");
+        Assert.Contains("GetDayAgenda", group.Tools);
+        Assert.Matches(group.Keywords, "Am I free next Tuesday afternoon?");
+        Assert.Matches(group.Keywords, "What's on Friday?");
+    }
+
     private static (DayPlannerService Service, FakeReminders Reminders, FakeCalendar Calendar, MutableClock Clock)
         Create(DateTimeOffset now, ICommitmentService? commitments = null)
     {
