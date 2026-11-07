@@ -144,4 +144,42 @@ public sealed class ChannelMediaTests
     [InlineData("http://evil.example/media/1", "http://localhost:5198/v21.0", false)]
     public void A_media_address_must_be_https_or_on_the_configured_graph_host(string? url, string graph, bool trusted) =>
         Assert.Equal(trusted, WhatsAppCloudTransport.IsTrustedMediaUrl(url, graph));
+
+    [Fact]
+    public void A_signal_photo_keeps_its_attachment_id_and_the_text_stays_the_caption()
+    {
+        using var document = JsonDocument.Parse("""
+            [{"envelope":{"sourceNumber":"+31611111111","timestamp":1727450000000,
+               "dataMessage":{"message":"What is this?","timestamp":1727450000000,
+                 "attachments":[{"id":"abc123.jpg","contentType":"image/jpeg","filename":"IMG_1.jpg","size":1234}]}}},
+             {"envelope":{"sourceNumber":"+31611111111","timestamp":1727450000001,
+               "dataMessage":{"timestamp":1727450000001,
+                 "attachments":[{"id":"voice9.aac","contentType":"audio/aac"}]}}},
+             {"envelope":{"sourceNumber":"+31611111111","timestamp":1727450000002,
+               "dataMessage":{"timestamp":1727450000002,"attachments":[]}}}]
+            """);
+
+        var messages = SignalReceiver.ParseInbound(document.RootElement).ToArray();
+
+        Assert.Equal(2, messages.Length);
+        Assert.Equal("What is this?", messages[0].Text);
+        Assert.Equal(new ChannelMediaRef("image", "abc123.jpg", "image/jpeg", null),
+            Assert.Single(ChannelMedia.Parse(messages[0].MediaJson)));
+        Assert.Equal(string.Empty, messages[1].Text);
+        Assert.Equal("audio", Assert.Single(ChannelMedia.Parse(messages[1].MediaJson)).Kind);
+        Assert.Equal("+31611111111:1727450000000", messages[0].ExternalId);
+    }
+
+    [Fact]
+    public void Signal_text_messages_parse_exactly_as_before()
+    {
+        using var document = JsonDocument.Parse("""
+            [{"envelope":{"sourceNumber":"+31611111111","timestamp":1727450000000,
+               "dataMessage":{"message":"Remind me to call mom","timestamp":1727450000000}}}]
+            """);
+
+        Assert.Equal([("+31611111111", "Remind me to call mom", "+31611111111:1727450000000")],
+            SignalReceiver.ParseEnvelopes(document.RootElement).ToArray());
+        Assert.Null(Assert.Single(SignalReceiver.ParseInbound(document.RootElement)).MediaJson);
+    }
 }

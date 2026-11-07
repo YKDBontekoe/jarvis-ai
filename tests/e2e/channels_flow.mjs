@@ -188,6 +188,15 @@ await check('Signal links through signal-cli and answers polled messages', async
   assert.equal(reply.to, owner);
 });
 
+await check('a Signal photo reaches the model as an image', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  await fetch(`${fake}/_test/signal/inbound`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: owner, message: 'How many images do you see?',
+      attachments: [{ id: 'fake-signal-1.png', contentType: 'image/png', filename: 'x.png', size: 100 }] }) });
+  const reply = await waitForReply('signal', message => /I see \d+ image/.test(message.text));
+  assert.match(reply.text, /I see 1 image\(s\): image\/png/, reply.text);
+});
+
 await check('/new starts a fresh conversation thread', async () => {
   await fetch(`${fake}/_test/signal/inbound`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ from: owner, message: '/new' }) });

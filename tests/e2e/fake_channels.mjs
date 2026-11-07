@@ -54,7 +54,13 @@ const server = http.createServer(async (request, response) => {
     for (const item of ready) signalInbox.splice(signalInbox.indexOf(item), 1);
     return json(response, 200, ready.map(item => ({ envelope: {
       source: item.from, sourceNumber: item.from, timestamp: item.timestamp,
-      dataMessage: { message: item.message, timestamp: item.timestamp } } })));
+      dataMessage: { message: item.message, timestamp: item.timestamp,
+        ...(item.attachments ? { attachments: item.attachments } : {}) } } })));
+  }
+  const attachment = url.pathname.match(/^\/v1\/attachments\/(fake-[a-z0-9.-]+)$/);
+  if (attachment && request.method === 'GET') {
+    response.writeHead(200, { 'Content-Type': 'image/png' });
+    return response.end(QR_PNG);
   }
   if (url.pathname === '/v2/send' && request.method === 'POST') {
     for (const recipient of body.recipients ?? [])
@@ -63,7 +69,7 @@ const server = http.createServer(async (request, response) => {
   }
   if (url.pathname === '/_test/signal/inbound' && request.method === 'POST') {
     signalInbox.push({ account: body.account ?? SIGNAL_ACCOUNT, from: body.from, message: body.message,
-      timestamp: Date.now() + signalInbox.length });
+      attachments: body.attachments, timestamp: Date.now() + signalInbox.length });
     return json(response, 202, { queued: signalInbox.length });
   }
   if (url.pathname === '/_test/sent') {

@@ -158,6 +158,29 @@ public sealed class SignalRestTransport(HttpClient http, ChannelOptions options)
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"signal-cli rejected the message ({(int)response.StatusCode}).");
     }
+
+    public async Task<DownloadedMedia?> FetchMediaAsync(ChannelConnectionRecord connection,
+        IReadOnlyDictionary<string, string>? secrets, string mediaId, long maxBytes,
+        CancellationToken cancellationToken)
+    {
+        var baseUrl = options.SignalBaseUrl ?? throw new InvalidOperationException("Channels:Signal:BaseUrl is not configured.");
+        using var response = await http.GetAsync($"{baseUrl.TrimEnd('/')}/v1/attachments/{Uri.EscapeDataString(mediaId)}",
+            HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"signal-cli could not deliver that attachment ({(int)response.StatusCode}).");
+        if (response.Content.Headers.ContentLength > maxBytes) return null;
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[81_920];
+        int read;
+        while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
+        {
+            if (buffer.Length + read > maxBytes) return null;
+            buffer.Write(chunk, 0, read);
+        }
+        return new DownloadedMedia(buffer.ToArray(),
+            response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream");
+    }
 }
 
 public static partial class ChannelText
