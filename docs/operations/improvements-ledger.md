@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 85 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 88 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -118,6 +118,9 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 83. Handler tests (6): ordinary messages and other slash commands fall through to the assistant, list commands only see the connection owner's lists, and a spend is logged to the expense service with source `chat`.
 84. `/journal <text>` adds to today's journal entry from WhatsApp or Signal (owner's home-zone day, validated like the app, source `chat`).
 85. Spending and journal commands from chat are audited with the record id only (never amounts or text); `channels_flow.mjs` checks the journal entry exists with source `chat` and that the audit log does not contain its text.
+86. Search finds a list by its name or by an item on it ("quinoa" finds the list holding it); owner-scoped; checked on the running API with and without the `kinds=list` filter.
+87. The app's search shows Lists hits, has a Lists filter chip, and opens the Lists screen from a hit (widget-tested).
+88. Unit test for the provider (item match, name match, no cross-owner leakage, unknown kind rules).
 
 A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 

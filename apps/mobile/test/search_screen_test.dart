@@ -82,6 +82,7 @@ void main() {
         hit('project', 'p1', 'Home renovation', {'projectId': 'p1'}),
         hit('goal', 'g1', 'Run a 10k', {'goalId': 'g1'}),
         hit('trip', 't1', 'Lisbon', {'tripId': 't1'}),
+        hit('list', 'l1', 'Shopping', {'listId': 'l1'}),
       ],
       'providers': <Object>[],
     });
@@ -95,18 +96,19 @@ void main() {
       'Home renovation',
       'Run a 10k',
       'Lisbon',
+      'Shopping',
     ]) {
       await tester.tap(find.text(title));
       await tester.pumpAndSettle();
     }
 
-    expect(opened, ['journal', 'project:p1', 'goal:g1', 'trip:t1']);
+    expect(opened, ['journal', 'project:p1', 'goal:g1', 'trip:t1', 'lists']);
   });
 
   testWidgets('the new kinds have filter chips', (tester) async {
     await show(tester);
 
-    for (final label in ['Journal', 'Projects', 'Missions', 'Goals', 'Trips']) {
+    for (final label in ['Journal', 'Projects', 'Missions', 'Goals', 'Trips', 'Lists']) {
       expect(find.text(label), findsOneWidget);
     }
   });

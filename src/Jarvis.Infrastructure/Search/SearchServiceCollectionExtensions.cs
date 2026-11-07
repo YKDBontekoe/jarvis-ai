@@ -28,6 +28,7 @@ public static class SearchServiceCollectionExtensions
         AddProvider<ProjectSearchProvider>(services);
         AddProvider<MissionSearchProvider>(services);
         AddProvider<GoalSearchProvider>(services);
+        AddProvider<ListSearchProvider>(services);
         AddProvider<TripSearchProvider>(services);
         return services;
     }

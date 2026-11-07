@@ -183,4 +183,24 @@ public sealed class ListTests
 
         Assert.Equal("**Shopping**\n☐ Eggs\n☐ Bread\n☑ Milk", text);
     }
+
+    [Fact]
+    public async Task Search_finds_a_list_by_its_name_or_by_an_item_on_it_and_only_the_owners()
+    {
+        var service = Create();
+        await service.AddItemsAsync(Owner, "Shopping", ["Oat milk", "Eggs"], default);
+        await service.AddItemsAsync(Owner, "Packing", ["Passport"], default);
+        await service.AddItemsAsync(Guid.NewGuid(), "Someone else", ["milk"], default);
+        var provider = new Jarvis.Infrastructure.Search.ListSearchProvider(service);
+
+        var byItem = Assert.Single(await provider.SearchAsync(Owner, "milk", 8, default));
+        var byName = Assert.Single(await provider.SearchAsync(Owner, "packing", 8, default));
+
+        Assert.Equal("Shopping", byItem.Title);
+        Assert.Contains("Oat milk", byItem.Summary, StringComparison.Ordinal);
+        Assert.Equal("list", byItem.Route.Kind);
+        Assert.Equal("Packing", byName.Title);
+        Assert.Empty(await provider.SearchAsync(Owner, "zebra", 8, default));
+        Assert.True(Jarvis.Application.Search.SearchResultKinds.IsValid("list"));
+    }
 }

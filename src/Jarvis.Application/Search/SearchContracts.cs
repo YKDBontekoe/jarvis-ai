@@ -20,11 +20,12 @@ public static class SearchResultKinds
     public const string Mission = "mission";
     public const string Goal = "goal";
     public const string Trip = "trip";
+    public const string List = "list";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
         Conversation, Memory, File, Task, Reminder, Skill, GraphEntity, ChannelThread, CodingRun, Message, Person,
-        Commitment, Decision, Journal, Project, Mission, Goal, Trip
+        Commitment, Decision, Journal, Project, Mission, Goal, Trip, List
     };
 
     /// <summary>Private writing: shown on the owner's own search screen, never handed to the agent or a restricted profile.</summary>

@@ -214,6 +214,9 @@ Future<void> navigateSearchRoute(
       final goalId = route.parameters['goalId'];
       onUtility(goalId == null ? 'goals' : 'goal:$goalId');
       return;
+    case 'list':
+      onUtility('lists');
+      return;
     case 'trip':
       final tripId = route.parameters['tripId'];
       onUtility(tripId == null ? 'trips' : 'trip:$tripId');
