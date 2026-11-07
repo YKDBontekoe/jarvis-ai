@@ -47,6 +47,9 @@ public static partial class ToolGroups
         new("calendar", "The user's upcoming calendar events from their connected calendar link",
             ["GetCalendarEvents"],
             CalendarKeywords()),
+        new("file-cleanup", "Delete one of the user's files after approval",
+            ["DeleteFile"],
+            FileCleanupKeywords()),
         new("people", "Contacts the user keeps up with: details, birthdays, logging contact, relationship radar",
             ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar", "GetPersonFollowThrough"],
             PeopleKeywords()),
@@ -54,7 +57,7 @@ public static partial class ToolGroups
             ["ListWhatsAppChats", "ReadWhatsAppChat", "SearchWhatsAppMessages", "SendWhatsAppMessage"],
             WhatsAppKeywords()),
         new("habits", "Habit tracking: list habits, check in, create a habit, archive or restore one",
-            ["GetHabits", "CheckInHabits", "CreateHabit", "ArchiveHabit"],
+            ["GetHabits", "CheckInHabits", "CreateHabit", "ArchiveHabit", "DeleteHabit"],
             HabitKeywords()),
         new("journal", "The user's daily journal: write or read entries",
             ["SaveJournalEntry", "ListJournalEntries"],
@@ -63,7 +66,7 @@ public static partial class ToolGroups
             ["LogDecision", "ResolveDecision", "GetDecisions", "GetCalibration"],
             DecisionKeywords()),
         new("projects", "Projects: what each is for, its status and the next action to take",
-            ["GetProjects", "SetProjectOutcome", "SetProjectNextAction"],
+            ["GetProjects", "DeleteProject", "SetProjectOutcome", "SetProjectNextAction"],
             ProjectKeywords()),
         new("comparisons", "Weigh options against criteria: create a comparison, record what is known, see the ranking",
             ["CreateComparison", "SetComparisonCell", "GetComparison"],
@@ -102,7 +105,7 @@ public static partial class ToolGroups
             ["CompareCostScenario", "CompareTimeScenario"],
             ScenarioKeywords()),
         new("goals", "Goals: create one when asked, pause/resume/achieve/archive/reword one, how they are going, check-ins in the user's words, a small proposed plan for the week",
-            ["GetGoals", "CreateGoal", "UpdateGoal", "AddGoalCheckIn", "ProposeGoalPlan"],
+            ["GetGoals", "CreateGoal", "UpdateGoal", "DeleteGoal", "AddGoalCheckIn", "ProposeGoalPlan"],
             GoalKeywords()),
         new("meetings", "Meetings: prepare from the user's own records, debrief into proposed decisions and promises, draft a follow-up",
             ["PrepareMeeting", "DebriefMeeting", "DraftMeetingFollowUp"],
@@ -271,6 +274,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(plan (my|the|for)|day plan|today'?s plan|my day|schedule (my|the) day|agenda|to-?do|planning|dagplan|mijn dag|vandaag plannen)", KeywordOptions)]
     private static partial Regex PlannerKeywords();
+
+    [GeneratedRegex(@"\b(delete|remove|get rid of|throw away|verwijder|wis)\b.{0,40}\b(file|document|pdf|upload|photo|bestand|foto)", KeywordOptions)]
+    private static partial Regex FileCleanupKeywords();
 
     [GeneratedRegex(@"\b(calendar|agenda|appointment|am i free|free (on|at|this|next|tomorrow)|busy|what'?s on|meeting|kalender|afspraak|vrij|bezet|wat staat er)", KeywordOptions)]
     private static partial Regex CalendarKeywords();

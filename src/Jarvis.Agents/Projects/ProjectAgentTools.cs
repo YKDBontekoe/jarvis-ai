@@ -17,6 +17,7 @@ internal sealed class ProjectToolContributor(IProjectStore projects, IProjectFoc
         yield return AIFunctionFactory.Create(tools.GetProjectsAsync);
         yield return AIFunctionFactory.Create(tools.SetProjectOutcomeAsync);
         yield return AIFunctionFactory.Create(tools.SetProjectNextActionAsync);
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(tools.DeleteProjectAsync));
     }
 }
 
@@ -46,6 +47,17 @@ internal sealed class ProjectAgentTools(IProjectStore projects, IProjectFocusSer
             text.AppendLine();
         }
         return text.ToString().TrimEnd();
+    }
+
+    [Description("Delete a project, only when the user clearly asks. Its chats, files and tasks stay and just leave the project. The user is asked to approve first. Find the project id with GetProjects.")]
+    public async Task<string> DeleteProjectAsync(
+        [Description("The project id from GetProjects")] string projectId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(projectId, out var id)) return "projectId must be an id from GetProjects.";
+        return await projects.DeleteAsync(id, currentUser.OwnerId, cancellationToken)
+            ? "The project is deleted. Its chats, files and tasks are kept."
+            : "No such project.";
     }
 
     [Description("Set what a project is trying to achieve (its outcome), and optionally mark it completed or archived. Use it when the user says what a project is for or that it is finished. Find the project id with GetProjects. The next action is left as it is.")]

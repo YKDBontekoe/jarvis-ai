@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 42 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 47 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -67,14 +67,21 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 41. With no calendar link it says so and how to connect one, and is told not to guess.
 42. Archive or restore a habit by name (`ArchiveHabit`): history kept, ambiguous names ask which one, audit log records ids not names.
 
+## Third batch: deleting, always with approval
+
+43. Delete a goal and its check-ins from chat (`DeleteGoal`), after approval. Pausing or archiving stays the gentler `UpdateGoal`.
+44. Delete a habit and its check-ins from chat (`DeleteHabit`), after approval, by exact name only; the audit log records the id, not the name.
+45. Delete a project from chat (`DeleteProject`), after approval; its chats, files and tasks stay.
+46. Delete a file from chat (`DeleteFile`), after approval; only offered when the message talks about deleting a file, and never in background tasks.
+47. Each of the four is owner-scoped and the approval wrapper is checked in tests.
+
 ## Gaps found but not built
 
 Found by asking the real model 20 everyday requests. Still open:
 
 - biweekly ("every other week") reminders need a recurrence anchored to a start date;
 - the day planner covers only today;
-- deleting a project from chat (would need an approval);
 - a shopping list;
 - pausing (not archiving) a habit.
 
-The new tools in items 38 to 42 have unit tests only; they were not yet run against the real model because the Codex plan was out of quota.
+The new tools in items 38 to 47 have unit tests only; they were not yet run against the real model because the Codex plan was out of quota.

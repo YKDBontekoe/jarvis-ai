@@ -14,6 +14,7 @@ internal sealed class GoalToolContributor(IGoalService goals, ICurrentUser curre
         yield return AIFunctionFactory.Create(tools.GetGoalsAsync);
         yield return AIFunctionFactory.Create(tools.CreateGoalAsync);
         yield return AIFunctionFactory.Create(tools.UpdateGoalAsync);
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(tools.DeleteGoalAsync));
         yield return AIFunctionFactory.Create(tools.AddGoalCheckInAsync);
         yield return AIFunctionFactory.Create(tools.ProposeGoalPlanAsync);
     }
@@ -108,6 +109,17 @@ internal sealed class GoalAgentTools(IGoalService goals, ICurrentUser currentUse
             GoalFailure.NotFound => "I could not find that goal.",
             _ => $"I could not update the goal: {result.Message}"
         };
+    }
+
+    [Description("Permanently delete a goal and its check-ins, only when the user clearly asks to delete it (not to pause or archive it; use UpdateGoal for that). The user is asked to approve first.")]
+    public async Task<string> DeleteGoalAsync(
+        [Description("The goal's ID from GetGoals.")] string goalId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(goalId, out var id)) return "That goal ID is not valid. Call GetGoals first.";
+        return await goals.DeleteAsync(currentUser.OwnerId, id, cancellationToken)
+            ? "The goal and its check-ins are deleted."
+            : "I could not find that goal.";
     }
 
     [Description("Record a check-in on a goal in the user's own words: what moved (even if small), what got in the way, and what to adjust. Only call it when the user told you this; never invent progress. Feeling is on_track, slipping or stuck.")]

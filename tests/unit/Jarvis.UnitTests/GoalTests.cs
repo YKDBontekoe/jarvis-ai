@@ -601,4 +601,22 @@ public sealed class GoalTests
     {
         Assert.Contains("UpdateGoal", Jarvis.Agents.ToolGroups.All.Single(item => item.Id == "goals").Tools);
     }
+
+    [Fact]
+    public async Task Deleting_a_goal_removes_only_the_owners_goal_and_needs_approval()
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+        var mine = (await s.Service.CreateAsync(Owner, new GoalInput("Mine", null, null, null, null, null, null, null, null, null), default)).Value!.Goal;
+        var theirs = (await s.Service.CreateAsync(Guid.NewGuid(), new GoalInput("Theirs", null, null, null, null, null, null, null, null, null), default)).Value!.Goal;
+
+        Assert.Equal("I could not find that goal.", await tools.DeleteGoalAsync(theirs.Id.ToString()));
+        Assert.Equal("The goal and its check-ins are deleted.", await tools.DeleteGoalAsync(mine.Id.ToString()));
+        Assert.Empty(await s.Service.ListAsync(Owner, true, default));
+        Assert.Equal("That goal ID is not valid. Call GetGoals first.", await tools.DeleteGoalAsync("x"));
+
+        var contributor = new Jarvis.Agents.Goals.GoalToolContributor(s.Service, new GoalUser());
+        var delete = contributor.GetTools(new Jarvis.Agents.AgentBuildContext(Owner, null)).Single(t => t.Name == "DeleteGoal");
+        Assert.IsType<Microsoft.Extensions.AI.ApprovalRequiredAIFunction>(delete);
+    }
 }

@@ -121,6 +121,22 @@ internal sealed class HabitAgentTools(IHabitService service, IAuditEventStore au
             : $"\"{result.Value!.Habit.Name}\" is tracked again.";
     }
 
+    [Description("Permanently delete a habit and all its check-ins, only when the user clearly asks to delete it (to stop tracking while keeping history use ArchiveHabit). The user is asked to approve first. Pass the habit by its exact name.")]
+    public async Task<string> DeleteHabitAsync(
+        [Description("The habit's exact name in the user's habit list.")] string habit,
+        CancellationToken cancellationToken = default)
+    {
+        var wanted = (habit ?? "").Trim();
+        var matches = (await service.ListAsync(currentUser.OwnerId, true, cancellationToken))
+            .Where(x => x.Habit.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0) return "No habit has that exact name. Call GetHabits and pass the name as listed.";
+        if (matches.Count > 1) return "More than one habit has that name; ask the user to delete it in the app.";
+        if (!await service.DeleteAsync(matches[0].Habit.Id, currentUser.OwnerId, cancellationToken))
+            return "I could not find that habit.";
+        await AuditAsync("habit.deleted", cancellationToken, [matches[0].Habit.Id]);
+        return "The habit and its check-ins are deleted.";
+    }
+
     internal static string Describe(HabitSummary summary)
     {
         var habit = summary.Habit;

@@ -153,6 +153,26 @@ public sealed class HabitTests
     }
 
     [Fact]
+    public async Task Chat_deletes_a_habit_only_by_its_exact_name_and_never_another_owners()
+    {
+        var (service, _, _, _, _) = Create();
+        await service.CreateAsync(Owner, new HabitDraft("Read 20 pages", null, null, null), null, default);
+        await service.CreateAsync(Owner, new HabitDraft("Read the news", null, null, null), null, default);
+        await service.CreateAsync(Other, new HabitDraft("Piano", null, null, null), null, default);
+        var audit = new RecordingAudit();
+        var tools = new HabitAgentTools(service, audit, new FixedUser(), NullLogger.Instance);
+
+        Assert.StartsWith("No habit has that exact name", await tools.DeleteHabitAsync("read"), StringComparison.Ordinal);
+        Assert.StartsWith("No habit has that exact name", await tools.DeleteHabitAsync("Piano"), StringComparison.Ordinal);
+        Assert.Equal("The habit and its check-ins are deleted.", await tools.DeleteHabitAsync("read the NEWS"));
+
+        Assert.Equal(["Read 20 pages"], (await service.ListAsync(Owner, true, default)).Select(x => x.Habit.Name));
+        Assert.Single(await service.ListAsync(Other, true, default));
+        Assert.Equal(["habit.deleted"], audit.Actions);
+        Assert.All(audit.Metadata, item => Assert.DoesNotContain("news", item, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task Chat_checks_habits_in_by_name_and_reports_misses()
     {
         var (service, _, _, _, _) = Create();
