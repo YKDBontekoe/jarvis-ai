@@ -44,7 +44,7 @@ See [proactive-work.md](proactive-work.md#api) for request shapes, revision conf
 
 | Area | Paths |
 |------|-------|
-| Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}`, `POST /reminders/{id}/snooze` (`minutes` or `until`), `POST /reminders/{id}/complete` (`conversationId` on each reminder). A place reminder posts `place` (`name`, `latitude`, `longitude`, `radiusMeters` 50–5000, `trigger` `arrive`/`leave`, `repeats`) instead of `dueAt` |
+| Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}`, `POST /reminders/{id}/snooze` (`minutes` or `until`), `POST /reminders/{id}/complete` (`conversationId` on each reminder). `recurrence` is `none`, `daily`, `weekdays`, `weekly` or `biweekly`; weekly and biweekly need `weekdays` (bit mask), and a biweekly series fires in the weeks of its first occurrence. A place reminder posts `place` (`name`, `latitude`, `longitude`, `radiusMeters` 50–5000, `trigger` `arrive`/`leave`, `repeats`) instead of `dueAt` |
 | Owner automations | `GET/POST /automations`, enable/run/history (`conversationId` and `lastRun` on each rule; approvals go through the shared `/approvals` inbox; see [automations.md](../automations.md)) |
 | Condition watches | `GET/POST /watches`, `GET/DELETE /watches/{id}`. `POST` accepts `repeat` (keep watching after an alert) and `cooldownMinutes` (5–10080, default 60); records report `repeat`, `cooldownMinutes`, `lastTriggeredAt`, `triggerCount` |
 | Autonomy settings | `GET/PUT /settings/autonomy` (`enabled`, `heartbeatMayStartTasks`, `maxHeartbeatTasksPerDay`, `maxHeartbeatTasksPerRun`, `triageInbox`, `digestInsteadOfDrop`, `level` (`ask_everything`, `standard`, `full`, or opt-in `autonomous`), `autoApproveReadOnly`, `autoApproveMcpReadHints`, `maxAutoApprovalsPerDay`, `reactToEvents`, `maxReactionsPerDay`, `autonomousOutboundCategories`, `maxAutonomousOutboundPerDay`); `GET /settings/autonomy/outbound-categories` lists what the autonomous level can allow. See [life-features.md](life-features.md#autonomy-envelope) and [event-spine.md](../architecture/event-spine.md#autonomy-levels) |
@@ -74,6 +74,7 @@ Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, 
 
 | Method | Path |
 |--------|------|
+| GET/POST/DELETE | `/lists` (GET all lists), `POST /lists/items` (`list`, `items`; creates the list by name, skips duplicates), `POST /lists/done` (`list`, `items`, `done`), `POST /lists/clear-done` (`list`), `DELETE /lists/{id}`. Stored in owner settings (`lists`); at most 50 lists of 200 items; a list name that matches more than one list answers 409 |
 | GET | `/planner/today` (timeline of calendar events, reminders and focus blocks; to-dos; free slots) |
 | POST | `/planner/today/items` (`title` ≤ 200, `minutes` 5–480, default 30; optional `sourceRef` `commitment:<id>` plans an open, accepted promise: the title defaults to its description and planning it again returns the same to-do; items carry `sourceRef`) |
 | PATCH/DELETE | `/planner/today/items/{id}` (PATCH: `title`, `minutes`, `done`) |

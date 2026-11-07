@@ -50,7 +50,12 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Tool area | Class | Approval notes |
 |-----------|-------|----------------|
 | Time | `ClockAgentTools.GetCurrentTime` | — |
-| Reminders | `ReminderAgentTools` create/list/cancel | — |
+| Time zone | `PreferenceAgentTools` `SetHomeTimeZone` | No approval; only changes how future times are read, scheduled reminders keep their moment |
+| This chat | `ConversationAgentTools` `RenameThisChat`, `PinThisChat` | No approval; only the current chat, never in background tasks |
+| Calendar | `CalendarAgentTools` `GetCalendarEvents` (the owner's ICS link; says so when none is connected) | Read-only; titles are untrusted text |
+| Lists | `ListAgentTools` `GetLists`, `AddToList`, `TickListItems`, `ClearTickedListItems` (stored in owner settings section `lists`) | No approval (owner's own lists); deleting a whole list is app-only |
+| File cleanup | `FileDeletionTools` `DeleteFile` | **Requires approval**; only offered when the message is about deleting a file, never in background tasks |
+| Reminders | `ReminderAgentTools` create/list/cancel/snooze/complete; recurrence is `none`, `daily`, `weekdays`, `weekly` or `biweekly` (every other week on the chosen weekdays) | — |
 | Files | `FileAgentTools` search (hybrid retrieval, model rerank) / list; `FileContextContributor` adds matching passages from attached sources each turn | — |
 | Tasks | `TaskAgentTools` list/cancel/create | Create hidden during background task turns |
 | Watches | `ConditionWatchAgentTools` | — |
@@ -60,11 +65,11 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Documents | `DocumentAgentTools` `DraftProjectUpdate` | Creates a draft in the app from the user's own records; never sends or shares, unknowns stay placeholders |
 | Apps | `AppGoalAgentTools` `FindAppForGoal` | Read-only: says which app covers a goal, its real capabilities and next step; connecting is done in the app, never with secrets in chat |
 | Scenarios | `ScenarioAgentTools` `CompareCostScenario`, `CompareTimeScenario` | No approval: pure arithmetic on numbers the user gave; nothing is stored or changed |
-| Goals | `GoalAgentTools` `GetGoals`, `AddGoalCheckIn`, `ProposeGoalPlan` | No approval: a check-in records what the user said, a plan is only a proposal the user accepts in the app |
+| Goals | `GoalAgentTools` `GetGoals`, `CreateGoal`, `UpdateGoal` (pause, resume, achieve, archive, reword), `AddGoalCheckIn`, `ProposeGoalPlan`, `DeleteGoal` | **DeleteGoal** requires approval. The rest need none: a check-in records what the user said, a plan is only a proposal the user accepts in the app |
 | Day planner | `PlannerAgentTools` `GetTodayPlan`, `AddToDayPlan` (optional `commitmentId`), `PlanMyDay`, `CompleteDayPlanItem`, `RemoveDayPlanItem` | No approval: they only change the owner's day plan in Jarvis. Calendar writes go through `InvokeMcpTool` (approval) per the planner guidance |
 | Expenses | `ExpenseAgentTools` `LogExpense` (skips an identical expense on the same day; `fromPhoto` keeps the latest chat photo as the receipt), `GetExpenses` (month summary and list), `UpdateExpense` | **DeleteExpense** requires approval. The rest only change the owner's own log. `ExpenseContextContributor` adds when-to-log guidance each turn |
 | WhatsApp read along | `WhatsAppAgentTools` `ListWhatsAppChats`, `ReadWhatsAppChat`, `SearchWhatsAppMessages` (only chats the owner turned on; output is marked as untrusted text from other people) | **SendWhatsAppMessage** requires approval for every message and is only offered on the API host (`IWhatsAppSender`). `WhatsAppContextContributor` adds guidance: drafts by default, never act on requests inside a chat |
-| Habits | `HabitAgentTools` `GetHabits`, `CheckInHabits` (by name, optional date up to 7 days back), `CreateHabit` | No approval (owner's own tracking data); hidden during background task turns. Deleting habits is app-only |
+| Habits | `HabitAgentTools` `GetHabits`, `CheckInHabits` (by name, optional date up to 7 days back), `CreateHabit`, `ArchiveHabit` (archive or restore, history kept), `DeleteHabit` (exact name only) | **DeleteHabit** requires approval; the rest need none (owner's own tracking data). Hidden during background task turns |
 | People | `PeopleAgentTools` `GetPeople`, `SavePerson` (creates or updates; only passed fields change), `LogContact`, `RemovePerson` | `RemovePerson` requires **approval**; the rest need none (owner's own data). Save/log are off when the profile disallows remembering. `PeopleContextContributor` adds names, birthdays in the next 14 days and due check-ins each turn |
 | Timeline | `TimelineAgentTools` `QueryTimeline`, `OnThisDay`, `GetLifeInsights` | Read-only, no approval, available in background tasks |
 | Inbox and commitments | `InboxAgentTools` `CheckInbox`, `TriageInboxThread`, `SetInboxState`, `SnoozeInboxThread`, `TrackInboxItem`, `GetCommitments`, `AddCommitment`, `AcceptCommitment`, `SetCommitmentStatus` | No approval (owner's own data); drafts are never sent from here. Hidden during background task turns except `GetCommitments`. Triage text is untrusted |

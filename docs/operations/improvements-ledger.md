@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 56 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 57 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -89,6 +89,7 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 54. Assistant tools `GetLists`, `AddToList`, `TickListItems`, `ClearTickedListItems`, offered when a message talks about a shopping, grocery or packing list (English and Dutch).
 55. A Lists screen in the app (tick, add, clear ticked, delete with confirm, empty state), with widget tests and a screenshot case.
 56. A Lists tile for Home, a quick command and feature-search keywords so the screen is easy to reach.
+57. The tool catalog and API reference now describe every tool and endpoint added in this effort (goals, habits, lists, calendar, time zone, chat, file cleanup, biweekly).
 
 Seen but left alone: Home lists the five oldest-due promises, so with five or more overdue promises one due today is not on Home. That may be intended (overdue first), so it is a question for the owner, not a fix.
 
