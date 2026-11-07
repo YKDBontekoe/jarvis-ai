@@ -7,6 +7,7 @@ using Jarvis.Application.Channels;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
+using Jarvis.Application.Lists;
 
 namespace Jarvis.Api.Channels;
 
@@ -80,12 +81,14 @@ public sealed class ChannelMessageRouter(
     IAuditEventStore audit,
     IFileService files,
     IConversationFileContextRepository fileContext,
+    IListService lists,
     ILogger<ChannelMessageRouter> logger)
 {
     internal const string Help = """
         I'm Jarvis. Message me like you would in the app.
         • /new — start a fresh conversation
         • /status — what I'm waiting on
+        • /lists, /list shopping, /add shopping: milk, eggs, /done shopping: milk — your lists
         • Send a photo (JPEG, PNG, WebP) or a file (PDF, Word, text) and ask about it
         • YES or NO — answer an approval request from this chat
         Approvals from app chats, tasks and automations can only be decided in the Jarvis app.
@@ -144,6 +147,12 @@ public sealed class ChannelMessageRouter(
         if (text.Equals("/help", StringComparison.OrdinalIgnoreCase))
         {
             await messenger.SendAsync(connection, sender, Help, cancellationToken);
+            return;
+        }
+        if (ListCommands.Parse(text) is { } listCommand)
+        {
+            await messenger.SendAsync(connection, sender, await RunListCommandAsync(ownerId, listCommand, cancellationToken),
+                cancellationToken);
             return;
         }
         if (text.Equals("/new", StringComparison.OrdinalIgnoreCase))
@@ -230,6 +239,38 @@ public sealed class ChannelMessageRouter(
             }
         }
         return stored;
+    }
+
+    private async Task<string> RunListCommandAsync(Guid ownerId, ListCommand command, CancellationToken cancellationToken)
+    {
+        switch (command)
+        {
+            case ListCommand.Usage usage:
+                return usage.Message;
+            case ListCommand.Show show:
+                var all = await lists.ListAsync(ownerId, cancellationToken);
+                if (show.List is null)
+                    return all.Count == 0
+                        ? "No lists yet. Try /add shopping: milk, eggs"
+                        : string.Join("\n", all.Take(20).Select(l => $"• {l.Name} ({l.Items.Count(i => !i.Done)} open)"));
+                var matches = all.Where(l => l.Name.Contains(show.List, StringComparison.OrdinalIgnoreCase)).ToList();
+                var exact = matches.FirstOrDefault(l => l.Name.Equals(show.List, StringComparison.OrdinalIgnoreCase));
+                if (exact is not null) return ListCommands.Render(exact);
+                return matches.Count switch
+                {
+                    1 => ListCommands.Render(matches[0]),
+                    0 => "There is no list with that name. /lists shows them.",
+                    _ => "More than one list matches: " + string.Join(", ", matches.Select(l => l.Name)),
+                };
+            case ListCommand.Add add:
+                var added = await lists.AddItemsAsync(ownerId, add.List, add.Items, cancellationToken);
+                return added.Succeeded ? ListCommands.Render(added.Value!) : "I could not add that: " + added.Message;
+            case ListCommand.Tick tick:
+                var ticked = await lists.SetDoneAsync(ownerId, tick.List, tick.Items, true, cancellationToken);
+                return ticked.Succeeded ? ListCommands.Render(ticked.Value!) : "I could not tick that: " + ticked.Message;
+            default:
+                return ListCommands.UsageText;
+        }
     }
 
     /// <summary>

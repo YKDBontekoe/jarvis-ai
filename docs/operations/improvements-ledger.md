@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 72 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 75 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -105,6 +105,9 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 70. Unit tests for both, including that another day's agenda leaves today's plan alone.
 71. The Today screen has previous-day and next-day buttons (a week back to three months ahead) that open the read-only agenda from item 68, with a "Back to today" button; widget-tested, and screenshot-checked in light and dark (`test/screenshots/planner_lookahead.dart`).
 72. While looking at another day the screen hides what only belongs to today (to-dos, focus-block actions, Plan my day, day hours), says why, and titles itself "Agenda"; the buttons stop at the range limits.
+73. `/lists` and `/list <name>` on WhatsApp and Signal show your lists instantly, without waiting for the model.
+74. `/add shopping: milk, eggs` and `/done shopping: milk` add and tick items from chat; a malformed command explains how to write it.
+75. These are listed in `/help`, unit tested (parsing, usage, rendering) and run end to end in `channels_flow.mjs` (23 checks), including that the same list shows up in the app.
 
 A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 

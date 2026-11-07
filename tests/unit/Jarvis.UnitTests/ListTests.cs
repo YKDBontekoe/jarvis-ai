@@ -139,4 +139,48 @@ public sealed class ListTests
 
         Assert.Equal(20, (await service.ListAsync(Owner, default)).Single().Items.Count);
     }
+
+    [Fact]
+    public void Chat_commands_are_read_for_showing_adding_and_ticking()
+    {
+        Assert.Equal(new ListCommand.Show(null), ListCommands.Parse("/lists"));
+        Assert.Equal(new ListCommand.Show("shopping"), ListCommands.Parse("/LIST shopping"));
+        Assert.Equal(new ListCommand.Show(null), ListCommands.Parse("/list"));
+
+        var add = Assert.IsType<ListCommand.Add>(ListCommands.Parse("/add Shopping: milk, eggs;  bread\nbutter"));
+        Assert.Equal("Shopping", add.List);
+        Assert.Equal(["milk", "eggs", "bread", "butter"], add.Items);
+
+        var tick = Assert.IsType<ListCommand.Tick>(ListCommands.Parse("/done packing: passport"));
+        Assert.Equal(["passport"], tick.Items);
+    }
+
+    [Theory]
+    [InlineData("/add milk")]
+    [InlineData("/add shopping:")]
+    [InlineData("/add : milk")]
+    [InlineData("/done shopping: , ,")]
+    public void A_malformed_add_or_done_explains_how_to_write_it(string text) =>
+        Assert.Equal(ListCommands.UsageText, Assert.IsType<ListCommand.Usage>(ListCommands.Parse(text)).Message);
+
+    [Theory]
+    [InlineData("add milk to my shopping list")]
+    [InlineData("/new")]
+    [InlineData("/help")]
+    [InlineData("/listing")]
+    [InlineData("")]
+    public void Ordinary_messages_and_other_commands_are_not_list_commands(string text) =>
+        Assert.Null(ListCommands.Parse(text));
+
+    [Fact]
+    public async Task A_list_renders_open_items_before_ticked_ones()
+    {
+        var service = Create();
+        await service.AddItemsAsync(Owner, "Shopping", ["Milk", "Eggs", "Bread"], default);
+        var list = (await service.SetDoneAsync(Owner, "Shopping", ["Milk"], true, default)).Value!;
+
+        var text = ListCommands.Render(list);
+
+        Assert.Equal("**Shopping**\n☐ Eggs\n☐ Bread\n☑ Milk", text);
+    }
 }

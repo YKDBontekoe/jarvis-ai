@@ -169,6 +169,26 @@ await check('a shared WhatsApp location pin is understood instead of dropped', a
   assert.equal(reply.to, owner);
 });
 
+await check('list commands work from WhatsApp without the model', async () => {
+  const tag = Date.now().toString(36);
+  const say = async (text, id, expected) => {
+    await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+    await postWebhook(whatsapp.webhookUrl, webhookPayload(owner, text, id));
+    return waitForReply('whatsapp', message => expected.test(message.text));
+  };
+  const added = await say(`/add Chat ${tag}: milk, eggs`, `wamid.add-${tag}`, /milk/);
+  assert.match(added.text, /eggs/);
+  const ticked = await say(`/done Chat ${tag}: milk`, `wamid.done-${tag}`, /☑/);
+  assert.match(ticked.text, /eggs/);
+  const lists = await say('/lists', `wamid.lists-${tag}`, new RegExp(`Chat ${tag}`));
+  assert.match(lists.text, /1 open/);
+  const usage = await say('/add oops', `wamid.oops-${tag}`, /\/add shopping: milk/);
+  assert.ok(usage.text);
+  const stored = (await call('/lists')).body.find(list => list.name === `Chat ${tag}`);
+  assert.ok(stored, 'the list is in the app too');
+  await call(`/lists/${stored.id}`, { method: 'DELETE' });
+});
+
 await check('/new leaves an attached file behind with the old conversation', async () => {
   // The fake model reads the whole prompt, so later checks need a thread without the file's source note.
   await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
