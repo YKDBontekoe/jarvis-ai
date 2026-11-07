@@ -169,6 +169,32 @@ await check('a shared WhatsApp location pin is understood instead of dropped', a
   assert.equal(reply.to, owner);
 });
 
+await check('check-in, spending and today commands work from WhatsApp without the model', async () => {
+  const tag = Date.now().toString(36);
+  const say = async (text, id, expected) => {
+    await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+    await postWebhook(whatsapp.webhookUrl, webhookPayload(owner, text, id));
+    return waitForReply('whatsapp', message => expected.test(message.text));
+  };
+  const habit = await call('/habits', { method: 'POST', body: JSON.stringify({ name: `Stretch ${tag}`, cadence: 'daily' }) });
+  assert.equal(habit.status, 201, habit.text);
+  const checked = await say(`/checkin stretch ${tag}`, `wamid.ci-${tag}`, /streak/);
+  assert.match(checked.text, new RegExp(`Stretch ${tag}`));
+  await say(`/checkin stretch ${tag}`, `wamid.ci2-${tag}`, /already checked in/);
+  await say('/checkin no such habit zz9', `wamid.ci3-${tag}`, /No habit called/);
+
+  const spent = await say(`/spent 7,40 espresso ${tag}`, `wamid.sp-${tag}`, /Logged 7\.40 [A-Z]{3}/);
+  assert.match(spent.text, new RegExp(`espresso ${tag}`));
+  const month = (await call('/expenses')).body;
+  assert.ok(month.expenses.some(item => item.merchant === `espresso ${tag}` && item.source === 'chat'));
+  await say(`/spent 7,40 espresso ${tag}`, `wamid.sp2-${tag}`, /same expense/);
+  await say('/spent lunch', `wamid.sp3-${tag}`, /Log spending with/);
+
+  const today = await say('/today', `wamid.td-${tag}`, /min free/);
+  assert.ok(today.text);
+  await call(`/habits/${habit.body.id}`, { method: 'DELETE' });
+});
+
 await check('reminder commands work from WhatsApp without the model', async () => {
   const tag = Date.now().toString(36);
   const say = async (text, id, expected) => {

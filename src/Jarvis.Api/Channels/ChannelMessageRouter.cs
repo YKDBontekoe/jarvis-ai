@@ -7,7 +7,10 @@ using Jarvis.Application.Channels;
 using Jarvis.Application.Conversations;
 using Jarvis.Application.Files;
 using Jarvis.Application.Integrations;
+using Jarvis.Application.Expenses;
+using Jarvis.Application.Habits;
 using Jarvis.Application.Lists;
+using Jarvis.Application.Planner;
 using Jarvis.Application.Preferences;
 using Jarvis.Application.Workflows;
 
@@ -86,6 +89,9 @@ public sealed class ChannelMessageRouter(
     IListService lists,
     IReminderService reminders,
     IOwnerPreferenceService preferences,
+    IHabitService habits,
+    IExpenseService expenses,
+    IDayPlannerService planner,
     ILogger<ChannelMessageRouter> logger,
     TimeProvider? timeProvider = null)
 {
@@ -93,6 +99,7 @@ public sealed class ChannelMessageRouter(
         I'm Jarvis. Message me like you would in the app.
         • /new — start a fresh conversation
         • /status — what I'm waiting on
+        • /checkin meditate, /spent 12.50 lunch, /today — habits, spending and your day
         • /remind in 30m call mum, /remind at 18:30 …, /remind tomorrow 9:00 …, /reminders — quick reminders
         • /lists, /list shopping, /add shopping: milk, eggs, /done shopping: milk — your lists
         • Send a photo (JPEG, PNG, WebP) or a file (PDF, Word, text) and ask about it
@@ -153,6 +160,12 @@ public sealed class ChannelMessageRouter(
         if (text.Equals("/help", StringComparison.OrdinalIgnoreCase))
         {
             await messenger.SendAsync(connection, sender, Help, cancellationToken);
+            return;
+        }
+        if (QuickCommands.Parse(text) is { } quickCommand)
+        {
+            await messenger.SendAsync(connection, sender, await RunQuickCommandAsync(ownerId, quickCommand, cancellationToken),
+                cancellationToken);
             return;
         }
         if (ReminderCommands.Parse(text) is { } reminderCommand)
@@ -252,6 +265,48 @@ public sealed class ChannelMessageRouter(
         }
         return stored;
     }
+
+    private async Task<string> RunQuickCommandAsync(Guid ownerId, QuickCommand command, CancellationToken cancellationToken)
+    {
+        switch (command)
+        {
+            case QuickCommand.Usage usage:
+                return usage.Message;
+            case QuickCommand.CheckIn checkIn:
+                var checkedIn = await habits.SetDoneByNameAsync(ownerId, checkIn.Habits, null, true, cancellationToken);
+                if (!checkedIn.Succeeded) return "I could not check that in: " + checkedIn.Message;
+                var result = checkedIn.Value!;
+                var lines = new List<string>();
+                lines.AddRange(result.Changed.Select(h => $"✅ {h.Habit.Name}: streak {h.Stats.CurrentStreak} {h.Stats.StreakUnit}"));
+                lines.AddRange(result.Unchanged.Select(h => $"{h.Habit.Name} was already checked in today."));
+                lines.AddRange(result.NotFound.Select(name => $"No habit called \"{name}\"."));
+                lines.AddRange(result.Ambiguous.Select(a => $"\"{a.Text}\" matches more than one habit: {string.Join(", ", a.Candidates)}."));
+                return lines.Count == 0 ? NothingToCheckIn : string.Join("\n", lines);
+            case QuickCommand.Spent spent:
+                var zoneView = await preferences.GetAsync(ownerId, cancellationToken);
+                var zone = LocalClock.TryFind(zoneView.HomeTimeZone, out var found) ? found : TimeZoneInfo.Utc;
+                var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime((timeProvider ?? TimeProvider.System).GetUtcNow(), zone).DateTime);
+                var created = await expenses.CreateAsync(ownerId,
+                    new ExpenseDraft(spent.Amount, spent.Currency, spent.Description, null, null, null, null, ExpenseSources.Chat),
+                    today, true, cancellationToken);
+                if (!created.Succeeded) return "I could not log that: " + created.Message;
+                var expense = created.Value!.Expense;
+                return created.Value.IsDuplicate
+                    ? $"That looks like the same expense as one already logged today ({expense.Amount:0.00} {expense.Currency}); I did not add it twice."
+                    : $"💶 Logged {expense.Amount:0.00} {expense.Currency}" +
+                      (string.IsNullOrWhiteSpace(expense.Merchant) ? "" : $" at {expense.Merchant}") + $" under {expense.Category}.";
+            case QuickCommand.Today:
+                var day = await planner.GetTodayAsync(ownerId, null, cancellationToken);
+                var dayZone = LocalClock.TryFind(day.TimeZoneId, out var planZone) ? planZone : TimeZoneInfo.Utc;
+                if (day.Entries.Count == 0) return $"Nothing is planned today. {day.FreeMinutes} min free.";
+                return string.Join("\n", day.Entries.Take(15).Select(entry =>
+                    $"{TimeZoneInfo.ConvertTime(entry.StartAt, dayZone):HH:mm} {entry.Title}")) + $"\n{day.FreeMinutes} min free.";
+            default:
+                return QuickCommands.CheckInUsage;
+        }
+    }
+
+    private const string NothingToCheckIn = "Nothing to check in.";
 
     private async Task<string> RunReminderCommandAsync(Guid ownerId, ReminderCommand command,
         CancellationToken cancellationToken)
