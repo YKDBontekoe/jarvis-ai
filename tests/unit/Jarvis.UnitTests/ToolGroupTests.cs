@@ -24,6 +24,25 @@ public sealed class ToolGroupTests
         Assert.Equal(ToolGroups.All.Count, ToolGroups.All.Select(group => group.Id).Distinct().Count());
     }
 
+    [Fact]
+    public void No_two_tool_classes_offer_a_tool_under_the_same_name()
+    {
+        // Two tools with one name make the model's tool list ambiguous or break the turn; adding a tool that already
+        // exists elsewhere is an easy mistake in a codebase this size.
+        var tools = typeof(JarvisAgentFactory).Assembly.GetTypes()
+            .Where(type => type.Name.EndsWith("Tools", StringComparison.Ordinal))
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
+                .Where(method => method.GetCustomAttribute<System.ComponentModel.DescriptionAttribute>() is not null)
+                .Select(method => (Name: method.Name.EndsWith("Async", StringComparison.Ordinal) ? method.Name[..^5] : method.Name,
+                    Type: type.FullName)))
+            .ToArray();
+
+        var duplicates = tools.GroupBy(tool => tool.Name, StringComparer.Ordinal).Where(group => group.Count() > 1)
+            .Select(group => group.Key + " in " + string.Join(", ", group.Select(tool => tool.Type))).ToArray();
+
+        Assert.True(duplicates.Length == 0, string.Join("; ", duplicates));
+    }
+
     [Theory]
     [InlineData("I spent €12 on lunch", "money")]
     [InlineData("Hoeveel heb ik deze maand uitgegeven?", "money")]
