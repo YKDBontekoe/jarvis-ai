@@ -160,6 +160,15 @@ await check('a file type Jarvis cannot store is refused kindly and nothing is ke
   assert.equal(((await call('/files')).body ?? []).length, filesBefore);
 });
 
+await check('a shared WhatsApp location pin is understood instead of dropped', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  const response = await postWebhook(whatsapp.webhookUrl, mediaPayload(owner, 'wamid.loc1', 'location',
+    { latitude: 38.7223, longitude: -9.1393, name: 'Time Out Market' }));
+  assert.equal(response.status, 200);
+  const reply = await waitForReply('whatsapp', () => true);
+  assert.equal(reply.to, owner);
+});
+
 await check('/new leaves an attached file behind with the old conversation', async () => {
   // The fake model reads the whole prompt, so later checks need a thread without the file's source note.
   await fetch(`${fake}/_test/sent`, { method: 'DELETE' });

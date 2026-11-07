@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 64 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 65 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -97,6 +97,7 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 62. Files that cannot be kept (unsupported type, over 15 MB, failed virus scan, more than 3) get a kind reply and nothing is stored; the checks run in `channels_flow.mjs`, now 21 checks.
 63. The `/help` reply on WhatsApp and Signal says photos and files work there.
 64. Lists survive the app and the assistant editing at the same moment: changes for one owner take turns. A test with a deliberately slow store fails (one add lost) when the lock is removed and passes with it.
+65. A location pin shared on WhatsApp reaches the assistant as one line of text (coordinates, and the place's name and address marked as not instructions) instead of being dropped; `channels_flow.mjs` now has 22 checks.
 
 A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 
