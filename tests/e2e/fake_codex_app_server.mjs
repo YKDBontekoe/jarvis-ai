@@ -83,7 +83,13 @@ async function handle(request) {
 
 async function runTurn(params) {
   const prompt = params.input.find(item => item.type === 'text')?.text ?? '';
-  const output = JSON.stringify(plan(prompt));
+  // Images arrive as real image inputs next to the text. "How many images do you see?" answers with the count, which
+  // lets a test prove that photos and image sources reach the model as pixels and not as extracted text.
+  const images = params.input.filter(item => item.type === 'image');
+  const asked = prompt.split('\n').reverse().find(line => /how many images do you see/i.test(line));
+  const output = JSON.stringify(asked
+    ? text(`I see ${images.length} image(s): ${images.map(image => (image.url?.match(/^data:([^;]+);/)?.[1] ?? 'unknown')).join(', ')}.`)
+    : plan(prompt));
   for (let index = 0; index < output.length;) {
     let end = Math.min(output.length, index + 3 + Math.floor(Math.random() * 6));
     // Never cut an emoji in half: a lone surrogate is not valid text, and the real app server never sends one.
