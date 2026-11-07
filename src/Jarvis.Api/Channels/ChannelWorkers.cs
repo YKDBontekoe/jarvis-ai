@@ -172,7 +172,8 @@ public sealed class SignalReceiver(IServiceScopeFactory scopes, IHttpClientFacto
                 : mime.StartsWith("audio/", StringComparison.Ordinal) ? "audio"
                 : mime.StartsWith("video/", StringComparison.Ordinal) ? "video"
                 : "document";
-            media.Add(new ChannelMediaRef(kind, id, mime, null));
+            var fileName = attachment.TryGetProperty("filename", out var nameElement) ? nameElement.GetString() : null;
+            media.Add(new ChannelMediaRef(kind, id, mime, null, fileName));
         }
         return media;
     }

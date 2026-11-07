@@ -97,7 +97,9 @@ public sealed class ChannelMediaTests
 
         var mixed = ChannelMedia.UnreadableReply([photo, new ChannelMediaRef("video", "3", "video/mp4", null),
             new ChannelMediaRef("document", "4", "application/pdf", null)]);
-        Assert.Contains("videos or documents", mixed, StringComparison.Ordinal);
+        Assert.Contains("videos", mixed, StringComparison.Ordinal);
+        Assert.DoesNotContain("documents", mixed, StringComparison.Ordinal);
+        Assert.Null(ChannelMedia.UnreadableReply([new ChannelMediaRef("document", "4", "application/pdf", null)]));
     }
 
     [Fact]
@@ -163,7 +165,7 @@ public sealed class ChannelMediaTests
 
         Assert.Equal(2, messages.Length);
         Assert.Equal("What is this?", messages[0].Text);
-        Assert.Equal(new ChannelMediaRef("image", "abc123.jpg", "image/jpeg", null),
+        Assert.Equal(new ChannelMediaRef("image", "abc123.jpg", "image/jpeg", null, "IMG_1.jpg"),
             Assert.Single(ChannelMedia.Parse(messages[0].MediaJson)));
         Assert.Equal(string.Empty, messages[1].Text);
         Assert.Equal("audio", Assert.Single(ChannelMedia.Parse(messages[1].MediaJson)).Kind);
@@ -181,5 +183,26 @@ public sealed class ChannelMediaTests
         Assert.Equal([("+31611111111", "Remind me to call mom", "+31611111111:1727450000000")],
             SignalReceiver.ParseEnvelopes(document.RootElement).ToArray());
         Assert.Null(Assert.Single(SignalReceiver.ParseInbound(document.RootElement)).MediaJson);
+    }
+
+    [Theory]
+    [InlineData("Roadmap Q3.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Roadmap Q3.docx")]
+    [InlineData("../../etc/passwd", "text/plain", "passwd.txt")]
+    [InlineData("C:\\Users\\me\\budget", "application/pdf", "budget.pdf")]
+    [InlineData("line\none.pdf", "application/pdf", "lineone.pdf")]
+    [InlineData(null, "application/pdf", "signal-file-2.pdf")]
+    [InlineData("  ", "application/octet-stream", "signal-file-2")]
+    public void A_sent_files_name_is_flattened_and_gets_an_extension_that_matches_its_type(string? name, string mime, string expected) =>
+        Assert.Equal(expected, ChannelMedia.DocumentName(new ChannelMediaRef("document", "1", mime, null, name), "Signal", 2));
+
+    [Fact]
+    public void A_very_long_file_name_is_cut_and_a_whatsapp_filename_travels_with_the_media()
+    {
+        var name = ChannelMedia.DocumentName(new ChannelMediaRef("document", "1", "application/pdf", null, new string('a', 300) + ".pdf"), "WhatsApp", 1);
+        Assert.True(name.Length <= 100, name);
+
+        var json = ChannelMedia.Serialize([new ChannelMediaRef("document", "1", "application/pdf", null, "Plan.pdf")]);
+        Assert.Equal("Plan.pdf", ChannelMedia.Parse(json)[0].FileName);
+        Assert.True(ChannelMedia.IsDocument(ChannelMedia.Parse(json)[0]));
     }
 }

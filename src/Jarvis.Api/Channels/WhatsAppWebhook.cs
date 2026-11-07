@@ -81,8 +81,9 @@ public static class WhatsAppWebhook
         if (string.IsNullOrWhiteSpace(id) || id.Length > 200) return null;
         var mime = body.TryGetProperty("mime_type", out var mimeElement) ? mimeElement.GetString() : null;
         var caption = body.TryGetProperty("caption", out var captionElement) ? captionElement.GetString() : null;
+        var fileName = body.TryGetProperty("filename", out var nameElement) ? nameElement.GetString() : null;
         return new ChannelMediaRef(type, id, ChannelMedia.NormalizeMime(mime),
-            string.IsNullOrWhiteSpace(caption) ? null : caption.Trim());
+            string.IsNullOrWhiteSpace(caption) ? null : caption.Trim(), fileName);
     }
 
     private static string? ReadText(JsonElement message)

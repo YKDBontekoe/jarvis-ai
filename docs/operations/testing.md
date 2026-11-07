@@ -48,7 +48,7 @@ Fixtures under `tests/e2e/`:
 | Script | Covers |
 |--------|--------|
 | `local_fixture_flow.mjs` | Streaming, tools, approvals, memory, reminders, Temporal task |
-| `channels_flow.mjs` | WhatsApp Cloud/Signal with `fake_channels.mjs` (QR linking is covered by unit and widget tests) |
+| `channels_flow.mjs` | WhatsApp Cloud/Signal photos, files and text with `fake_channels.mjs` (QR linking is covered by unit and widget tests) |
 | `platform_flow.mjs` | A2A, devices, voice options; `JARVIS_PLATFORM_CHAT=1` for `RenderUi` |
 | `image_input_flow.mjs` | Photos, follow-ups and image sources reach the model as images (fake Codex counts the image inputs) |
 | `document_upload_flow.mjs` | Word, PowerPoint, TSV, YAML and calendar uploads are indexed and found by search (fixtures in `fixtures/docs`); a file whose bytes do not match its type is refused; an unreadable one fails at once |

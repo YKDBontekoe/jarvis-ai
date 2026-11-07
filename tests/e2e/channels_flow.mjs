@@ -135,6 +135,38 @@ await check('voice notes and documents are answered honestly instead of being dr
   assert.match(reply.text, /voice notes or audio/);
 });
 
+await check('a WhatsApp document is stored, attached to the chat as a source, and answered', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  const response = await postWebhook(whatsapp.webhookUrl, mediaPayload(owner, 'wamid.doc1', 'document',
+    { id: 'fake-docx-1', mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      filename: 'Roadmap Q3.docx', caption: 'Summarise this file' }));
+  assert.equal(response.status, 200);
+  await waitForReply('whatsapp', message => !/couldn't|can't store/.test(message.text));
+  const files = (await call('/files')).body ?? [];
+  const stored = files.find(file => file.fileName === 'Roadmap Q3.docx');
+  assert.ok(stored, JSON.stringify(files.map(f => f.fileName)));
+  const threads = (await call(`/channels/${whatsapp.id}/messages`)).body ?? [];
+  assert.ok(threads.some(item => item.direction === 'in' && item.status === 'processed'));
+});
+
+await check('a file type Jarvis cannot store is refused kindly and nothing is kept', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  const filesBefore = ((await call('/files')).body ?? []).length;
+  const response = await postWebhook(whatsapp.webhookUrl, mediaPayload(owner, 'wamid.doc2', 'document',
+    { id: 'fake-exe-1', mime_type: 'application/x-msdownload', filename: 'setup.exe' }));
+  assert.equal(response.status, 200);
+  const reply = await waitForReply('whatsapp', message => /can't store setup\.exe/.test(message.text));
+  assert.match(reply.text, /PDF, Word/);
+  assert.equal(((await call('/files')).body ?? []).length, filesBefore);
+});
+
+await check('/new leaves an attached file behind with the old conversation', async () => {
+  // The fake model reads the whole prompt, so later checks need a thread without the file's source note.
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  await postWebhook(whatsapp.webhookUrl, webhookPayload(owner, '/new', 'wamid.new-after-doc'));
+  await waitForReply('whatsapp', message => /fresh conversation/.test(message.text));
+});
+
 await check('a photo from a stranger is never downloaded', async () => {
   await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
   const filesBefore = ((await call('/files')).body ?? []).length;
@@ -186,6 +218,24 @@ await check('Signal links through signal-cli and answers polled messages', async
     body: JSON.stringify({ from: owner, message: 'hello' }) });
   const reply = await waitForReply('signal', message => /I'm Jarvis/.test(message.text));
   assert.equal(reply.to, owner);
+});
+
+await check('a Signal document is stored as the sender named it', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  await fetch(`${fake}/_test/signal/inbound`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: owner, message: 'What is in this?',
+      attachments: [{ id: 'fake-docx-signal.docx', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        filename: 'Signal plan.docx', size: 100 }] }) });
+  await waitForReply('signal', message => !/couldn't|can't store/.test(message.text));
+  const files = (await call('/files')).body ?? [];
+  assert.ok(files.some(file => file.fileName === 'Signal plan.docx'), JSON.stringify(files.map(f => f.fileName)));
+});
+
+await check('Signal /new leaves the attached file behind', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  await fetch(`${fake}/_test/signal/inbound`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: owner, message: '/new' }) });
+  await waitForReply('signal', message => /fresh conversation/.test(message.text));
 });
 
 await check('a Signal photo reaches the model as an image', async () => {

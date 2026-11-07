@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 59 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 62 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -91,7 +91,12 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 56. A Lists tile for Home, a quick command and feature-search keywords so the screen is easy to reach.
 57. The tool catalog and API reference now describe every tool and endpoint added in this effort (goals, habits, lists, calendar, time zone, chat, file cleanup, biweekly).
 58. A guard test fails the build if two tool classes offer a tool under the same name (a mistake made and caught by hand in this effort).
-59. A guard test fails the build if a destructive or outward-facing tool (deletes, forget, send, run, invoke) is registered without `ApprovalRequiredAIFunction`; checked by temporarily removing the wrapper from `DeleteFile`.
+59. A guard test (`ApprovalRegistrationGuardTests`) fails the build if a destructive or outward-facing tool (deletes, forget, send, run, invoke) is registered without `ApprovalRequiredAIFunction`; checked by temporarily removing the wrapper from `DeleteFile`.
+60. A file sent on WhatsApp (PDF, Word, ...) is stored under its own flattened name and attached to the chat as a source, so the owner can ask about it from their phone.
+61. The same on Signal.
+62. Files that cannot be kept (unsupported type, over 15 MB, failed virus scan, more than 3) get a kind reply and nothing is stored; the checks run in `channels_flow.mjs`, now 21 checks.
+
+A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 
 Seen but left alone: Home lists the five oldest-due promises, so with five or more overdue promises one due today is not on Home. That may be intended (overdue first), so it is a question for the owner, not a fix.
 

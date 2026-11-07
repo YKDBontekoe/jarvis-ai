@@ -1,3 +1,4 @@
+using Jarvis.Domain.Files;
 using System.Text.Json;
 using Jarvis.Api.Conversations;
 using Jarvis.Application.Approvals;
@@ -78,6 +79,7 @@ public sealed class ChannelMessageRouter(
     ChannelMessenger messenger,
     IAuditEventStore audit,
     IFileService files,
+    IConversationFileContextRepository fileContext,
     ILogger<ChannelMessageRouter> logger)
 {
     internal const string Help = """
@@ -110,25 +112,30 @@ public sealed class ChannelMessageRouter(
         if (text.Length > 32_000) text = text[..32_000];
         var ownerId = connection.OwnerId;
 
-        // Photos go to the model as real images; other media is answered honestly instead of being dropped.
+        // Photos go to the model as real images, files are stored and attached as sources to the chat, and other media is
+        // answered honestly instead of being dropped.
         var media = ChannelMedia.Parse(message.MediaJson);
         IReadOnlyList<MessageAttachment>? attachments = null;
+        IReadOnlyList<StoredFile> documents = [];
         if (media.Count > 0)
         {
             if (ChannelMedia.UnreadableReply(media) is { } unreadable)
                 await messenger.SendAsync(connection, sender, unreadable, cancellationToken);
             var stored = await StorePhotosAsync(connection, media, cancellationToken);
-            if (stored.Count == 0)
-            {
-                if (media.Any(ChannelMedia.IsPhoto))
-                    await messenger.SendAsync(connection, sender,
-                        "I couldn't download that photo. Please send it again.", cancellationToken);
-                if (text.Length == 0) return;
-            }
-            else
+            if (stored.Count == 0 && media.Any(ChannelMedia.IsPhoto))
+                await messenger.SendAsync(connection, sender,
+                    "I couldn't download that photo. Please send it again.", cancellationToken);
+            if (stored.Count > 0)
             {
                 attachments = stored;
                 if (text.Length == 0) text = MessageAttachments.DefaultContent(stored.Count);
+            }
+            documents = await StoreDocumentsAsync(connection, sender, media, cancellationToken);
+            if (documents.Count > 0)
+            {
+                var names = string.Join(", ", documents.Select(file => file.FileName));
+                var note = $"[Files the user sent with this message, attached to this chat as sources: {names}]";
+                text = text.Length == 0 ? "I sent you a file.\n\n" + note : text + "\n\n" + note;
             }
         }
         if (text.Length == 0) return;
@@ -146,6 +153,7 @@ public sealed class ChannelMessageRouter(
         }
 
         var conversationId = await GetOrCreateConversationAsync(connection, sender, cancellationToken);
+        await AttachDocumentsAsync(ownerId, conversationId, documents, cancellationToken);
         var pending = (await approvals.ListActionableForConversationAsync(ownerId, conversationId, cancellationToken))
             .Where(approval => approval.Status == "pending").ToList();
         if (text.Equals("/status", StringComparison.OrdinalIgnoreCase))
@@ -184,6 +192,7 @@ public sealed class ChannelMessageRouter(
             if (result is ConversationTurnResult.NotFound)
             {
                 conversationId = await StartConversationAsync(connection, sender, cancellationToken);
+                await AttachDocumentsAsync(ownerId, conversationId, documents, cancellationToken);
                 result = await turns.SendAsync(ownerId, conversationId, text, cancellationToken,
                     attachments: attachments);
             }
@@ -220,6 +229,60 @@ public sealed class ChannelMessageRouter(
             }
         }
         return stored;
+    }
+
+    /// <summary>
+    /// Downloads the files of a message and stores each as one of the owner's files, through the same type check, size
+    /// limit and virus scan as an upload from the app. A file that fails any step is reported to the sender.
+    /// </summary>
+    private async Task<IReadOnlyList<StoredFile>> StoreDocumentsAsync(ChannelConnectionRecord connection, string sender,
+        IReadOnlyList<ChannelMediaRef> media, CancellationToken cancellationToken)
+    {
+        var stored = new List<StoredFile>();
+        var label = ChannelKinds.Label(connection.Kind);
+        foreach (var item in media.Where(ChannelMedia.IsDocument).Take(ChannelMedia.MaxDocuments))
+        {
+            var name = ChannelMedia.DocumentName(item, label, stored.Count + 1);
+            var downloaded = await messenger.FetchMediaAsync(connection, item.Id, ChannelMedia.MaxDocumentBytes,
+                cancellationToken);
+            if (downloaded is null)
+            {
+                await messenger.SendAsync(connection, sender,
+                    $"I couldn't download {name} (files up to {ChannelMedia.MaxDocumentBytes / (1024 * 1024)} MB work). Please send it again.",
+                    cancellationToken);
+                continue;
+            }
+            try
+            {
+                using var content = new MemoryStream(downloaded.Content);
+                stored.Add(await files.UploadAsync(connection.OwnerId, name,
+                    ChannelMedia.NormalizeMime(item.Mime), content.Length, content, cancellationToken));
+            }
+            catch (ArgumentException)
+            {
+                await messenger.SendAsync(connection, sender,
+                    $"I can't store {name}: that file type isn't supported. PDF, Word, PowerPoint and plain text files work.",
+                    cancellationToken);
+            }
+            catch (MalwareDetectedException)
+            {
+                logger.LogWarning("A {Kind} file was refused by the virus scan.", connection.Kind);
+                await messenger.SendAsync(connection, sender, $"I didn't keep {name}: it did not pass the safety scan.",
+                    cancellationToken);
+            }
+        }
+        if (media.Count(ChannelMedia.IsDocument) > ChannelMedia.MaxDocuments)
+            await messenger.SendAsync(connection, sender,
+                $"I can take up to {ChannelMedia.MaxDocuments} files in one message, so I only used the first {ChannelMedia.MaxDocuments}.",
+                cancellationToken);
+        return stored;
+    }
+
+    private async Task AttachDocumentsAsync(Guid ownerId, Guid conversationId, IReadOnlyList<StoredFile> documents,
+        CancellationToken cancellationToken)
+    {
+        foreach (var file in documents)
+            await fileContext.AttachFileAsync(conversationId, file.Id, ownerId, cancellationToken);
     }
 
     internal static string Describe(ConversationTurnResult result) => result switch
