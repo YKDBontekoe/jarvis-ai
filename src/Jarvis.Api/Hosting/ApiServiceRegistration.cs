@@ -36,6 +36,7 @@ internal static class ApiServiceRegistration
         services.AddScoped<Channels.IChannelTransport>(provider => provider.GetRequiredService<Channels.WhatsAppLinkedTransport>());
         services.AddSingleton<Channels.ChannelLinkService>();
         services.AddScoped<Channels.ChannelMessenger>();
+        services.AddScoped<Channels.ChannelCommandHandler>();
         services.AddScoped<Channels.ChannelMessageRouter>();
         services.AddHostedService<Channels.ChannelInboundProcessor>();
         services.AddHostedService<Channels.SignalReceiver>();

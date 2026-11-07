@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 81 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 83 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -114,6 +114,8 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 79. `/checkin meditate, read` checks habits in from WhatsApp or Signal (by name, up to five), telling you the streak, what was already done and what matched nothing or too much.
 80. `/spent 12.50 lunch` (also `12,50`, `€45`, `20 eur`, `$9.99`) logs an expense from chat without the model, skipping an identical one logged the same day.
 81. `/today` sends the day's timeline and free minutes. 20 unit tests, and `channels_flow.mjs` (25 checks) runs all three against the stack, including that the expense appears in the app with source `chat`.
+82. The chat commands moved out of the message router into their own `ChannelCommandHandler`, so the router lost six dependencies and about 150 lines and each part is easier to read and test; the 25 channel checks pass unchanged.
+83. Handler tests (6): ordinary messages and other slash commands fall through to the assistant, list commands only see the connection owner's lists, and a spend is logged to the expense service with source `chat`.
 
 A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 
