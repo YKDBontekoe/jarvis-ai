@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 37 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 42 improvements in this ledger. The goal of 100 has not been reached.**
 
 ## Images go to the model as images
 
@@ -59,13 +59,22 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 36. Fixture images with a README under `tests/e2e/fixtures/vision/`.
 37. Unit tests for all of the above (image plan, index text, security headers, channel media, Office text, goals, preferences).
 
+## Second batch: more things the assistant can do
+
+38. Rename the current chat on request (`RenameThisChat`): control characters stripped, 80-character cap, only this chat.
+39. Pin or unpin the current chat on request (`PinThisChat`). Neither tool exists in background tasks.
+40. Read the calendar on request (`GetCalendarEvents`): ordered, in the owner's home zone, titles flattened to one line, look-ahead kept between 1 and 31 days. The assistant could not answer "what is on my calendar?" at all before.
+41. With no calendar link it says so and how to connect one, and is told not to guess.
+42. Archive or restore a habit by name (`ArchiveHabit`): history kept, ambiguous names ask which one, audit log records ids not names.
+
 ## Gaps found but not built
 
 Found by asking the real model 20 everyday requests. Still open:
 
 - biweekly ("every other week") reminders need a recurrence anchored to a start date;
 - the day planner covers only today;
-- renaming or pinning a conversation from chat;
 - deleting a project from chat (would need an approval);
 - a shopping list;
-- calendar events are readable only when an ICS URL is configured, and the assistant does not say so.
+- pausing (not archiving) a habit.
+
+The new tools in items 38 to 42 have unit tests only; they were not yet run against the real model because the Codex plan was out of quota.

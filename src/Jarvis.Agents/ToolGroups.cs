@@ -44,14 +44,17 @@ public static partial class ToolGroups
         new("planner", "Today's day plan: show it, plan the day, add, complete or remove items",
             ["GetTodayPlan", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
             PlannerKeywords()),
+        new("calendar", "The user's upcoming calendar events from their connected calendar link",
+            ["GetCalendarEvents"],
+            CalendarKeywords()),
         new("people", "Contacts the user keeps up with: details, birthdays, logging contact, relationship radar",
             ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar", "GetPersonFollowThrough"],
             PeopleKeywords()),
         new("whatsapp", "Read, search and send WhatsApp messages in chats the user turned on",
             ["ListWhatsAppChats", "ReadWhatsAppChat", "SearchWhatsAppMessages", "SendWhatsAppMessage"],
             WhatsAppKeywords()),
-        new("habits", "Habit tracking: list habits, check in, create a habit",
-            ["GetHabits", "CheckInHabits", "CreateHabit"],
+        new("habits", "Habit tracking: list habits, check in, create a habit, archive or restore one",
+            ["GetHabits", "CheckInHabits", "CreateHabit", "ArchiveHabit"],
             HabitKeywords()),
         new("journal", "The user's daily journal: write or read entries",
             ["SaveJournalEntry", "ListJournalEntries"],
@@ -268,6 +271,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(plan (my|the|for)|day plan|today'?s plan|my day|schedule (my|the) day|agenda|to-?do|planning|dagplan|mijn dag|vandaag plannen)", KeywordOptions)]
     private static partial Regex PlannerKeywords();
+
+    [GeneratedRegex(@"\b(calendar|agenda|appointment|am i free|free (on|at|this|next|tomorrow)|busy|what'?s on|meeting|kalender|afspraak|vrij|bezet|wat staat er)", KeywordOptions)]
+    private static partial Regex CalendarKeywords();
 
     [GeneratedRegex(@"\b(contact|friend|birthday|person|people|relationship|radar|keep in touch|catch up with|haven'?t (talked|spoken)|called|met with|vriend|verjaardag|persoon|mensen|contact|gesproken|gebeld)", KeywordOptions)]
     private static partial Regex PeopleKeywords();

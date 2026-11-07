@@ -116,6 +116,43 @@ public sealed class HabitTests
     }
 
     [Fact]
+    public async Task Chat_archives_and_restores_a_habit_by_name_without_losing_history()
+    {
+        var (service, _, _, _, _) = Create();
+        var created = await service.CreateAsync(Owner, new HabitDraft("Meditate", null, null, null), null, default);
+        await service.SetDoneAsync(created.Value!.Habit.Id, Owner, null, true, HabitSources.App, default);
+        var audit = new RecordingAudit();
+        var tools = new HabitAgentTools(service, audit, new FixedUser(), NullLogger.Instance);
+
+        var archived = await tools.ArchiveHabitAsync("meditat");
+        var again = await tools.ArchiveHabitAsync("Meditate");
+        var restored = await tools.ArchiveHabitAsync("Meditate", archive: false);
+
+        Assert.Contains("Archived \"Meditate\"", archived, StringComparison.Ordinal);
+        Assert.Contains("no active habits to archive", again, StringComparison.Ordinal);
+        Assert.Contains("is tracked again", restored, StringComparison.Ordinal);
+        var summary = Assert.Single(await service.ListAsync(Owner, false, default));
+        Assert.Equal(1, summary.Stats.TotalCheckIns);
+        Assert.Equal(["habit.archived", "habit.restored"], audit.Actions);
+        Assert.All(audit.Metadata, item => Assert.DoesNotContain("Meditate", item));
+    }
+
+    [Fact]
+    public async Task Archiving_asks_which_habit_when_the_name_is_ambiguous_and_ignores_other_owners()
+    {
+        var (service, _, _, _, _) = Create();
+        await service.CreateAsync(Owner, new HabitDraft("Read 20 pages", null, null, null), null, default);
+        await service.CreateAsync(Owner, new HabitDraft("Read the news", null, null, null), null, default);
+        await service.CreateAsync(Other, new HabitDraft("Piano", null, null, null), null, default);
+        var tools = new HabitAgentTools(service, new RecordingAudit(), new FixedUser(), NullLogger.Instance);
+
+        Assert.Contains("matches more than one habit", await tools.ArchiveHabitAsync("read"), StringComparison.Ordinal);
+        Assert.Contains("No active habit matches", await tools.ArchiveHabitAsync("Piano"), StringComparison.Ordinal);
+        Assert.Equal(2, (await service.ListAsync(Owner, false, default)).Count);
+        Assert.Single(await service.ListAsync(Other, false, default));
+    }
+
+    [Fact]
     public async Task Chat_checks_habits_in_by_name_and_reports_misses()
     {
         var (service, _, _, _, _) = Create();

@@ -93,6 +93,34 @@ internal sealed class HabitAgentTools(IHabitService service, IAuditEventStore au
                    : "");
     }
 
+    [Description("Archive a habit the user wants to stop tracking (\"stop tracking meditation\"), or bring an archived one back. Archiving keeps the history and stops the evening check-in; it does not delete anything. Pass the habit by its name in the user's habit list. Never archive a habit on your own because it is missed often.")]
+    public async Task<string> ArchiveHabitAsync(
+        [Description("The habit, by its name in the user's habit list.")] string habit,
+        [Description("True to archive, false to bring it back.")] bool archive = true,
+        CancellationToken cancellationToken = default)
+    {
+        var all = await service.ListAsync(currentUser.OwnerId, true, cancellationToken);
+        var pool = all.Where(x => x.Habit.IsArchived == !archive).ToList();
+        var wanted = (habit ?? "").Trim();
+        var matches = pool.Where(x => x.Habit.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0 && wanted.Length > 0)
+            matches = pool.Where(x => x.Habit.Name.Contains(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0)
+            return pool.Count == 0
+                ? archive ? "The user has no active habits to archive." : "The user has no archived habits."
+                : $"No {(archive ? "active" : "archived")} habit matches \"{AgentText.Limit(wanted, HabitRules.MaxNameLength)}\". " +
+                  "The candidates are " + Join(pool.Select(x => x.Habit.Name)) + ".";
+        if (matches.Count > 1)
+            return $"\"{AgentText.Limit(wanted, HabitRules.MaxNameLength)}\" matches more than one habit (" +
+                   Join(matches.Select(x => x.Habit.Name)) + "); ask the user which one.";
+        var result = await service.SetArchivedAsync(matches[0].Habit.Id, currentUser.OwnerId, archive, cancellationToken);
+        if (!result.Succeeded) return "I could not change that habit: " + result.Message;
+        await AuditAsync(archive ? "habit.archived" : "habit.restored", cancellationToken, [matches[0].Habit.Id]);
+        return archive
+            ? $"Archived \"{result.Value!.Habit.Name}\". Its history is kept, and it can be brought back."
+            : $"\"{result.Value!.Habit.Name}\" is tracked again.";
+    }
+
     internal static string Describe(HabitSummary summary)
     {
         var habit = summary.Habit;
