@@ -15,9 +15,10 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     ILoggerFactory loggerFactory,
     ICurrentUser currentUser, IIntegrationCredentialStore credentialStore,
     IUserMcpServerRegistry userMcpServers, IOwnerMcpPolicyStore ownerPolicy,
-    ICustomMcpServerStore customServers) : IAsyncDisposable
+    ICustomMcpServerStore customServers, McpConnectionPool? connectionPool = null) : IAsyncDisposable
 {
     private readonly List<IAsyncDisposable> _clients = [];
+    private readonly List<McpConnectionPool.Lease> _leases = [];
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _pendingState =
         new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _stateGate = new(1, 1);
@@ -180,7 +181,7 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
         if (cancellationToken.IsCancellationRequested)
         {
             foreach (var connection in connections)
-                if (connection?.Client is { } openClient) await CloseQuietlyAsync(openClient);
+                if (connection is not null) await CloseConnectionAsync(connection);
             var canceled = connections.Select(connection => connection?.Failure)
                 .Select(failure => failure is null ? null : CancellationExceptions.Unwrap(failure))
                 .FirstOrDefault(failure => failure is not null);
@@ -197,7 +198,7 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 continue;
             }
             var connection = connections[index]!;
-            IAsyncDisposable? client = connection.Client;
+            var open = connection.Client is not null;
             try
             {
                 if (connection.Failure is { } failure) throw failure;
@@ -207,8 +208,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                 var availableNames = availableTools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
                 if (allowAllTools && availableNames.Count > McpToolSelection.MaxTools)
                 {
-                    await CloseQuietlyAsync(connectedClient);
-                    client = null;
+                    await CloseConnectionAsync(connection);
+                    open = false;
                     statuses.Add(await BuildStatusAsync(server, "unavailable", 0, "too_many_tools", true, null,
                         cancellationToken));
                     logger.LogWarning("Skipping MCP server {ServerName}: it exposes {ToolCount} tools, above the {MaxTools} tool limit.",
@@ -223,8 +224,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                     allowed.IntersectWith(availableNames);
                     if (allowed.Count == 0)
                     {
-                        await CloseQuietlyAsync(connectedClient);
-                        client = null;
+                        await CloseConnectionAsync(connection);
+                        open = false;
                         statuses.Add(await BuildStatusAsync(server, "disabled", 0, "no_matching_tools", true, [],
                             cancellationToken));
                         continue;
@@ -260,9 +261,10 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
 
                 tools.AddRange(selected);
                 foreach (var tool in selected) toolNames.Add(tool.Name);
-                _clients.Add(connectedClient);
+                if (connection.Lease is { } lease) _leases.Add(lease);
+                else _clients.Add(connectedClient);
                 Remember(server, new LiveSession(connectedClient, transportSecrets));
-                client = null;
+                open = false;
                 statuses.Add(await BuildStatusAsync(server, "connected", selected.Length, null, true,
                     selected.Select(tool => tool.Name).ToArray(), cancellationToken) with
                 {
@@ -273,14 +275,14 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
                                               CancellationExceptions.Unwrap(exception) is { } canceled)
             {
-                if (client is not null) await client.DisposeAsync();
+                if (open) await CloseConnectionAsync(connection);
                 for (var rest = index + 1; rest < slots.Count; rest++)
-                    if (connections[rest]?.Client is { } openClient) await CloseQuietlyAsync(openClient);
+                    if (connections[rest] is { } pending) await CloseConnectionAsync(pending);
                 throw canceled;
             }
             catch (Exception exception)
             {
-                if (client is not null) await CloseQuietlyAsync(client);
+                if (open) await CloseConnectionAsync(connection, healthy: false);
                 statuses.Add(await FailureStatusAsync(server, exception, cancellationToken));
             }
         }
@@ -291,7 +293,20 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     }
 
     /// <summary>A started server and its tools, or why it could not start. Never throws.</summary>
-    private sealed record ServerConnection(McpClient? Client, IList<McpClientTool>? Tools, Exception? Failure);
+    private sealed record ServerConnection(McpClient? Client, IList<McpClientTool>? Tools, Exception? Failure,
+        McpConnectionPool.Lease? Lease = null);
+
+    /// <summary>Gives a pooled connection back, or closes one this request opened for itself.</summary>
+    private async Task CloseConnectionAsync(ServerConnection connection, bool healthy = true)
+    {
+        if (connection.Lease is { } lease) connectionPool?.Release(lease, healthy);
+        else if (connection.Client is { } client) await CloseQuietlyAsync(client);
+    }
+
+    /// <summary>Self-built servers save their state through this request's host, so they always connect afresh.</summary>
+    private bool IsPoolable(McpServerOptions server) =>
+        connectionPool is not null && server.Command != McpStdioCommandValidator.CustomScriptCommand &&
+        server.Script is null;
 
     /// <summary>
     /// Starts one server and lists its tools. It touches only the network and the server process, never the
@@ -302,6 +317,9 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
         McpClient? client = null;
         try
         {
+            var poolKey = IsPoolable(server) ? McpConnectionPool.KeyFor(currentUser.OwnerId, server) : null;
+            if (poolKey is not null && await connectionPool!.TryRentAsync(poolKey, cancellationToken) is { } reused)
+                return new ServerConnection(reused.Client, reused.Tools, null, reused);
             if (IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider) &&
                 server.Transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase))
                 await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
@@ -313,7 +331,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             client = await McpClient.CreateAsync(CreateTransport(server, loggerFactory),
                 cancellationToken: connectTimeout.Token);
             var tools = await client.ListToolsAsync(cancellationToken: connectTimeout.Token);
-            return new ServerConnection(client, tools, null);
+            var lease = poolKey is null ? null : connectionPool!.Add(poolKey, client, tools);
+            return new ServerConnection(client, tools, null, lease);
         }
         catch (Exception exception)
         {
@@ -663,6 +682,9 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     {
         foreach (var client in _clients)
             await client.DisposeAsync();
+        foreach (var lease in _leases)
+            connectionPool?.Release(lease);
+        _leases.Clear();
         foreach (var provider in _pendingState.Keys.ToArray())
             await PersistScriptStateAsync(provider, CancellationToken.None);
     }

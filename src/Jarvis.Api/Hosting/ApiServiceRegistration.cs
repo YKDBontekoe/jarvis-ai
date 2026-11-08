@@ -155,6 +155,8 @@ internal static class ApiServiceRegistration
         services.AddSingleton<Jarvis.Application.Realtime.IRealtimePublisher, Devices.SignalRRealtimePublisher>();
         services.AddSingleton<Jarvis.Application.Devices.IDeviceInvoker, Devices.SignalRDeviceInvoker>();
         services.AddHttpClient("a2a", client => client.Timeout = TimeSpan.FromSeconds(30));
+        // Server connections outlive the request so chat turns do not restart every MCP server.
+        services.AddSingleton<McpConnectionPool>();
         services.AddScoped<McpToolHost>();
         services.AddScoped<AgentRunCoordinator>();
         services.AddScoped<ConversationTurnService>();
