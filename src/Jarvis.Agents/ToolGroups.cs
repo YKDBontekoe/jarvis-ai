@@ -42,7 +42,7 @@ public static partial class ToolGroups
              "CheckLessonAnswer"],
             LibraryKeywords()),
         new("planner", "Today's day plan: show it, plan the day, add, complete or remove items; another day's agenda",
-            ["GetTodayPlan", "GetDayAgenda", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
+            ["GetTodayPlan", "GetDayAgenda", "PreviewDayPlan", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
             PlannerKeywords()),
         new("calendar", "The user's upcoming calendar events from their connected calendar link",
             ["GetCalendarEvents"],

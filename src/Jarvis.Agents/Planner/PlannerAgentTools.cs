@@ -36,6 +36,27 @@ internal sealed class PlannerAgentTools(IDayPlannerService planner, ICurrentUser
         }
     }
 
+    [Description("Propose how the to-dos kept for a later day would fit into that day's free time around its calendar events, e.g. \"how would Friday look?\". It is only a proposal and saves nothing; the real plan is made on the day with PlanMyDay. Resolve 'Friday' to a date from the current time in context.")]
+    public async Task<string> PreviewDayPlanAsync(
+        [Description("The later day as YYYY-MM-DD.")] string date,
+        CancellationToken cancellationToken = default)
+    {
+        if (!DateOnly.TryParseExact(date?.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+            return "I could not read that date. Use YYYY-MM-DD.";
+        try
+        {
+            var result = await planner.PreviewPlanAsync(currentUser.OwnerId, day, null, cancellationToken);
+            var text = new StringBuilder("Proposal only, nothing is saved. ").Append(Describe(result.Today));
+            if (result.DidNotFit.Count > 0)
+                text.Append("\nDid not fit: ").Append(string.Join(", ", result.DidNotFit.Select(item => AgentText.Limit(item.Title, 80)))).Append('.');
+            return text.ToString();
+        }
+        catch (ArgumentException exception)
+        {
+            return exception.Message;
+        }
+    }
+
     [Description("Add a to-do to today's plan with an estimate in minutes (5 to 480, default 30). It is not on the timeline until PlanMyDay places it. Use this for things the user wants to get done today, or on a later day with the date, not for reminders at a fixed time.")]
     public async Task<string> AddToDayPlanAsync(
         [Description("Short title of the to-do. May be empty when commitmentId is given.")] string title = "",

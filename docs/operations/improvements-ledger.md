@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 106 improvements in this ledger.**
+**Count so far: 108 improvements in this ledger.**
 
 ## Images go to the model as images
 
@@ -143,6 +143,8 @@ Seen but left alone: Home lists the five oldest-due promises, so with five or mo
 104. To-dos can be kept for a later day (today to 90 days ahead, up to 60 waiting): stored with the day plan (no migration), shown in that day's agenda, and moved into the plan when the day arrives (moved, not copied). `POST /planner/today/items` takes `date`.
 105. The assistant keeps a to-do for a later day (`AddToDayPlan` with `date`); on the real model "put renew passport on my list for next Wednesday, 30 minutes" was stored under Wednesday 11 November.
 106. The app's look-ahead lists "Kept for this day" read-only and explains when the day's to-dos join the plan; widget-tested.
+107. A plan preview for a later day (`GET /planner/day/plan-preview?date=`): the to-dos kept for that day placed into its free time around its calendar events, saved nowhere; checked on the running API and in unit tests (an event is respected, an 8-hour to-do is reported as not fitting, today and out-of-range days are refused).
+108. The assistant answers "how would Friday look?" with `PreviewDayPlan`, labelled as a proposal; on the real model it gave a tentative preview, said nothing was saved and noted that the calendar could not be read.
 
 ## Real-model evidence
 
@@ -166,5 +168,5 @@ The numbered list counts separately checkable changes. Several features are numb
 
 ## Gaps found but not built
 
-- placing (scheduling into free time) to-dos on days other than today: they are kept for the day and joined to the plan when it comes, and Plan my day then places them; a future day cannot be auto-planned in advance;
+- saving a plan for a future day: by design the proposal is not stored, because the calendar can change; the real plan is made on the day with Plan my day;
 - reschedule needs no new tool: snoozing already moves a reminder to a new time.

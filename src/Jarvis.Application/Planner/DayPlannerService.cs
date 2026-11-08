@@ -61,6 +61,26 @@ public sealed class DayPlannerService(
         return await BuildAsync(ownerId, other, cancellationToken);
     }
 
+    public async Task<DayPlanResultDto> PreviewPlanAsync(Guid ownerId, DateOnly date, string? timeZoneId,
+        CancellationToken cancellationToken)
+    {
+        var today = await LoadDayAsync(ownerId, timeZoneId, cancellationToken);
+        var current = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), today.Zone).DateTime);
+        if (date <= current || date > current.AddDays(AgendaDaysAhead))
+            throw new ArgumentException($"Pick a day after today and within {AgendaDaysAhead} days. Today is planned with Plan my day.");
+        var kept = (today.State.Later ?? []).Where(later => later.Date == date).Select(later => later.Item).ToArray();
+        var other = today with { State = today.State with { Date = date, Items = kept, PlannedAt = null }, Changed = false };
+        var events = await ReadEventsAsync(ownerId, other, cancellationToken);
+        var now = clock.GetUtcNow();
+        var window = Window(other, now);
+        var placed = DayPlanScheduler.Place(window, BlockingEvents(events.Events),
+            kept.Select(item => (item.Id, TimeSpan.FromMinutes(item.Minutes))));
+        var proposed = kept.Select(item => item with { StartAt = placed.TryGetValue(item.Id, out var start) ? start : null }).ToArray();
+        var preview = other with { State = other.State with { Items = proposed } };
+        var timeline = Build(preview, events, await TodayRemindersAsync(ownerId, other, cancellationToken), now);
+        return new DayPlanResultDto(timeline, placed.Count, proposed.Where(item => item.StartAt is null).Select(ToDto).ToArray());
+    }
+
     public async Task<DayPlanItemDto> AddItemAsync(Guid ownerId, AddDayPlanItemRequest request, string? timeZoneId,
         CancellationToken cancellationToken)
     {

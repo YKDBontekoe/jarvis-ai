@@ -91,6 +91,13 @@ public interface IDayPlannerService
     Task<DayTimelineDto> GetAgendaAsync(Guid ownerId, DateOnly date, string? timeZoneId,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// A proposal for a later day: the to-dos kept for it placed into that day's free time around its calendar events.
+    /// Nothing is saved; the real plan is made on the day, when the calendar may have changed.
+    /// </summary>
+    Task<DayPlanResultDto> PreviewPlanAsync(Guid ownerId, DateOnly date, string? timeZoneId,
+        CancellationToken cancellationToken);
+
     Task<DayPlanItemDto> AddItemAsync(Guid ownerId, AddDayPlanItemRequest request, string? timeZoneId,
         CancellationToken cancellationToken);
 
