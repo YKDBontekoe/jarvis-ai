@@ -153,4 +153,19 @@ void main() {
       isFalse,
     );
   });
+
+  test('a failed remote reply keeps the reason that already arrived', () {
+    const limit =
+        'Your Codex plan has reached its usage limit. Try again later, or '
+        'switch models in Settings → Models.';
+    expect(remoteQueryFailureMessage(limit), limit);
+    expect(
+      remoteQueryFailureMessage(null),
+      'Jarvis could not complete this response.',
+    );
+    expect(
+      remoteQueryFailureMessage('  '),
+      'Jarvis could not complete this response.',
+    );
+  });
 }

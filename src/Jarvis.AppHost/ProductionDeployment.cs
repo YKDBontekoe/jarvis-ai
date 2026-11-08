@@ -243,7 +243,7 @@ internal static class ProductionDeployment
                 ("Authentication__Issuer", "${AUTH_ISSUER:?Set AUTH_ISSUER}"),
                 ("Authentication__Audience", "${AUTH_AUDIENCE:?Set AUTH_AUDIENCE}"),
                 ("Authentication__SigningKey", "${AUTH_SIGNING_KEY:?Set AUTH_SIGNING_KEY}"),
-                ("Authentication__AllowRegistration", "${AUTH_ALLOW_REGISTRATION:-true}"),
+                ("Authentication__AllowRegistration", "${AUTH_ALLOW_REGISTRATION:-first}"),
                 ("Cors__AllowedOrigins__0", "${JARVIS_WEB_ORIGIN:?Set JARVIS_WEB_ORIGIN}"),
                 ("LiveKit__ApiKey", "${LIVEKIT_API_KEY:?Set LIVEKIT_API_KEY}"),
                 ("LiveKit__ApiSecret", "${LIVEKIT_API_SECRET:?Set LIVEKIT_API_SECRET}"),

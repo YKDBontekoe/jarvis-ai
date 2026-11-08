@@ -27,14 +27,26 @@ import { randomUUID } from 'node:crypto';
 
 const tag = Date.now().toString(36);
 
-// A real upload goes through the virus scanner. Where ClamAV cannot load its signatures (a sandbox without internet),
-// set JARVIS_E2E_PG_CONTAINER to the Postgres container and a stored-file row is inserted for the dev owner instead:
-// attaching a file as a chat source needs the row, not the bytes.
+// A real upload goes through the virus scanner and object storage, then is indexed in the background. Where the
+// scanner or storage is unavailable (a sandbox without internet), set JARVIS_E2E_PG_CONTAINER to the Postgres
+// container and a stored-file row is inserted for the dev owner instead: attaching a file as a chat source needs the
+// row, not the bytes.
+async function waitUntilReady(id) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const file = (await request('GET', '/files')).data?.find((item) => item.id === id);
+    assert.ok(file, `uploaded file ${id} is not listed`);
+    if (file.processingStatus === 'ready') return id;
+    assert.notEqual(file.processingStatus, 'failed', `indexing failed: ${JSON.stringify(file)}`);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  assert.fail(`uploaded file ${id} was not indexed within 30 seconds`);
+}
+
 async function storedFile() {
   const form = new FormData();
   form.append('file', new Blob([`The ${tag} proposal costs 4200 euro and starts in March.`], { type: 'text/plain' }), `proposal-${tag}.txt`);
   const upload = await request('POST', '/files', form);
-  if (upload.status === 201) return upload.data.id;
+  if (upload.status === 201) return waitUntilReady(upload.data.id);
   const container = process.env.JARVIS_E2E_PG_CONTAINER;
   assert.ok(container && upload.status === 503, `upload failed: ${JSON.stringify(upload.data)}`);
   const id = randomUUID();

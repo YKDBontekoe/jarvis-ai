@@ -61,6 +61,7 @@ import '../entities/entity_screen.dart';
 import '../devices/devices_screen.dart';
 import '../habits/habits_screen.dart';
 import '../journal/journal_screen.dart';
+import '../lists/lists_screen.dart';
 import '../library/library_screen.dart';
 import '../learning/learning_screen.dart';
 import '../memory/knowledge_graph_screen.dart';
@@ -249,6 +250,7 @@ Widget? utilityPageFor(
   ),
   'finance' => FinanceScreen(http: http, onAskInChat: onAskInChat),
   'habits' => HabitsScreen(http: http),
+  'lists' => ListsScreen(http: http),
   'people' => PeopleScreen(http: http),
   'approvals' => ApprovalsScreen(http: http),
   'reminders' => RemindersScreen(

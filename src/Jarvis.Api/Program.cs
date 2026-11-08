@@ -31,6 +31,8 @@ if (args is ["mcp-runner"])
 JarvisSentry.ShouldCaptureException = exception => JarvisSentryExceptions.ShouldCapture(exception);
 
 var builder = WebApplication.CreateBuilder(args);
+// "Server: Kestrel" tells a scanner what to aim at and helps nobody.
+builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
 builder.ValidateProductionConfiguration();
 
 var accountTokens = AccountTokenOptions.From(builder.Configuration, builder.Environment.IsDevelopment());
@@ -52,6 +54,7 @@ if (app.Environment.IsDevelopment() && builder.Configuration.GetValue("Database:
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
+app.UseJarvisSecurityHeaders();
 app.UseJarvisRateLimiting();
 app.UseExceptionHandler();
 app.UseJarvisApiProblemResponses();
@@ -124,6 +127,7 @@ api.MapImprovementEndpoints();
 api.MapDecisionEndpoints(app.Logger);
 api.MapComparisonEndpoints();
 api.MapGoalEndpoints();
+api.MapListEndpoints();
 api.MapScenarioEndpoints();
 api.MapAppGoalEndpoints();
 api.MapDocumentEndpoints();

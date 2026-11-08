@@ -301,6 +301,161 @@ public sealed class DayPlannerTests
         // The fake service has no Complete handler, so any attempt to close the promise would throw above.
     }
 
+    [Fact]
+    public async Task Another_days_agenda_shows_its_events_and_reminders_and_free_time_without_touching_today()
+    {
+        var (service, reminders, calendar, _) = Create(Morning);
+        await service.AddItemAsync(Owner, new AddDayPlanItemRequest("Write report", 60), Amsterdam, default);
+        var friday = new DateOnly(2026, 10, 9);
+        DateTimeOffset At(int hour) => new DateTimeOffset(2026, 10, 9, hour, 0, 0, TimeSpan.FromHours(2)).ToUniversalTime();
+        calendar.Events.Add(new CalendarEventRecord("Dentist", At(10), At(11)));
+        reminders.Items.Add(new ReminderRecord(Guid.NewGuid(), Owner, "Call Sam", At(15), "wf", "pending", Morning, null));
+
+        var agenda = await service.GetAgendaAsync(Owner, friday, Amsterdam, default);
+        var today = await service.GetTodayAsync(Owner, Amsterdam, default);
+
+        Assert.Equal(friday, agenda.Date);
+        Assert.Equal(["Dentist", "Call Sam"], agenda.Entries.Select(entry => entry.Title));
+        Assert.Empty(agenda.Items);
+        Assert.True(agenda.FreeMinutes > 0);
+        Assert.Equal(new DateOnly(2026, 10, 2), today.Date);
+        Assert.Equal(["Write report"], today.Items.Select(item => item.Title));
+    }
+
+    [Theory]
+    [InlineData(-8)]
+    [InlineData(91)]
+    public async Task An_agenda_too_far_away_is_refused(int days)
+    {
+        var (service, _, _, _) = Create(Morning);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.GetAgendaAsync(Owner, new DateOnly(2026, 10, 2).AddDays(days), Amsterdam, default));
+    }
+
+    [Fact]
+    public async Task Asking_the_assistant_for_a_day_reads_the_date_and_reports_bad_input_and_todays_date_matches_the_plan()
+    {
+        var (service, _, calendar, _) = Create(Morning);
+        calendar.Events.Add(new CalendarEventRecord("Dentist", new DateTimeOffset(2026, 10, 3, 10, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 10, 3, 11, 0, 0, TimeSpan.FromHours(2))));
+        var tools = new PlannerAgentTools(service, new FixedUser());
+
+        var reply = await tools.GetDayAgendaAsync("2026-10-03");
+
+        Assert.Contains("Day plan for Saturday 2026-10-03", reply, StringComparison.Ordinal);
+        Assert.Contains("Dentist", reply, StringComparison.Ordinal);
+        Assert.Equal("I could not read that date. Use YYYY-MM-DD.", await tools.GetDayAgendaAsync("next friday"));
+        Assert.StartsWith("Pick a day between", await tools.GetDayAgendaAsync("2030-01-01"), StringComparison.Ordinal);
+        var group = Jarvis.Agents.ToolGroups.All.Single(item => item.Id == "planner");
+        Assert.Contains("GetDayAgenda", group.Tools);
+        Assert.Matches(group.Keywords, "Am I free next Tuesday afternoon?");
+        Assert.Matches(group.Keywords, "What's on Friday?");
+    }
+
+    [Fact]
+    public async Task A_to_do_kept_for_a_later_day_shows_in_that_days_agenda_and_joins_the_plan_when_the_day_comes()
+    {
+        var (service, _, _, clock) = Create(Morning);
+        var friday = new DateOnly(2026, 10, 9);
+
+        var waiting = await service.AddItemAsync(Owner, new AddDayPlanItemRequest("File taxes", 45, null, friday), Amsterdam, default);
+        var today = await service.GetTodayAsync(Owner, Amsterdam, default);
+        var agenda = await service.GetAgendaAsync(Owner, friday, Amsterdam, default);
+
+        Assert.Empty(today.Items);
+        Assert.Equal(["File taxes"], agenda.Items.Select(item => item.Title));
+        Assert.Equal(waiting.Id, agenda.Items.Single().Id);
+
+        clock.Now = new DateTimeOffset(2026, 10, 9, 6, 0, 0, TimeSpan.Zero);
+        var onTheDay = await service.GetTodayAsync(Owner, Amsterdam, default);
+        Assert.Equal(["File taxes"], onTheDay.Items.Select(item => item.Title));
+        // It moved, it was not copied: a second look finds it once.
+        Assert.Single((await service.GetTodayAsync(Owner, Amsterdam, default)).Items);
+    }
+
+    [Fact]
+    public async Task Later_to_dos_can_be_removed_and_have_a_range_a_limit_and_dedupe_promises()
+    {
+        var (service, _, _, _) = Create(Morning);
+        var friday = new DateOnly(2026, 10, 9);
+        var waiting = await service.AddItemAsync(Owner, new AddDayPlanItemRequest("Call bank", 15, null, friday), Amsterdam, default);
+
+        Assert.True(await service.RemoveItemAsync(Owner, waiting.Id, Amsterdam, default));
+        Assert.Empty((await service.GetAgendaAsync(Owner, friday, Amsterdam, default)).Items);
+        Assert.False(await service.RemoveItemAsync(Owner, waiting.Id, Amsterdam, default));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.AddItemAsync(Owner, new AddDayPlanItemRequest("Old", 15, null, new DateOnly(2026, 9, 1)), Amsterdam, default));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.AddItemAsync(Owner, new AddDayPlanItemRequest("Far", 15, null, new DateOnly(2027, 6, 1)), Amsterdam, default));
+        for (var i = 0; i < DayPlannerService.MaxLaterItems; i++)
+            await service.AddItemAsync(Owner, new AddDayPlanItemRequest($"Item {i}", 15, null, friday), Amsterdam, default);
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.AddItemAsync(Owner, new AddDayPlanItemRequest("One too many", 15, null, friday), Amsterdam, default));
+        Assert.Empty(await Task.FromResult((await service.GetTodayAsync(Other, Amsterdam, default)).Items));
+    }
+
+    [Fact]
+    public async Task The_assistant_keeps_a_to_do_for_a_later_day_and_reports_a_bad_date()
+    {
+        var (service, _, _, _) = Create(Morning);
+        var tools = new PlannerAgentTools(service, new FixedUser());
+
+        var kept = await tools.AddToDayPlanAsync("File taxes", 45, null, "2026-10-09");
+
+        Assert.Contains("Kept for Friday 2026-10-09", kept, StringComparison.Ordinal);
+        Assert.StartsWith("I could not read that date", await tools.AddToDayPlanAsync("x", 30, null, "friday"), StringComparison.Ordinal);
+        Assert.StartsWith("I could not add that to the plan", await tools.AddToDayPlanAsync("x", 30, null, "2020-01-01"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_later_days_to_dos_are_proposed_into_its_free_time_around_events_without_saving()
+    {
+        var (service, _, calendar, _) = Create(Morning);
+        var friday = new DateOnly(2026, 10, 9);
+        DateTimeOffset At(int hour) => new DateTimeOffset(2026, 10, 9, hour, 0, 0, TimeSpan.FromHours(2)).ToUniversalTime();
+        calendar.Events.Add(new CalendarEventRecord("Workshop", At(9), At(12)));
+        await service.AddItemAsync(Owner, new AddDayPlanItemRequest("Write report", 60, null, friday), Amsterdam, default);
+        await service.AddItemAsync(Owner, new AddDayPlanItemRequest("Rebuild shed", 480, null, friday), Amsterdam, default);
+
+        var preview = await service.PreviewPlanAsync(Owner, friday, Amsterdam, default);
+        var again = await service.GetAgendaAsync(Owner, friday, Amsterdam, default);
+
+        Assert.Equal(1, preview.Scheduled);
+        var block = Assert.Single(preview.Today.Entries, entry => entry.Kind == DayTimelineKinds.Focus);
+        Assert.Equal("Write report", block.Title);
+        Assert.True(block.EndAt <= At(9) || block.StartAt >= At(12), "placed in free time, not over the workshop");
+        Assert.Equal(["Rebuild shed"], preview.DidNotFit.Select(item => item.Title));
+        Assert.All(again.Items, item => Assert.Null(item.StartAt)); // nothing was saved
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(91)]
+    public async Task A_plan_preview_is_for_a_day_after_today_and_within_range(int days)
+    {
+        var (service, _, _, _) = Create(Morning);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.PreviewPlanAsync(Owner, new DateOnly(2026, 10, 2).AddDays(days), Amsterdam, default));
+    }
+
+    [Fact]
+    public async Task The_assistant_previews_a_later_day_and_says_it_is_only_a_proposal()
+    {
+        var (service, _, _, _) = Create(Morning);
+        var tools = new PlannerAgentTools(service, new FixedUser());
+        await tools.AddToDayPlanAsync("Write report", 60, null, "2026-10-09");
+
+        var reply = await tools.PreviewDayPlanAsync("2026-10-09");
+
+        Assert.StartsWith("Proposal only, nothing is saved.", reply, StringComparison.Ordinal);
+        Assert.Contains("Write report", reply, StringComparison.Ordinal);
+        Assert.StartsWith("I could not read that date", await tools.PreviewDayPlanAsync("friday"), StringComparison.Ordinal);
+        Assert.Contains("Plan my day", await tools.PreviewDayPlanAsync("2026-10-02"), StringComparison.Ordinal);
+    }
+
     private static (DayPlannerService Service, FakeReminders Reminders, FakeCalendar Calendar, MutableClock Clock)
         Create(DateTimeOffset now, ICommitmentService? commitments = null)
     {

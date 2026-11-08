@@ -1328,6 +1328,25 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   'GET /api/v1/usage': usage(),
   'GET /api/v1/tasks': tasks(),
   'GET /api/v1/habits': habits(),
+  'GET /api/v1/lists': [
+    {
+      'id': '01a1b800-0000-7000-8000-000000000001',
+      'name': 'Shopping',
+      'items': [
+        {'id': 'a1', 'text': 'Oat milk', 'done': false},
+        {'id': 'a2', 'text': 'Eggs', 'done': false},
+        {'id': 'a3', 'text': 'Sourdough bread', 'done': true},
+      ],
+    },
+    {
+      'id': '01a1b800-0000-7000-8000-000000000002',
+      'name': 'Packing for Lisbon',
+      'items': [
+        {'id': 'b1', 'text': 'Passport', 'done': true},
+        {'id': 'b2', 'text': 'Phone charger', 'done': false},
+      ],
+    },
+  ],
   'GET /api/v1/expenses': expenseMonth(),
   'GET /api/v1/journal/summary': {'currentStreak': 12, 'days': 30},
   'GET /api/v1/channels': [

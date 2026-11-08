@@ -22,10 +22,15 @@ public sealed class FileService(
         new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase)
         {
             ["application/pdf"] = [".pdf"],
-            ["text/plain"] = [".txt", ".log"],
+            ["text/plain"] = [".txt", ".log", ".srt", ".vtt"],
             ["text/markdown"] = [".md", ".markdown"],
             ["text/csv"] = [".csv"],
+            ["text/tab-separated-values"] = [".tsv"],
+            ["text/calendar"] = [".ics"],
+            ["application/yaml"] = [".yaml", ".yml"],
             ["application/json"] = [".json"],
+            [Jarvis.Application.Files.OfficeText.DocxContentType] = [".docx"],
+            [Jarvis.Application.Files.OfficeText.PptxContentType] = [".pptx"],
             ["image/jpeg"] = [".jpg", ".jpeg"],
             ["image/png"] = [".png"],
             ["image/webp"] = [".webp"]
@@ -221,6 +226,9 @@ public sealed class FileService(
             "image/jpeg" => count >= 3 && prefix[0] == 0xFF && prefix[1] == 0xD8 && prefix[2] == 0xFF,
             "image/webp" => count >= 12 && prefix.AsSpan(0, 4).SequenceEqual("RIFF"u8) &&
                 prefix.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+            // Word and PowerPoint files are zip archives.
+            Jarvis.Application.Files.OfficeText.DocxContentType or Jarvis.Application.Files.OfficeText.PptxContentType =>
+                count >= 4 && prefix[0] == 0x50 && prefix[1] == 0x4B && prefix[2] == 0x03 && prefix[3] == 0x04,
             _ => !prefix.AsSpan(0, count).Contains((byte)0)
         };
         if (!valid)

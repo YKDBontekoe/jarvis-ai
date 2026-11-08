@@ -26,7 +26,7 @@ All colours come from `JarvisColors.of(context)` (`apps/mobile/lib/theme.dart`).
 | `outlineStrong` | `#d3d3de` | `#363642` | Borders that must show |
 | `ink` | `#16161d` | `#f2f2f7` | Primary text, primary buttons |
 | `inkSoft` | `#5a5b68` | `#a9aab8` | Secondary text |
-| `muted` | `#8a8b9a` | `#7c7d8d` | Tertiary text, caps labels |
+| `muted` | `#656675` | `#8f90a0` | Tertiary text, caps labels (≥ 4.5:1 on every surface) |
 | `onInk` | `#ffffff` | `#0f0f14` | Text on `ink` |
 | `accent` | `#5b4ef0` | `#8f86ff` | Links, counts, selection, Jarvis |
 | `accentDeep` | `#4338ca` | `#c4c0ff` | Text on `accentSoft` |
@@ -70,7 +70,7 @@ Geist for everything (`JarvisType`, `theme.dart`).
   - text next to fixed-width controls goes in `Expanded`/`Flexible` with `maxLines` and an ellipsis;
   - tags that sit beside a title are `Flexible` and only as wide as their label (`ChatTag`).
 - **Text scaling:** body text follows the system size fully. Only display headings clamp (greeting 1.3×, day line 1.6×, 3 lines).
-- **Nothing overflows at 3×.** `layout_audit.dart` (`large-text`, 320pt wide) and `ui_polish.dart` fail on any overflow at the largest accessibility size. In a `Row`, text that can grow is `Flexible` or `Expanded` and ellipsizes; a title next to an action uses `Wrap` so the action can drop under it; a line with a button stacks when `textScalerOf(context).scale(1) >= 1.5`; every `DropdownButtonFormField` sets `isExpanded: true`.
+- **Nothing overflows at 3×.** `layout_audit.dart` (`large-text`, 320pt wide) and `ui_polish.dart` fail on any overflow at the largest accessibility size. In a `Row`, text that can grow is `Flexible` or `Expanded` and ellipsizes; a title next to an action uses `Wrap` so the action can drop under it; a line with a button stacks when `textScalerOf(context).scale(1) >= 1.5`; every `DropdownButtonFormField` sets `isExpanded: true`. A row of icon actions under a message (Copy, rate, ⋯, Try again) is a `Wrap`, so the last action drops to a second line instead of being clipped at 320pt and 3×.
 - Section rhythm on Home is 20–28 between sections and 8–14 inside a card.
 - Wide layout (≥ 900): a navigation rail, a list pane, and a detail pane. A WhatsApp chat linked to a person adds the About panel (320 wide) when the pane is ≥ 860 (`PersonPanel.fits`).
 
@@ -179,7 +179,7 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 - Every custom tappable has a `Semantics` label (and `button: true`), and decorative children use `excludeSemantics`.
 - Give buttons with a long visible text and subtitle a short label too. The web recorder (`tool/record_web.mjs`) taps by accessible name, so use unique names.
 - Check contrast in both themes. Never put information in colour alone; pair it with text or an icon.
-- 44pt targets, and the text-scale rules in §4.
+- 48dp targets (Android's minimum; iOS asks 44pt) and the text-scale rules in §4. `test/accessibility_guidelines_test.dart` checks contrast, both target sizes and labels on the main screens in both themes; keyboard focus order and activation are in `test/keyboard_navigation_test.dart`.
 - **Announce what changed.** `InlineNotice` with the `danger` or `success` tone is a live region, so VoiceOver reads a save failure or confirmation as it appears. Use those tones for results of an action, `info`/`warning` for standing state (they stay quiet).
 - **Privacy cover.** Jarvis is blurred in the app switcher by default, with or without the Face ID lock (More → Face ID lock → Hide in app switcher). The cover never asks for Face ID; only the lock does.
 - **Pinned primary controls.** On full-screen sessions (voice) the End and Mute buttons sit outside the scroll area, so growing captions, cards or 3× text never push them off screen. Captions can be hidden mid-call.

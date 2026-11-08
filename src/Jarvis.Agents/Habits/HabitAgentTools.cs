@@ -93,6 +93,81 @@ internal sealed class HabitAgentTools(IHabitService service, IAuditEventStore au
                    : "");
     }
 
+    [Description("Archive a habit the user wants to stop tracking (\"stop tracking meditation\"), or bring an archived one back. Archiving keeps the history and stops the evening check-in; it does not delete anything. Pass the habit by its name in the user's habit list. Never archive a habit on your own because it is missed often.")]
+    public async Task<string> ArchiveHabitAsync(
+        [Description("The habit, by its name in the user's habit list.")] string habit,
+        [Description("True to archive, false to bring it back.")] bool archive = true,
+        CancellationToken cancellationToken = default)
+    {
+        var all = await service.ListAsync(currentUser.OwnerId, true, cancellationToken);
+        var pool = all.Where(x => x.Habit.IsArchived == !archive).ToList();
+        var wanted = (habit ?? "").Trim();
+        var matches = pool.Where(x => x.Habit.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0 && wanted.Length > 0)
+            matches = pool.Where(x => x.Habit.Name.Contains(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0)
+            return pool.Count == 0
+                ? archive ? "The user has no active habits to archive." : "The user has no archived habits."
+                : $"No {(archive ? "active" : "archived")} habit matches \"{AgentText.Limit(wanted, HabitRules.MaxNameLength)}\". " +
+                  "The candidates are " + Join(pool.Select(x => x.Habit.Name)) + ".";
+        if (matches.Count > 1)
+            return $"\"{AgentText.Limit(wanted, HabitRules.MaxNameLength)}\" matches more than one habit (" +
+                   Join(matches.Select(x => x.Habit.Name)) + "); ask the user which one.";
+        var result = await service.SetArchivedAsync(matches[0].Habit.Id, currentUser.OwnerId, archive, cancellationToken);
+        if (!result.Succeeded) return "I could not change that habit: " + result.Message;
+        await AuditAsync(archive ? "habit.archived" : "habit.restored", cancellationToken, [matches[0].Habit.Id]);
+        return archive
+            ? $"Archived \"{result.Value!.Habit.Name}\". Its history is kept, and it can be brought back."
+            : $"\"{result.Value!.Habit.Name}\" is tracked again.";
+    }
+
+    [Description("Permanently delete a habit and all its check-ins, only when the user clearly asks to delete it (to stop tracking while keeping history use ArchiveHabit). The user is asked to approve first. Pass the habit by its exact name.")]
+    public async Task<string> DeleteHabitAsync(
+        [Description("The habit's exact name in the user's habit list.")] string habit,
+        CancellationToken cancellationToken = default)
+    {
+        var wanted = (habit ?? "").Trim();
+        var matches = (await service.ListAsync(currentUser.OwnerId, true, cancellationToken))
+            .Where(x => x.Habit.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0) return "No habit has that exact name. Call GetHabits and pass the name as listed.";
+        if (matches.Count > 1) return "More than one habit has that name; ask the user to delete it in the app.";
+        if (!await service.DeleteAsync(matches[0].Habit.Id, currentUser.OwnerId, cancellationToken))
+            return "I could not find that habit.";
+        await AuditAsync("habit.deleted", cancellationToken, [matches[0].Habit.Id]);
+        return "The habit and its check-ins are deleted.";
+    }
+
+    [Description("Pause a habit for a while (a holiday, an illness) so it is not asked about and its streak is not broken by the paused days, or resume it. Pass the habit by its name and the last day of the pause as YYYY-MM-DD (at most 90 days ahead), or leave the date empty to resume. Use ArchiveHabit to stop tracking for good. Never pause a habit on your own because it is missed.")]
+    public async Task<string> PauseHabitAsync(
+        [Description("The habit, by its name in the user's habit list.")] string habit,
+        [Description("The last day of the pause, YYYY-MM-DD. Empty resumes the habit.")] string? until = null,
+        CancellationToken cancellationToken = default)
+    {
+        DateOnly? end = null;
+        if (!string.IsNullOrWhiteSpace(until))
+        {
+            if (!DateOnly.TryParseExact(until.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+                return "I could not read that date. Use YYYY-MM-DD, or leave it empty to resume.";
+            end = parsed;
+        }
+        var wanted = (habit ?? "").Trim();
+        var active = (await service.ListAsync(currentUser.OwnerId, false, cancellationToken)).ToList();
+        var matches = active.Where(x => x.Habit.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0 && wanted.Length > 0)
+            matches = active.Where(x => x.Habit.Name.Contains(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0)
+            return "No active habit matches. The candidates are " + Join(active.Select(x => x.Habit.Name)) + ".";
+        if (matches.Count > 1)
+            return $"\"{AgentText.Limit(wanted, HabitRules.MaxNameLength)}\" matches more than one habit (" +
+                   Join(matches.Select(x => x.Habit.Name)) + "); ask the user which one.";
+        var result = await service.SetPausedAsync(matches[0].Habit.Id, currentUser.OwnerId, end, cancellationToken);
+        if (!result.Succeeded) return "I could not change that habit: " + result.Message;
+        await AuditAsync(end is null ? "habit.resumed" : "habit.paused", cancellationToken, [matches[0].Habit.Id]);
+        return end is null
+            ? $"\"{result.Value!.Habit.Name}\" is active again."
+            : $"Paused \"{result.Value!.Habit.Name}\" until {end:yyyy-MM-dd}. Its streak is not broken by those days.";
+    }
+
     internal static string Describe(HabitSummary summary)
     {
         var habit = summary.Habit;

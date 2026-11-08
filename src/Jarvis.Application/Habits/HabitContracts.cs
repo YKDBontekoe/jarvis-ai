@@ -96,7 +96,7 @@ public sealed record HabitSummary(Habit Habit, HabitStats Stats)
     /// Still worth doing today: a daily habit not yet checked in, or a weekly habit below its weekly target that was
     /// not already done today.
     /// </summary>
-    public bool IsOpenToday => !Habit.IsArchived && !Stats.DoneToday &&
+    public bool IsOpenToday => !Habit.IsArchived && !Habit.IsPausedOn(Stats.Today) && !Stats.DoneToday &&
                                (Habit.Cadence == HabitCadences.Daily || Stats.ThisWeekCount < Habit.TargetPerWeek);
 }
 
@@ -111,8 +111,8 @@ public static class HabitStreaks
         var recentFrom = today.AddDays(-(HabitRules.HistoryDays - 1));
         var recent = dates.Where(date => date >= recentFrom).Order().ToArray();
         var (current, best, unit) = habit.Cadence == HabitCadences.Weekly
-            ? (CurrentWeeks(dates, today, habit.TargetPerWeek), BestWeeks(dates, habit.TargetPerWeek), "weeks")
-            : (CurrentDays(dates, today), BestDays(dates), "days");
+            ? (CurrentWeeks(dates, today, habit.TargetPerWeek, habit), BestWeeks(dates, habit.TargetPerWeek), "weeks")
+            : (CurrentDays(dates, today, habit), BestDays(dates), "days");
         return new HabitStats(today, current, Math.Max(best, current), dates.Contains(today), thisWeek, dates.Count,
             recent) { StreakUnit = unit };
     }
@@ -121,13 +121,15 @@ public static class HabitStreaks
         date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
 
     /// <summary>Consecutive days up to today; a streak stays alive through today until the day is over.</summary>
-    internal static int CurrentDays(IReadOnlySet<DateOnly> dates, DateOnly today)
+    internal static int CurrentDays(IReadOnlySet<DateOnly> dates, DateOnly today, Habit? habit = null)
     {
-        var day = dates.Contains(today) ? today : today.AddDays(-1);
+        var day = dates.Contains(today) || habit?.IsPausedOn(today) == true ? today : today.AddDays(-1);
         var count = 0;
-        while (dates.Contains(day))
+        while (true)
         {
-            count++;
+            if (dates.Contains(day)) count++;
+            // Paused days neither count nor break the streak.
+            else if (habit?.IsPausedOn(day) != true) break;
             day = day.AddDays(-1);
         }
         return count;
@@ -147,15 +149,18 @@ public static class HabitStreaks
     }
 
     /// <summary>Consecutive weeks that met the target; the current week counts once it has met it.</summary>
-    internal static int CurrentWeeks(IReadOnlySet<DateOnly> dates, DateOnly today, int target)
+    internal static int CurrentWeeks(IReadOnlySet<DateOnly> dates, DateOnly today, int target, Habit? habit = null)
     {
         var perWeek = CountPerWeek(dates);
+        // A week that was paused for all seven days neither counts nor breaks the streak.
+        bool Paused(DateOnly week) => habit is not null && Enumerable.Range(0, 7).All(d => habit.IsPausedOn(week.AddDays(d)));
         var week = WeekStart(today);
-        if (perWeek.GetValueOrDefault(week) < target) week = week.AddDays(-7);
+        if (perWeek.GetValueOrDefault(week) < target && !Paused(week)) week = week.AddDays(-7);
         var count = 0;
-        while (perWeek.GetValueOrDefault(week) >= target)
+        while (true)
         {
-            count++;
+            if (perWeek.GetValueOrDefault(week) >= target) count++;
+            else if (!Paused(week)) break;
             week = week.AddDays(-7);
         }
         return count;
@@ -292,6 +297,13 @@ public interface IHabitService
         CancellationToken cancellationToken);
     Task<HabitOperation<HabitSummary>> SetArchivedAsync(Guid id, Guid ownerId, bool archived,
         CancellationToken cancellationToken);
+    /// <summary>
+    /// Pauses the habit from today until <paramref name="until"/> (at most 90 days ahead), or resumes it when null. A paused
+    /// habit is not asked about and its streak skips the paused days.
+    /// </summary>
+    Task<HabitOperation<HabitSummary>> SetPausedAsync(Guid id, Guid ownerId, DateOnly? until,
+        CancellationToken cancellationToken);
+
     Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
 
     /// <summary>Marks the habit done on <paramref name="date"/> (today when null); doing it twice is harmless.</summary>

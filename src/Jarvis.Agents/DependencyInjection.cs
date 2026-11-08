@@ -96,6 +96,11 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Projects.ProjectToolContributor>();
         services.AddScoped<IAgentToolContributor, Comparisons.ComparisonToolContributor>();
         services.AddScoped<IAgentToolContributor, Goals.GoalToolContributor>();
+        services.AddScoped<IAgentToolContributor, Lists.ListToolContributor>();
+        services.AddScoped<IAgentToolContributor, FileDeletionToolContributor>();
+        services.AddScoped<IAgentToolContributor, Calendar.CalendarToolContributor>();
+        services.AddScoped<IAgentToolContributor, Conversations.ConversationToolContributor>();
+        services.AddScoped<IAgentToolContributor, Preferences.PreferenceToolContributor>();
         services.AddScoped<IAgentToolContributor, Scenarios.ScenarioToolContributor>();
         services.AddScoped<IAgentToolContributor, Apps.AppGoalToolContributor>();
         services.AddScoped<IAgentToolContributor, Documents.DocumentToolContributor>();

@@ -14,12 +14,14 @@ public sealed class HabitEntity
     public string Cadence { get; set; } = HabitCadences.Daily;
     public int TargetPerWeek { get; set; } = 1;
     public DateTimeOffset? ArchivedAt { get; set; }
+    public DateOnly? PausedFrom { get; set; }
+    public DateOnly? PausedUntil { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public List<HabitCheckInEntity> CheckIns { get; set; } = [];
 
     public Habit ToRecord() =>
-        new(Id, OwnerId, Name, Icon, Cadence, TargetPerWeek, ArchivedAt, CreatedAt, UpdatedAt);
+        new(Id, OwnerId, Name, Icon, Cadence, TargetPerWeek, ArchivedAt, CreatedAt, UpdatedAt, PausedFrom, PausedUntil);
 }
 
 public sealed class HabitCheckInEntity
@@ -53,7 +55,7 @@ public sealed class HabitRepository(JarvisDbContext db) : IHabitRepository
         {
             Id = habit.Id, OwnerId = habit.OwnerId, Name = habit.Name, Icon = habit.Icon, Cadence = habit.Cadence,
             TargetPerWeek = habit.TargetPerWeek, ArchivedAt = habit.ArchivedAt, CreatedAt = habit.CreatedAt,
-            UpdatedAt = habit.UpdatedAt
+            UpdatedAt = habit.UpdatedAt, PausedFrom = habit.PausedFrom, PausedUntil = habit.PausedUntil
         });
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -66,6 +68,8 @@ public sealed class HabitRepository(JarvisDbContext db) : IHabitRepository
                 .SetProperty(x => x.Cadence, habit.Cadence)
                 .SetProperty(x => x.TargetPerWeek, habit.TargetPerWeek)
                 .SetProperty(x => x.ArchivedAt, habit.ArchivedAt)
+                .SetProperty(x => x.PausedFrom, habit.PausedFrom)
+                .SetProperty(x => x.PausedUntil, habit.PausedUntil)
                 .SetProperty(x => x.UpdatedAt, habit.UpdatedAt), cancellationToken) > 0;
 
     public async Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>

@@ -235,9 +235,9 @@ internal static class ChannelEndpoints
                 return Results.Unauthorized();
             if (!connection.Enabled) return Results.Ok();
             using var document = JsonDocument.Parse(buffer.ToArray());
-            foreach (var (sender, text, externalId) in WhatsAppWebhook.ParseMessages(document.RootElement,
-                         connection.Account))
-                await repository.EnqueueInboundAsync(connection.Id, sender, text, externalId, ct);
+            foreach (var message in WhatsAppWebhook.ParseInbound(document.RootElement, connection.Account))
+                await repository.EnqueueInboundAsync(connection.Id, message.Sender, message.Text, message.ExternalId, ct,
+                    message.MediaJson);
             return Results.Ok();
         }).WithName("ReceiveWhatsAppWebhook").AllowAnonymous().DisableAntiforgery()
             .RequireRateLimiting(ApiRateLimiting.PublicPolicy);

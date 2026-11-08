@@ -10,7 +10,9 @@ internal static class LegacyErrorResponseParser
         try
         {
             using var document = JsonDocument.Parse(bodyText);
-            return document.RootElement.TryGetProperty("code", out _);
+            // Error bodies are not always objects: Results.BadRequest("text") writes a JSON string.
+            return document.RootElement.ValueKind == JsonValueKind.Object &&
+                   document.RootElement.TryGetProperty("code", out _);
         }
         catch (JsonException)
         {
@@ -25,6 +27,9 @@ internal static class LegacyErrorResponseParser
         {
             using var document = JsonDocument.Parse(bodyText);
             var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.String)
+                return root.GetString() is { Length: > 0 and <= 500 } text ? text : null;
+            if (root.ValueKind != JsonValueKind.Object) return null;
             if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
                 return detail.GetString();
             if (root.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String)
@@ -49,7 +54,8 @@ internal static class LegacyErrorResponseParser
         try
         {
             using var document = JsonDocument.Parse(bodyText);
-            if (!document.RootElement.TryGetProperty("errors", out var errorsElement) ||
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("errors", out var errorsElement) ||
                 errorsElement.ValueKind != JsonValueKind.Object)
                 return false;
 

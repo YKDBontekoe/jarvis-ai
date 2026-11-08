@@ -48,11 +48,14 @@ Fixtures under `tests/e2e/`:
 | Script | Covers |
 |--------|--------|
 | `local_fixture_flow.mjs` | Streaming, tools, approvals, memory, reminders, Temporal task |
-| `channels_flow.mjs` | WhatsApp Cloud/Signal with `fake_channels.mjs` (QR linking is covered by unit and widget tests) |
+| `channels_flow.mjs` | WhatsApp Cloud/Signal photos, files and text with `fake_channels.mjs` (QR linking is covered by unit and widget tests) |
 | `platform_flow.mjs` | A2A, devices, voice options; `JARVIS_PLATFORM_CHAT=1` for `RenderUi` |
+| `image_input_flow.mjs` | Photos, follow-ups and image sources reach the model as images (fake Codex counts the image inputs) |
+| `document_upload_flow.mjs` | Word, PowerPoint, TSV, YAML and calendar uploads are indexed and found by search (fixtures in `fixtures/docs`); a file whose bytes do not match its type is refused; an unreadable one fails at once |
+| `real_vision_flow.mjs` | Vision on **real** Codex with the images in `fixtures/vision`: receipt totals, follow-up without the photo, comparing photos, instructions inside an image are not obeyed, a text-free photo is searchable, whiteboard to reminders |
 
 Quickest path (also in cloud sessions): `scripts/dev/smoke.sh` starts the AppHost with `verification`, waits for
-`/health`, and runs `local_fixture_flow.mjs` (`up`, `test [flow.mjs …]` and `down` run the steps separately; logs in
+`/health`, and runs `local_fixture_flow.mjs` and `ask_file_flow.mjs` (a real upload through ClamAV, object storage and indexing) (`up`, `test [flow.mjs …]` and `down` run the steps separately; logs in
 `artifacts/smoke/`). In Claude Code cloud sessions it skips the WhatsApp bridge image, whose `npm ci` cannot run inside
 `docker build` behind the sandbox proxy.
 
@@ -78,6 +81,32 @@ dotnet run --project workers/Jarvis.Worker --no-launch-profile &
 ## Behavioral evals
 
 Model-agnostic scenarios: `evals/jarvis-core-v1.jsonl` — see [evals/README.md](../../evals/README.md). Run against a disposable deployment through the public API.
+
+### Real-model flows on the local stack
+
+`behavior_evaluations.mjs` and `extended_flow.mjs` need a real model, so run the AppHost without the fake Codex server
+(`JARVIS_FEATURES=" " scripts/dev/smoke.sh up`, after `codex login`) and give the API and worker the verification MCP
+fixture (`JarvisMcpServers.Verification` in `src/Jarvis.AppHost/JarvisFeatures.cs` lists its `Mcp__Servers__0__*`
+variables). From the repository root:
+
+```sh
+python3 tests/e2e/create_identity_fixture.py
+node tests/e2e/model_catalog.mjs > artifacts/verification/model-catalog.json
+JARVIS_E2E_URL=http://localhost:5082 node tests/e2e/extended_flow.mjs        # stores the fixture MCP token first
+JARVIS_E2E_URL=http://localhost:5082 node tests/e2e/behavior_evaluations.mjs
+```
+
+- `extended_flow.mjs` reads fixture MCP calls from `/tmp/jarvis-verification-mcp-calls.jsonl` (set
+  `JARVIS_VERIFICATION_API_CONTAINER` when the API runs in a container). Its coding case needs a `verification`
+  repository: `Coding__Repositories__0__Name=verification`, `Coding__Repositories__0__Path` pointing at a git
+  checkout in `artifacts/verification/coding/fixture`, and `Coding__WorktreeRoot=artifacts/verification/coding/worktrees`.
+  Where api.github.com is not reachable, set `JARVIS_E2E_PUBLIC_JSON_URL` and `JARVIS_E2E_PUBLIC_JSON_PATH` to another
+  public JSON number (for example `https://api.npmjs.org/downloads/point/last-week/react` and `downloads`).
+- The evals expect the owner's time zone as the app sets it on first launch
+  (`POST /api/v1/briefings/daily/default` with the device zone).
+- `JARVIS_EVAL_CASES=id,id` and `JARVIS_EXTENDED_CASES=name,name` rerun selected cases into the same report.
+- `agent-discovers-mcp-tools-before-registration` needs a public HTTPS MCP endpoint at `tools.example.net`; the
+  discovery tool's SSRF guard refuses local addresses, so it only passes on a deployment that provides one.
 
 Component evals for memory (no deployment needed): `tests/eval/Jarvis.MemoryEval` scores retrieval against a scratch
 PostgreSQL database, and `tests/eval/Jarvis.ExtractionEval` scores memory extraction against a real model (`--dry-run`

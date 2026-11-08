@@ -33,7 +33,11 @@ public sealed record DayPlanState(
     TimeOnly DayStart,
     TimeOnly DayEnd,
     DateTimeOffset? PlannedAt,
-    string? TimeZoneId = null);
+    string? TimeZoneId = null,
+    IReadOnlyList<LaterDayItem>? Later = null);
+
+/// <summary>A to-do kept for a later day; it joins that day's plan when the day comes.</summary>
+public sealed record LaterDayItem(DateOnly Date, DayPlanItem Item);
 
 public sealed record DayTimelineEntryDto(
     string Kind,
@@ -68,7 +72,8 @@ public sealed record DayPlanResultDto(DayTimelineDto Today, int Scheduled, IRead
 /// <paramref name="SourceRef"/> ties the to-do to the thing it comes from; today only <c>commitment:&lt;id&gt;</c>,
 /// which supplies the title when none is given and keeps a promise from being planned twice.
 /// </summary>
-public sealed record AddDayPlanItemRequest(string? Title = null, int? Minutes = null, string? SourceRef = null);
+public sealed record AddDayPlanItemRequest(string? Title = null, int? Minutes = null, string? SourceRef = null,
+    DateOnly? Date = null);
 
 public sealed record UpdateDayPlanItemRequest(string? Title = null, int? Minutes = null, bool? Done = null, bool? Pinned = null);
 
@@ -78,6 +83,20 @@ public interface IDayPlannerService
 {
     /// <summary>Today's timeline in <paramref name="timeZoneId"/>, or the owner's saved zone when it is null.</summary>
     Task<DayTimelineDto> GetTodayAsync(Guid ownerId, string? timeZoneId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A read-only look at another day (up to a week back, three months ahead): calendar events, reminders and the
+    /// free time between them. To-dos and focus blocks belong to today only, so they are empty; nothing is saved.
+    /// </summary>
+    Task<DayTimelineDto> GetAgendaAsync(Guid ownerId, DateOnly date, string? timeZoneId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A proposal for a later day: the to-dos kept for it placed into that day's free time around its calendar events.
+    /// Nothing is saved; the real plan is made on the day, when the calendar may have changed.
+    /// </summary>
+    Task<DayPlanResultDto> PreviewPlanAsync(Guid ownerId, DateOnly date, string? timeZoneId,
+        CancellationToken cancellationToken);
 
     Task<DayPlanItemDto> AddItemAsync(Guid ownerId, AddDayPlanItemRequest request, string? timeZoneId,
         CancellationToken cancellationToken);

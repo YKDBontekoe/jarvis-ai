@@ -79,5 +79,6 @@ const searchKindLabels = <String, String>{
   'project': 'Projects',
   'mission': 'Missions',
   'goal': 'Goals',
+  'list': 'Lists',
   'trip': 'Trips',
 };

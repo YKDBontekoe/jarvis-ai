@@ -485,4 +485,138 @@ public sealed class GoalTests
     {
         public Guid OwnerId => Owner;
     }
+
+    private sealed class GoalUser : ICurrentUser
+    {
+        public Guid OwnerId => Owner;
+    }
+
+    [Fact]
+    public async Task The_assistant_can_create_a_goal_the_owner_asked_for_and_it_is_theirs_alone()
+    {
+        // Found on the real model: "Set a goal: run a 10k by the end of March" ended in "I can't create goals yet",
+        // although the app has goals, because the assistant had tools to read and check in on them but not to add one.
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+
+        var reply = await tools.CreateGoalAsync("Run a 10k", motivation: "Feel fit", target: "10 km without stopping",
+            horizon: "2027-03-31", weeklyMinutes: 90);
+
+        Assert.StartsWith("Goal created: \"Run a 10k\"", reply, StringComparison.Ordinal);
+        Assert.Contains("due 2027-03-31", reply, StringComparison.Ordinal);
+        var stored = Assert.Single(await s.Service.ListAsync(Owner, false, default));
+        Assert.Equal("Run a 10k", stored.Title);
+        Assert.Empty(await s.Service.ListAsync(Guid.NewGuid(), false, default));
+    }
+
+    [Theory]
+    [InlineData("31/03/2027")]
+    [InlineData("next March")]
+    [InlineData("2027-13-40")]
+    public async Task A_date_the_assistant_cannot_read_is_refused_without_creating_anything(string horizon)
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+
+        var reply = await tools.CreateGoalAsync("Run a 10k", horizon: horizon);
+
+        Assert.Contains("YYYY-MM-DD", reply, StringComparison.Ordinal);
+        Assert.Empty(await s.Service.ListAsync(Owner, false, default));
+    }
+
+    [Fact]
+    public async Task A_goal_without_a_usable_title_is_refused_with_the_reason()
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+
+        var reply = await tools.CreateGoalAsync("   ");
+
+        Assert.StartsWith("I could not create the goal", reply, StringComparison.Ordinal);
+        Assert.Empty(await s.Service.ListAsync(Owner, false, default));
+    }
+
+    [Fact]
+    public void Creating_a_goal_is_offered_with_the_other_goal_tools()
+    {
+        var group = Jarvis.Agents.ToolGroups.All.Single(item => item.Id == "goals");
+
+        Assert.Contains("CreateGoal", group.Tools);
+        Assert.Matches(group.Keywords, "Set a goal: run a 10k by the end of March");
+    }
+
+    [Fact]
+    public async Task The_assistant_can_pause_and_resume_a_goal_and_only_what_was_asked_changes()
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+        var created = (await s.Service.CreateAsync(Owner,
+            new GoalInput("Run a 10k", null, null, "10 km", null, null, null, null, null, null), default)).Value!.Goal;
+
+        var paused = await tools.UpdateGoalAsync(created.Id.ToString(), status: "Paused");
+        var afterPause = (await s.Service.GetAsync(Owner, created.Id, default))!.Goal;
+
+        Assert.Contains("is paused", paused, StringComparison.Ordinal);
+        Assert.Equal(GoalStatuses.Paused, afterPause.Status);
+        Assert.Equal("Run a 10k", afterPause.Title);
+        Assert.Equal("10 km", afterPause.Target);
+
+        await tools.UpdateGoalAsync(created.Id.ToString(), status: "active", horizon: "2027-06-30");
+        var resumed = (await s.Service.GetAsync(Owner, created.Id, default))!.Goal;
+        Assert.Equal(GoalStatuses.Active, resumed.Status);
+        Assert.Equal(new DateOnly(2027, 6, 30), resumed.Horizon);
+    }
+
+    [Theory]
+    [InlineData("deleted")]
+    [InlineData("done-ish")]
+    public async Task An_unknown_goal_state_is_refused_and_nothing_changes(string status)
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+        var created = (await s.Service.CreateAsync(Owner,
+            new GoalInput("Read more", null, null, null, null, null, null, null, null, null), default)).Value!.Goal;
+
+        var reply = await tools.UpdateGoalAsync(created.Id.ToString(), status: status);
+
+        Assert.StartsWith("Status must be one of", reply, StringComparison.Ordinal);
+        Assert.Equal(GoalStatuses.Active, (await s.Service.GetAsync(Owner, created.Id, default))!.Goal.Status);
+    }
+
+    [Fact]
+    public async Task Updating_with_nothing_to_change_or_a_goal_that_is_not_the_owners_does_nothing()
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+        var created = (await s.Service.CreateAsync(Guid.NewGuid(),
+            new GoalInput("Someone else's", null, null, null, null, null, null, null, null, null), default)).Value!.Goal;
+
+        Assert.StartsWith("Nothing to change", await tools.UpdateGoalAsync(created.Id.ToString()), StringComparison.Ordinal);
+        Assert.Equal("I could not find that goal.", await tools.UpdateGoalAsync(created.Id.ToString(), status: "archived"));
+        Assert.Equal("That goal ID is not valid. Call GetGoals first.", await tools.UpdateGoalAsync("nope", status: "paused"));
+    }
+
+    [Fact]
+    public void Updating_a_goal_is_offered_with_the_other_goal_tools()
+    {
+        Assert.Contains("UpdateGoal", Jarvis.Agents.ToolGroups.All.Single(item => item.Id == "goals").Tools);
+    }
+
+    [Fact]
+    public async Task Deleting_a_goal_removes_only_the_owners_goal_and_needs_approval()
+    {
+        var s = Create();
+        var tools = new Jarvis.Agents.Goals.GoalAgentTools(s.Service, new GoalUser());
+        var mine = (await s.Service.CreateAsync(Owner, new GoalInput("Mine", null, null, null, null, null, null, null, null, null), default)).Value!.Goal;
+        var theirs = (await s.Service.CreateAsync(Guid.NewGuid(), new GoalInput("Theirs", null, null, null, null, null, null, null, null, null), default)).Value!.Goal;
+
+        Assert.Equal("I could not find that goal.", await tools.DeleteGoalAsync(theirs.Id.ToString()));
+        Assert.Equal("The goal and its check-ins are deleted.", await tools.DeleteGoalAsync(mine.Id.ToString()));
+        Assert.Empty(await s.Service.ListAsync(Owner, true, default));
+        Assert.Equal("That goal ID is not valid. Call GetGoals first.", await tools.DeleteGoalAsync("x"));
+
+        var contributor = new Jarvis.Agents.Goals.GoalToolContributor(s.Service, new GoalUser());
+        var delete = contributor.GetTools(new Jarvis.Agents.AgentBuildContext(Owner, null)).Single(t => t.Name == "DeleteGoal");
+        Assert.IsType<Microsoft.Extensions.AI.ApprovalRequiredAIFunction>(delete);
+    }
 }

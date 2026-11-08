@@ -265,6 +265,7 @@ class _NewTripSheetState extends State<_NewTripSheet> {
             children: [
               IconButton(
                 key: const Key('trip-fewer'),
+                tooltip: 'Fewer travellers',
                 onPressed: _travelers > 1
                     ? () => setState(() => _travelers--)
                     : null,
@@ -272,6 +273,8 @@ class _NewTripSheetState extends State<_NewTripSheet> {
               ),
               Text(
                 '$_travelers',
+                semanticsLabel:
+                    '$_travelers ${_travelers == 1 ? 'traveller' : 'travellers'}',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -279,6 +282,7 @@ class _NewTripSheetState extends State<_NewTripSheet> {
               ),
               IconButton(
                 key: const Key('trip-more'),
+                tooltip: 'More travellers',
                 onPressed: _travelers < 20
                     ? () => setState(() => _travelers++)
                     : null,

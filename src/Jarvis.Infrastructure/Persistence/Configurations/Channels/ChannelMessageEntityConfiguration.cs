@@ -20,6 +20,7 @@ internal sealed class ChannelMessageEntityConfiguration : IEntityTypeConfigurati
             builder.Property(x => x.CreatedAt).HasColumnName("created_at");
             builder.Property(x => x.ProcessedAt).HasColumnName("processed_at");
             builder.Property(x => x.LeaseUntil).HasColumnName("lease_until");
+            builder.Property(x => x.MediaJson).HasColumnName("media_json");
             builder.HasOne<ChannelConnectionEntity>().WithMany().HasForeignKey(x => x.ConnectionId)
                 .OnDelete(DeleteBehavior.Cascade);
             builder.HasIndex(x => new { x.ConnectionId, x.ExternalId }).IsUnique().HasFilter("external_id IS NOT NULL");

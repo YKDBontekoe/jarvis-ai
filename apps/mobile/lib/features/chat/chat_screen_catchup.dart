@@ -164,7 +164,7 @@ mixin _ChatScreenCatchUp on _ChatScreenController {
             _entries[index] = (_entries[index] as MessageEntry).copyWith(
               failed: true,
             );
-            _error = 'Jarvis could not complete this response.';
+            _error = remoteQueryFailureMessage(_error);
           }
         }
       });

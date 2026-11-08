@@ -70,7 +70,7 @@ about 14 ms per query and 8 ms per memory for the default model, in PyTorch; the
 | Key | Purpose |
 |-----|---------|
 | `Authentication__Issuer`, `__Audience`, `__SigningKey` | Required outside Development |
-| `Authentication__AllowRegistration` | Default true |
+| `Authentication__AllowRegistration` | `first` (production default: only the first account may register), `true` (unset default, Development) or `false` |
 | `Authentication__AccessTokenMinutes`, `__RefreshTokenDays` | Token lifetimes |
 | `RateLimiting__AuthPermitsPerMinute` | Requests per client IP per minute to `/api/v1/auth/*` and the MCP OAuth callback (default 10) |
 | `RateLimiting__PublicPermitsPerMinute` | Requests per client IP per minute to `/a2a`, the agent card, and WhatsApp webhooks (default 120) |

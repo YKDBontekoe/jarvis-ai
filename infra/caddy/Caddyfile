@@ -23,6 +23,9 @@
 {$JARVIS_DOMAIN} {$LIVEKIT_DOMAIN} {
 	encode zstd gzip
 
+	# The edge only speaks HTTPS here, so browsers may be told to insist on it. The API sets the other headers.
+	header Strict-Transport-Security "max-age=31536000"
+
 	@livekit_host {
 		host {$LIVEKIT_DOMAIN}
 		not host {$JARVIS_DOMAIN}

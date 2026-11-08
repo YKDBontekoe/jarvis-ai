@@ -19,6 +19,9 @@ internal sealed class HabitToolContributor(IHabitService habits, IAuditEventStor
         yield return AIFunctionFactory.Create(tools.GetHabitsAsync);
         yield return AIFunctionFactory.Create(tools.CheckInHabitsAsync);
         yield return AIFunctionFactory.Create(tools.CreateHabitAsync);
+        yield return AIFunctionFactory.Create(tools.ArchiveHabitAsync);
+        yield return AIFunctionFactory.Create(tools.PauseHabitAsync);
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(tools.DeleteHabitAsync));
     }
 }
 

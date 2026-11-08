@@ -7,6 +7,9 @@ namespace Jarvis.Api.Security;
 
 public static class IdentityAuthEndpoints
 {
+    // Serializes first-account sign-ups so two can't both see "no account yet" (one API process in production).
+    private static readonly SemaphoreSlim FirstAccountGate = new(1, 1);
+
     private static readonly string DummyPasswordHash = new PasswordHasher<JarvisUser>()
         .HashPassword(new JarvisUser(), "not-a-real-password");
 
@@ -20,7 +23,7 @@ public static class IdentityAuthEndpoints
         return api;
     }
 
-    private static async Task<IResult> Register(
+    internal static async Task<IResult> Register(
         AuthCredentialsRequest request,
         UserManager<JarvisUser> users,
         RefreshTokenStore refreshTokens,
@@ -28,7 +31,7 @@ public static class IdentityAuthEndpoints
         CancellationToken cancellationToken)
     {
         if (!tokens.AllowRegistration)
-            return Results.Json(new { message = "Account registration is disabled." }, statusCode: StatusCodes.Status403Forbidden);
+            return RegistrationDisabled();
 
         var email = request.Email?.Trim() ?? "";
         var password = request.Password ?? "";
@@ -51,13 +54,22 @@ public static class IdentityAuthEndpoints
             EmailConfirmed = true,
         };
         IdentityResult created;
+        var firstAccountOnly = tokens.Registration == RegistrationMode.FirstAccount;
+        if (firstAccountOnly) await FirstAccountGate.WaitAsync(cancellationToken);
         try
         {
+            if (firstAccountOnly && await users.Users.AnyAsync(cancellationToken))
+                return Results.Json(new { message = "This Jarvis already has its owner account. Sign in instead." },
+                    statusCode: StatusCodes.Status403Forbidden);
             created = await users.CreateAsync(user, password);
         }
         catch (DbUpdateException)
         {
             return Results.Conflict(new { message = "An account with that email already exists." });
+        }
+        finally
+        {
+            if (firstAccountOnly) FirstAccountGate.Release();
         }
         if (!created.Succeeded)
         {
@@ -136,6 +148,9 @@ public static class IdentityAuthEndpoints
         var refreshToken = await refreshTokens.IssueAsync(user.Id, tokens.RefreshTokenLifetime, cancellationToken);
         return Results.Ok(new AuthSessionResponse(accessToken, refreshToken, expiresAt, user.Email ?? ""));
     }
+
+    private static IResult RegistrationDisabled() =>
+        Results.Json(new { message = "Account registration is disabled." }, statusCode: StatusCodes.Status403Forbidden);
 
     private static IResult InvalidCredentials() =>
         Results.Json(new { message = "Invalid email or password." }, statusCode: StatusCodes.Status401Unauthorized);

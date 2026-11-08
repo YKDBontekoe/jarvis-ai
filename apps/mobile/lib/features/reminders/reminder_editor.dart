@@ -265,7 +265,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
       );
       return;
     }
-    if (_recurrence == 'weekly' && _weekdays == 0) {
+    if ((_recurrence == 'weekly' || _recurrence == 'biweekly') && _weekdays == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Choose at least one weekday.')),
       );
@@ -550,11 +550,12 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
           ('daily', 'Daily'),
           ('weekdays', 'Weekdays'),
           ('weekly', 'Weekly'),
+          ('biweekly', 'Every 2 weeks'),
         ],
         selected: _recurrence,
         onSelected: (value) => setState(() => _recurrence = value),
       ),
-      if (_recurrence == 'weekly') ...[
+      if (_recurrence == 'weekly' || _recurrence == 'biweekly') ...[
         const SizedBox(height: 10),
         Wrap(
           spacing: 6,

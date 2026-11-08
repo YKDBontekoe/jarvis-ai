@@ -21,12 +21,12 @@ internal sealed partial class ReminderAgentTools(
     private const int MaxListedReminders = 20;
     private static readonly TimeSpan FreshPosition = TimeSpan.FromMinutes(15);
 
-    [Description("Create a durable reminder that will notify the user at the requested time. Use an ISO 8601 timestamp with an explicit timezone offset (for example 2026-03-14T09:30:00+01:00). Convert relative times such as 'in 20 minutes' from the current time in context. For repeating reminders set recurrence to daily, weekdays, or weekly (with weekdays as a bitmask: Mon=1 Tue=2 Wed=4 Thu=8 Fri=16 Sat=32 Sun=64). Ask a short clarification if the date or time is ambiguous.")]
+    [Description("Create a durable reminder that will notify the user at the requested time. Use an ISO 8601 timestamp with an explicit timezone offset (for example 2026-03-14T09:30:00+01:00). Convert relative times such as 'in 20 minutes' from the current time in context. For repeating reminders set recurrence to daily, weekdays, weekly, or biweekly for \"every other week\" (weekly and biweekly use weekdays as a bitmask: Mon=1 Tue=2 Wed=4 Thu=8 Fri=16 Sat=32 Sun=64). Ask a short clarification if the date or time is ambiguous.")]
     public async Task<string> CreateReminderAsync(
         [Description("A concise description of what the user should be reminded about.")] string title,
         [Description("The first reminder time as an ISO 8601 date-time with a timezone offset or Z.")] string dueAt,
-        [Description("none, daily, weekdays, or weekly. Default none (one-shot).")] string? recurrence = null,
-        [Description("Bit mask of weekdays for weekly recurrence. Ignored for daily and weekdays.")] int weekdays = 0,
+        [Description("none, daily, weekdays, weekly, or biweekly. Default none (one-shot).")] string? recurrence = null,
+        [Description("Bit mask of weekdays for weekly and biweekly recurrence. Ignored for daily and weekdays.")] int weekdays = 0,
         [Description("IANA time zone such as Europe/Amsterdam. Defaults to the user's briefing time zone.")] string? timeZoneId = null,
         [Description("Optional last local date (YYYY-MM-DD) the recurring reminder may fire.")] string? until = null,
         CancellationToken cancellationToken = default)

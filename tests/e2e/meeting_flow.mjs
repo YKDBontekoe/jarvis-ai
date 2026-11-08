@@ -94,7 +94,7 @@ const again = await request('POST', `/meetings/${id}/candidates/${promise.id}/ac
 assert.equal(again.status, 200);
 const afterAccept = (await request('GET', '/commitments')).data;
 assert.equal(afterAccept.length, before + 1, 'accepting twice creates one commitment');
-const made = afterAccept.find((c) => c.description.includes('revised quote'));
+const made = afterAccept.find((c) => c.description.includes('revised quote') && c.counterparty === who);
 assert.equal(made.source, 'meeting');
 assert.equal(made.dueOn, promise.dueOn);
 assert.equal(made.suggested, false);

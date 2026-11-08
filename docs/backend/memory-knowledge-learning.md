@@ -67,7 +67,7 @@ HTTP CRUD: `/api/v1/memory/*` (`MemoryEndpoints`).
 
 ## Uploaded files
 
-Files (PDF, text, JSON, images) are indexed by the worker (`FileProcessingWorkflow`, `StoredFileProcessor`) and searched
+Files (PDF, Word, PowerPoint, text, JSON, YAML, images) are indexed by the worker (`FileProcessingWorkflow`, `StoredFileProcessor`) and searched
 with the same building blocks as memory.
 
 **Indexing**

@@ -225,8 +225,11 @@ class _MessageBubbleState extends State<MessageBubble> {
                 if (!message.pending)
                   Padding(
                     padding: const EdgeInsets.only(top: 6, left: -8 + 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    // Wraps instead of overflowing: five actions do not fit
+                    // beside the avatar on a 320pt phone at large text.
+                    child: Wrap(
+                      key: const Key('message-actions'),
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         _CopyButton(copied: _copied, onPressed: _copy),
                         if (widget.onRate != null) ...[
@@ -459,9 +462,10 @@ class _MessageBubbleState extends State<MessageBubble> {
 
 /// Compact square hit area shared by the reply actions so they sit in a
 /// tight, even row under the text.
+// 48dp hit areas (playbook §9); the icons stay small.
 final _actionStyle = IconButton.styleFrom(
-  minimumSize: const Size(32, 32),
-  fixedSize: const Size(32, 32),
+  minimumSize: const Size(48, 48),
+  fixedSize: const Size(48, 48),
   padding: EdgeInsets.zero,
   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
@@ -483,6 +487,7 @@ class _RateButton extends StatelessWidget {
     final up = rating == 'up';
     return IconButton(
       tooltip: up ? 'Good reply' : 'Could be better',
+      isSelected: selected,
       onPressed: onPressed,
       iconSize: 16,
       style: _actionStyle,
@@ -552,7 +557,7 @@ class _CopyButton extends StatelessWidget {
         foregroundColor: copied
             ? JarvisColors.of(context).success
             : JarvisColors.of(context).muted,
-        minimumSize: const Size(0, 32),
+        minimumSize: const Size(48, 48),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),

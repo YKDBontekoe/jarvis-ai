@@ -117,7 +117,8 @@ public sealed record ChannelMessageRecord(Guid Id, Guid ConnectionId, string Dir
 public sealed record ChannelThreadRecord(string Peer, Guid? ConversationId, int MessageCount,
     ChannelMessageRecord? LastMessage);
 
-public sealed record InboundChannelMessage(Guid Id, ChannelConnectionRecord Connection, string Sender, string Text);
+public sealed record InboundChannelMessage(Guid Id, ChannelConnectionRecord Connection, string Sender, string Text,
+    string? MediaJson = null);
 
 public interface IChannelRepository
 {
@@ -133,7 +134,7 @@ public interface IChannelRepository
 
     /// <summary>Stores an inbound message once per external id; returns false for a duplicate delivery.</summary>
     Task<bool> EnqueueInboundAsync(Guid connectionId, string sender, string text, string externalId,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, string? mediaJson = null);
     Task<IReadOnlyList<InboundChannelMessage>> ClaimPendingInboundAsync(int limit, CancellationToken cancellationToken);
     Task CompleteInboundAsync(Guid messageId, string? error, CancellationToken cancellationToken);
     Task RecordOutboundAsync(Guid connectionId, string recipient, string text, string? error,

@@ -44,7 +44,7 @@ See [proactive-work.md](proactive-work.md#api) for request shapes, revision conf
 
 | Area | Paths |
 |------|-------|
-| Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}`, `POST /reminders/{id}/snooze` (`minutes` or `until`), `POST /reminders/{id}/complete` (`conversationId` on each reminder). A place reminder posts `place` (`name`, `latitude`, `longitude`, `radiusMeters` 50–5000, `trigger` `arrive`/`leave`, `repeats`) instead of `dueAt` |
+| Reminders | `GET/POST /reminders`, `GET/DELETE /reminders/{id}`, `POST /reminders/{id}/snooze` (`minutes` or `until`), `POST /reminders/{id}/complete` (`conversationId` on each reminder). `recurrence` is `none`, `daily`, `weekdays`, `weekly` or `biweekly`; weekly and biweekly need `weekdays` (bit mask), and a biweekly series fires in the weeks of its first occurrence. A place reminder posts `place` (`name`, `latitude`, `longitude`, `radiusMeters` 50–5000, `trigger` `arrive`/`leave`, `repeats`) instead of `dueAt` |
 | Owner automations | `GET/POST /automations`, enable/run/history (`conversationId` and `lastRun` on each rule; approvals go through the shared `/approvals` inbox; see [automations.md](../automations.md)) |
 | Condition watches | `GET/POST /watches`, `GET/DELETE /watches/{id}`. `POST` accepts `repeat` (keep watching after an alert) and `cooldownMinutes` (5–10080, default 60); records report `repeat`, `cooldownMinutes`, `lastTriggeredAt`, `triggerCount` |
 | Autonomy settings | `GET/PUT /settings/autonomy` (`enabled`, `heartbeatMayStartTasks`, `maxHeartbeatTasksPerDay`, `maxHeartbeatTasksPerRun`, `triageInbox`, `digestInsteadOfDrop`, `level` (`ask_everything`, `standard`, `full`, or opt-in `autonomous`), `autoApproveReadOnly`, `autoApproveMcpReadHints`, `maxAutoApprovalsPerDay`, `reactToEvents`, `maxReactionsPerDay`, `autonomousOutboundCategories`, `maxAutonomousOutboundPerDay`); `GET /settings/autonomy/outbound-categories` lists what the autonomous level can allow. See [life-features.md](life-features.md#autonomy-envelope) and [event-spine.md](../architecture/event-spine.md#autonomy-levels) |
@@ -63,7 +63,7 @@ Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, 
 | Method | Path |
 |--------|------|
 | GET/POST | `/memory`, `/memory/search`, `/memory/{id}` |
-| GET | `/search?query=&kinds=` | One search over conversations, **messages** (what was said inside a chat; excerpt around the match; the chat's title may not contain it), memories, files, tasks, reminders, skills, graph entities, channel threads, coding runs, **people**, **promises** (suggested ones say so) and **decisions**. Every hit has a typed `route` (`message` carries `conversationId` and `messageId`; `person` / `commitment` / `decision` carry `personId` / `commitmentId` / `decisionId`). Accents are ignored ("Joel" finds "Joël") in everything except message text, which PostgreSQL matches as typed. The agent's `SearchEverything` never returns message hits |
+| GET | `/search?query=&kinds=` | One search over conversations, **messages** (what was said inside a chat; excerpt around the match; the chat's title may not contain it), memories, files, tasks, reminders, skills, graph entities, channel threads, coding runs, **people**, **promises** (suggested ones say so), **decisions** and **lists** (by name or by an item on them; kind `list`, route carries `listId`). Every hit has a typed `route` (`message` carries `conversationId` and `messageId`; `person` / `commitment` / `decision` carry `personId` / `commitmentId` / `decisionId`). Accents are ignored ("Joel" finds "Joël") in everything except message text, which PostgreSQL matches as typed. The agent's `SearchEverything` never returns message hits |
 | GET | `/conversations/{id}/messages?around={messageId}&limit=` | The message with history either side, plus `nextCursor`/`hasMore` (older, usual `cursor` paging), `newerCursor`/`hasNewer` (newer, `?after=<cursor>`) and `anchorId`. 404 when the message is not in that conversation |
 | PUT/DELETE | `/memory/{id}` |
 | GET/PUT | `/settings/learning` |
@@ -74,6 +74,9 @@ Described in [life-features.md](life-features.md): `/timeline` (`/on-this-day`, 
 
 | Method | Path |
 |--------|------|
+| GET/POST/DELETE | `/lists` (GET all lists), `POST /lists/items` (`list`, `items`; creates the list by name, skips duplicates), `POST /lists/done` (`list`, `items`, `done`), `POST /lists/remove` (`list`, `items`; ticked or not), `POST /lists/rename` (`list`, `newName`), `POST /lists/clear-done` (`list`), `DELETE /lists/{id}`. Stored in owner settings (`lists`); at most 50 lists of 200 items; a list name that matches more than one list answers 409 |
+| GET | `/planner/day?date=YYYY-MM-DD` (read-only agenda for another day, 7 days back to 90 ahead: calendar events, reminders, free time, and the to-dos kept for that day; focus blocks are today only; 400 outside the range). `POST /planner/today/items` also takes `date` to keep a to-do for a later day (up to 90 days ahead, 60 waiting); it joins the plan when the day comes |
+| GET | `/planner/day/plan-preview?date=YYYY-MM-DD` (proposal only: the to-dos kept for a later day placed into its free time around calendar events; nothing is saved; 400 for today or out of range) |
 | GET | `/planner/today` (timeline of calendar events, reminders and focus blocks; to-dos; free slots) |
 | POST | `/planner/today/items` (`title` ≤ 200, `minutes` 5–480, default 30; optional `sourceRef` `commitment:<id>` plans an open, accepted promise: the title defaults to its description and planning it again returns the same to-do; items carry `sourceRef`) |
 | PATCH/DELETE | `/planner/today/items/{id}` (PATCH: `title`, `minutes`, `done`) |
@@ -135,7 +138,7 @@ Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints
 | GET | `/habits?includeArchived=` (returns `today`, `habits` with streak stats, and `settings`) |
 | POST | `/habits` (`name`, `icon`, `cadence` `daily`/`weekly`, `targetPerWeek` 1–7, optional `timeZoneId`) |
 | GET/PUT/DELETE | `/habits/{id}` |
-| PUT | `/habits/{id}/archived` (`archived`) |
+| PUT | `/habits/{id}/archived`, `PUT /habits/{id}/pause` (`{ until }` YYYY-MM-DD up to 90 days ahead pauses from today; null resumes; the habit DTO carries `pausedUntil` while a pause is on) (`archived`) |
 | POST | `/habits/{id}/check-ins` (`date` optional, up to 7 days back; `done` default true) |
 | GET/PUT | `/habits/settings` (`eveningCheckIn`, `checkInTime` `HH:mm`, `timeZoneId`) |
 

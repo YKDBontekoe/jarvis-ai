@@ -44,6 +44,12 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
   int _revision = 0;
   final Set<String> _busyItems = {};
 
+  /// The day being looked at; null is today. Other days are read-only: the to-do list and focus blocks are today's.
+  DateTime? _viewing;
+  DateTime? _todayDate;
+  static const _daysBack = 7;
+  static const _daysAhead = 90;
+
   @override
   void initState() {
     super.initState();
@@ -69,13 +75,19 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
     final revision = ++_revision;
     setState(() => _loading = true);
     try {
-      final response = await widget.http.get<dynamic>(
-        _base,
-        queryParameters: _zone,
-      );
+      final viewing = _viewing;
+      final response = viewing == null
+          ? await widget.http.get<dynamic>(_base, queryParameters: _zone)
+          : await widget.http.get<dynamic>(
+              '/api/v1/planner/day',
+              queryParameters: {..._zone, 'date': _dateKey(viewing)},
+            );
       if (!mounted || revision != _revision) return;
       setState(() {
         _today = jsonObject(response.data);
+        if (viewing == null) {
+          _todayDate = DateTime.tryParse(asJsonString(_today?['date']) ?? '');
+        }
         _loading = false;
         _error = null;
       });
@@ -84,6 +96,25 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
     } catch (_) {
       _failLoad(revision, null);
     }
+  }
+
+  static String _dateKey(DateTime day) =>
+      '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+
+  /// Moves the view by [days] from the day being looked at; going back to today returns to the editable plan.
+  void _shift(int days) {
+    final base = _viewing ?? _todayDate;
+    final today = _todayDate;
+    if (base == null || today == null) return;
+    final next = DateTime(base.year, base.month, base.day + days);
+    final offset = DateTime(
+      next.year,
+      next.month,
+      next.day,
+    ).difference(DateTime(today.year, today.month, today.day)).inDays;
+    if (offset < -_daysBack || offset > _daysAhead) return;
+    setState(() => _viewing = offset == 0 ? null : next);
+    unawaited(_load());
   }
 
   void _failLoad(int revision, String? message) {
@@ -263,11 +294,13 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
         .any((item) => !asJsonBool(item['done']));
     return Scaffold(
       appBar: AppBar(
-        title: const PageTitle('Today'),
+        title: PageTitle(_viewing == null ? 'Today' : 'Agenda'),
         actions: [
           IconButton(
             tooltip: 'Day hours',
-            onPressed: today == null ? null : () => unawaited(_editHours()),
+            onPressed: today == null || _viewing != null
+                ? null
+                : () => unawaited(_editHours()),
             icon: const Icon(PhosphorIconsRegular.sliders, size: 20),
           ),
           HeaderAction(
@@ -275,7 +308,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
             label: 'Plan my day',
             icon: PhosphorIconsRegular.magicWand,
             busy: _planning,
-            onPressed: today == null || !hasOpen
+            onPressed: today == null || !hasOpen || _viewing != null
                 ? null
                 : () => unawaited(_plan()),
           ),
@@ -333,7 +366,9 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                       key: const Key('planner-summary'),
                       style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
+                    _dayNavigator(),
+                    const SizedBox(height: 10),
                     _DayStrip(today: today),
                   ],
                 ),
@@ -362,7 +397,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
               SectionHeader(
                 'Timeline',
                 padding: const EdgeInsets.only(left: 4, bottom: 8),
-                trailing: focus.isEmpty
+                trailing: focus.isEmpty || _viewing != null
                     ? null
                     : TextButton(
                         key: const Key('planner-clear'),
@@ -371,7 +406,9 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                       ),
               ),
               _Timeline(entries: entries, onToggle: _toggleEntry),
-              if (focus.isNotEmpty && widget.onAskInChat != null) ...[
+              if (focus.isNotEmpty &&
+                  widget.onAskInChat != null &&
+                  _viewing == null) ...[
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -393,40 +430,113 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 28),
-              SectionHeader(
-                'To-dos',
-                padding: const EdgeInsets.only(left: 4, bottom: 8),
-              ),
-              _composer(),
-              const SizedBox(height: 12),
-              if (items.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-                  child: Text(
-                    'Add what you want to get done today. '
-                    'Plan my day fits it around your calendar.',
-                    style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
+              if (_viewing != null) ...[
+                const SizedBox(height: 20),
+                if (items.isNotEmpty) ...[
+                  SectionHeader(
+                    'Kept for this day',
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
                   ),
-                )
-              else
-                GroupedSection(
-                  dividerIndent: 52,
-                  children: [
-                    for (final item in items)
-                      _TodoRow(
-                        key: ValueKey('todo-${item['id']}'),
-                        item: item,
-                        busy: _busyItems.contains(asJsonString(item['id'])),
-                        onToggle: () => unawaited(_toggle(item)),
-                        onRemove: () => unawaited(_remove(item)),
-                        onPin: () => unawaited(_pin(item)),
-                      ),
-                  ],
+                  GroupedSection(
+                    children: [
+                      for (final item in items)
+                        ListTile(
+                          key: ValueKey('later-${item['id']}'),
+                          title: Text(asJsonString(item['title']) ?? ''),
+                          subtitle: Text(
+                            durationLabel(asJsonInt(item['minutes'], 30)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  items.isEmpty
+                      ? 'You are looking ahead. To-dos belong to the day they are for, so there are none here yet. Ask Jarvis to keep one for this day.'
+                      : 'These join your plan when the day comes. Plan my day and focus blocks work on today only.',
+                  key: const Key('planner-readonly-note'),
+                  style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
                 ),
+              ] else ...[
+                const SizedBox(height: 28),
+                SectionHeader(
+                  'To-dos',
+                  padding: const EdgeInsets.only(left: 4, bottom: 8),
+                ),
+                _composer(),
+                const SizedBox(height: 12),
+                if (items.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                    child: Text(
+                      'Add what you want to get done today. '
+                      'Plan my day fits it around your calendar.',
+                      style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
+                    ),
+                  )
+                else
+                  GroupedSection(
+                    dividerIndent: 52,
+                    children: [
+                      for (final item in items)
+                        _TodoRow(
+                          key: ValueKey('todo-${item['id']}'),
+                          item: item,
+                          busy: _busyItems.contains(asJsonString(item['id'])),
+                          onToggle: () => unawaited(_toggle(item)),
+                          onRemove: () => unawaited(_remove(item)),
+                          onPin: () => unawaited(_pin(item)),
+                        ),
+                    ],
+                  ),
+              ],
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  /// Previous day, next day and a way back to today.
+  Widget _dayNavigator() {
+    final today = _todayDate;
+    final base = _viewing ?? today;
+    int offset(DateTime day) => today == null
+        ? 0
+        : DateTime(
+            day.year,
+            day.month,
+            day.day,
+          ).difference(DateTime(today.year, today.month, today.day)).inDays;
+    final current = base == null ? 0 : offset(base);
+    return Row(
+      children: [
+        IconButton(
+          key: const Key('planner-prev-day'),
+          tooltip: 'Previous day',
+          onPressed: today == null || current <= -_daysBack
+              ? null
+              : () => _shift(-1),
+          icon: const Icon(PhosphorIconsRegular.caretLeft, size: 20),
+        ),
+        IconButton(
+          key: const Key('planner-next-day'),
+          tooltip: 'Next day',
+          onPressed: today == null || current >= _daysAhead
+              ? null
+              : () => _shift(1),
+          icon: const Icon(PhosphorIconsRegular.caretRight, size: 20),
+        ),
+        if (_viewing != null)
+          TextButton(
+            key: const Key('planner-today'),
+            onPressed: () {
+              setState(() => _viewing = null);
+              unawaited(_load());
+            },
+            child: const Text('Back to today'),
+          ),
       ],
     );
   }

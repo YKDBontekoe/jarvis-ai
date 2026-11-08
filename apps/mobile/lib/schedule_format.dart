@@ -70,6 +70,11 @@ String? repeatLabel(String? recurrence, int weekdays) => switch (recurrence) {
         ? 'Every week'
         : 'Every ${[for (final day in weekdayNames)
             if (weekdays & day.$1 != 0) day.$2].join(', ')}',
+  'biweekly' =>
+    weekdays == 0
+        ? 'Every other week'
+        : 'Every other ${[for (final day in weekdayNames)
+            if (weekdays & day.$1 != 0) day.$2].join(', ')}',
   _ => null,
 };
 

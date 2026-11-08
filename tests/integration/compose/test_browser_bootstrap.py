@@ -1,5 +1,6 @@
 """Exercise the real AppHost browser and egress proxy without host ports or private sessions."""
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -64,7 +65,7 @@ async function proxy(method, target) {
   const tools = await rpc({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
   assert(tools.tools.some(t => t.name === 'browser_navigate'));
   const page = await rpc({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: {
-    name: 'browser_navigate', arguments: { url: 'https://example.com/' } } });
+    name: 'browser_navigate', arguments: { url: process.env.JARVIS_BROWSER_TEST_URL || 'https://example.com/' } } });
   assert(!page.isError, JSON.stringify(page));
   assert(page.content.some(c => c.text?.includes('Example Domain')), 'real browser must render the public page');
   const identity = await rpc({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: {
@@ -104,7 +105,11 @@ class BrowserBootstrapTests(unittest.TestCase):
                 self.assertFalse(container["HostConfig"]["PortBindings"])
                 self.assertTrue(container["HostConfig"]["ReadonlyRootfs"])
                 self.assertEqual(1, len(container["NetworkSettings"]["Networks"]))
-                output = run(["docker", "exec", "-i", browser, "node", "-"], PROBE, timeout=180)
+                # A sandbox that re-signs TLS with its own CA breaks the HTTPS page; JARVIS_BROWSER_TEST_URL=http://example.com/
+                # still checks the browser renders a public page through the proxy.
+                page_url = os.environ.get("JARVIS_BROWSER_TEST_URL", "")
+                output = run(["docker", "exec", "-i", "-e", f"JARVIS_BROWSER_TEST_URL={page_url}", browser, "node", "-"],
+                             PROBE, timeout=180)
                 self.assertIn('"mcp":"connected"', output)
                 print(output)
             finally:

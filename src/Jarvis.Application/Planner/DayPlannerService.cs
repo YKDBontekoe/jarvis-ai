@@ -42,6 +42,45 @@ public sealed class DayPlannerService(
         return await BuildAsync(ownerId, day, cancellationToken);
     }
 
+    public const int AgendaDaysBack = 7;
+    public const int AgendaDaysAhead = 90;
+    public const int MaxLaterItems = 60;
+
+    public async Task<DayTimelineDto> GetAgendaAsync(Guid ownerId, DateOnly date, string? timeZoneId,
+        CancellationToken cancellationToken)
+    {
+        var today = await LoadDayAsync(ownerId, timeZoneId, cancellationToken);
+        var current = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), today.Zone).DateTime);
+        if (date < current.AddDays(-AgendaDaysBack) || date > current.AddDays(AgendaDaysAhead))
+            throw new ArgumentException(
+                $"Pick a day between {AgendaDaysBack} days ago and {AgendaDaysAhead} days ahead.");
+        if (date == current) return await BuildAsync(ownerId, today, cancellationToken);
+        // Not saved: this is a look at another day, so the to-do list and today's blocks stay as they are.
+        var laterItems = (today.State.Later ?? []).Where(later => later.Date == date).Select(later => later.Item).ToArray();
+        var other = today with { State = today.State with { Date = date, Items = laterItems, PlannedAt = null }, Changed = false };
+        return await BuildAsync(ownerId, other, cancellationToken);
+    }
+
+    public async Task<DayPlanResultDto> PreviewPlanAsync(Guid ownerId, DateOnly date, string? timeZoneId,
+        CancellationToken cancellationToken)
+    {
+        var today = await LoadDayAsync(ownerId, timeZoneId, cancellationToken);
+        var current = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), today.Zone).DateTime);
+        if (date <= current || date > current.AddDays(AgendaDaysAhead))
+            throw new ArgumentException($"Pick a day after today and within {AgendaDaysAhead} days. Today is planned with Plan my day.");
+        var kept = (today.State.Later ?? []).Where(later => later.Date == date).Select(later => later.Item).ToArray();
+        var other = today with { State = today.State with { Date = date, Items = kept, PlannedAt = null }, Changed = false };
+        var events = await ReadEventsAsync(ownerId, other, cancellationToken);
+        var now = clock.GetUtcNow();
+        var window = Window(other, now);
+        var placed = DayPlanScheduler.Place(window, BlockingEvents(events.Events),
+            kept.Select(item => (item.Id, TimeSpan.FromMinutes(item.Minutes))));
+        var proposed = kept.Select(item => item with { StartAt = placed.TryGetValue(item.Id, out var start) ? start : null }).ToArray();
+        var preview = other with { State = other.State with { Items = proposed } };
+        var timeline = Build(preview, events, await TodayRemindersAsync(ownerId, other, cancellationToken), now);
+        return new DayPlanResultDto(timeline, placed.Count, proposed.Where(item => item.StartAt is null).Select(ToDto).ToArray());
+    }
+
     public async Task<DayPlanItemDto> AddItemAsync(Guid ownerId, AddDayPlanItemRequest request, string? timeZoneId,
         CancellationToken cancellationToken)
     {
@@ -49,6 +88,23 @@ public sealed class DayPlannerService(
         var title = CleanTitle(string.IsNullOrWhiteSpace(request.Title) ? sourceRef?.Description : request.Title);
         var minutes = CleanMinutes(request.Minutes ?? DefaultMinutes);
         var day = await LoadDayAsync(ownerId, timeZoneId, cancellationToken);
+        var currentDay = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), day.Zone).DateTime);
+        if (request.Date is { } wanted && wanted != currentDay)
+        {
+            if (wanted < currentDay || wanted > currentDay.AddDays(AgendaDaysAhead))
+                throw new ArgumentException($"Pick a day from today to {AgendaDaysAhead} days ahead.");
+            var later = (day.State.Later ?? []).ToList();
+            if (later.Count >= MaxLaterItems)
+                throw new ArgumentException($"At most {MaxLaterItems} to-dos can wait for later days.");
+            var duplicate = sourceRef is null
+                ? null
+                : later.FirstOrDefault(entry => entry.Date == wanted && entry.Item.SourceRef == sourceRef.Ref);
+            if (duplicate is not null) return ToDto(duplicate.Item);
+            var waiting = new DayPlanItem(Guid.NewGuid(), title, minutes, false, null, clock.GetUtcNow(), sourceRef?.Ref);
+            later.Add(new LaterDayItem(wanted, waiting));
+            await SaveAsync(ownerId, day.State with { Later = later }, cancellationToken);
+            return ToDto(waiting);
+        }
         // Planning the same promise twice would only double its time on the timeline.
         var existing = sourceRef is null
             ? null
@@ -106,6 +162,15 @@ public sealed class DayPlannerService(
         CancellationToken cancellationToken)
     {
         var day = await LoadDayAsync(ownerId, timeZoneId, cancellationToken);
+        var waitingItem = (day.State.Later ?? []).FirstOrDefault(entry => entry.Item.Id == itemId);
+        if (waitingItem is not null)
+        {
+            await SaveAsync(ownerId, day.State with
+            {
+                Later = day.State.Later!.Where(entry => entry.Item.Id != itemId).ToArray()
+            }, cancellationToken);
+            return true;
+        }
         if (day.State.Items.All(item => item.Id != itemId)) return false;
         await SaveAsync(ownerId, day.State with
         {
@@ -291,10 +356,19 @@ public sealed class DayPlannerService(
             }
         };
         state = state with { Items = state.Items ?? [] };
+        // To-dos kept for a day that has now come join today's list.
+        var dueLater = (state.Later ?? []).Where(later => later.Date <= today).ToArray();
+        var promoted = dueLater.Length > 0;
+        if (promoted)
+            state = state with
+            {
+                Items = [.. state.Items, .. dueLater.Select(later => later.Item)],
+                Later = state.Later!.Where(later => later.Date > today).ToArray()
+            };
         var zoneChanged = explicitZone is not null && !string.Equals(explicitZone, state.TimeZoneId,
             StringComparison.Ordinal);
         if (zoneChanged) state = state with { TimeZoneId = explicitZone };
-        return new Day(state, zone, zoneId, zoneChanged || (saved is not null && saved.Date != today));
+        return new Day(state, zone, zoneId, zoneChanged || promoted || (saved is not null && saved.Date != today));
     }
 
     private Task SaveAsync(Guid ownerId, DayPlanState state, CancellationToken cancellationToken) =>

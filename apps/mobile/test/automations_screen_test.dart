@@ -166,6 +166,8 @@ void main() {
       'Whenever a reminder goes off',
     );
     expect(repeatLabel('weekly', 1 | 16), 'Every Mon, Fri');
+    expect(repeatLabel('biweekly', 1 | 16), 'Every other Mon, Fri');
+    expect(repeatLabel('biweekly', 0), 'Every other week');
     final now = DateTime(2030, 1, 1, 12);
     expect(
       relativeFromNow(now.add(const Duration(minutes: 25)), now: now),

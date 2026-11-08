@@ -41,17 +41,26 @@ public static partial class ToolGroups
              "GradeFlashcard", "AddFlashcards", "ClipUrlToLibrary", "StartDeepResearch", "TeachFromLibraryItem",
              "CheckLessonAnswer"],
             LibraryKeywords()),
-        new("planner", "Today's day plan: show it, plan the day, add, complete or remove items",
-            ["GetTodayPlan", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
+        new("planner", "Today's day plan: show it, plan the day, add, complete or remove items; another day's agenda",
+            ["GetTodayPlan", "GetDayAgenda", "PreviewDayPlan", "AddToDayPlan", "PlanMyDay", "CompleteDayPlanItem", "RemoveDayPlanItem"],
             PlannerKeywords()),
+        new("calendar", "The user's upcoming calendar events from their connected calendar link",
+            ["GetCalendarEvents"],
+            CalendarKeywords()),
+        new("file-cleanup", "Delete one of the user's files after approval",
+            ["DeleteFile"],
+            FileCleanupKeywords()),
+        new("lists", "Plain lists such as shopping or packing: show, add items, tick them off, clear the ticked ones",
+            ["GetLists", "AddToList", "TickListItems", "RemoveFromList", "RenameList", "ClearTickedListItems"],
+            ListKeywords()),
         new("people", "Contacts the user keeps up with: details, birthdays, logging contact, relationship radar",
             ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar", "GetPersonFollowThrough"],
             PeopleKeywords()),
         new("whatsapp", "Read, search and send WhatsApp messages in chats the user turned on",
             ["ListWhatsAppChats", "ReadWhatsAppChat", "SearchWhatsAppMessages", "SendWhatsAppMessage"],
             WhatsAppKeywords()),
-        new("habits", "Habit tracking: list habits, check in, create a habit",
-            ["GetHabits", "CheckInHabits", "CreateHabit"],
+        new("habits", "Habit tracking: list habits, check in, create a habit, archive or restore one",
+            ["GetHabits", "CheckInHabits", "CreateHabit", "ArchiveHabit", "PauseHabit", "DeleteHabit"],
             HabitKeywords()),
         new("journal", "The user's daily journal: write or read entries",
             ["SaveJournalEntry", "ListJournalEntries"],
@@ -60,7 +69,7 @@ public static partial class ToolGroups
             ["LogDecision", "ResolveDecision", "GetDecisions", "GetCalibration"],
             DecisionKeywords()),
         new("projects", "Projects: what each is for, its status and the next action to take",
-            ["GetProjects", "SetProjectOutcome", "SetProjectNextAction"],
+            ["GetProjects", "DeleteProject", "SetProjectOutcome", "SetProjectNextAction"],
             ProjectKeywords()),
         new("comparisons", "Weigh options against criteria: create a comparison, record what is known, see the ranking",
             ["CreateComparison", "SetComparisonCell", "GetComparison"],
@@ -98,8 +107,8 @@ public static partial class ToolGroups
         new("scenarios", "What-if arithmetic: compare a cost or a pace now and with an alternative, nothing is changed",
             ["CompareCostScenario", "CompareTimeScenario"],
             ScenarioKeywords()),
-        new("goals", "Goals: how they are going, check-ins in the user's words, a small proposed plan for the week",
-            ["GetGoals", "AddGoalCheckIn", "ProposeGoalPlan"],
+        new("goals", "Goals: create one when asked, pause/resume/achieve/archive/reword one, how they are going, check-ins in the user's words, a small proposed plan for the week",
+            ["GetGoals", "CreateGoal", "UpdateGoal", "DeleteGoal", "AddGoalCheckIn", "ProposeGoalPlan"],
             GoalKeywords()),
         new("meetings", "Meetings: prepare from the user's own records, debrief into proposed decisions and promises, draft a follow-up",
             ["PrepareMeeting", "DebriefMeeting", "DraftMeetingFollowUp"],
@@ -266,8 +275,17 @@ public static partial class ToolGroups
     [GeneratedRegex(@"\b(library|article|read later|saved? (this|it|link)|clip|bookmark|flashcard|study|quiz me|teach me|lesson|explain this article|leer me|les over|deep research|research report|digest|bibliotheek|artikel|opslaan|onderzoek)", KeywordOptions)]
     private static partial Regex LibraryKeywords();
 
-    [GeneratedRegex(@"\b(plan (my|the|for)|day plan|today'?s plan|my day|schedule (my|the) day|agenda|to-?do|planning|dagplan|mijn dag|vandaag plannen)", KeywordOptions)]
+    [GeneratedRegex(@"\b(plan (my|the|for)|day plan|today'?s plan|my day|schedule (my|the) day|agenda|to-?do|planning|dagplan|mijn dag|vandaag plannen|am i free|free (on|next|tomorrow)|what'?s on (tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next)|tomorrow'?s (plan|schedule)|ben ik vrij|morgen (staat|plan))", KeywordOptions)]
     private static partial Regex PlannerKeywords();
+
+    [GeneratedRegex(@"\b(shopping list|grocery list|groceries|packing list|to-?buy|(add|put) .{1,60} (to|on) (my|the) .{0,20}list|(my|the) .{0,20}list|boodschappen|winkellijst|inpaklijst|lijstje)", KeywordOptions)]
+    private static partial Regex ListKeywords();
+
+    [GeneratedRegex(@"\b(delete|remove|get rid of|throw away|verwijder|wis)\b.{0,40}\b(file|document|pdf|upload|photo|bestand|foto)", KeywordOptions)]
+    private static partial Regex FileCleanupKeywords();
+
+    [GeneratedRegex(@"\b(calendar|agenda|appointment|am i free|free (on|at|this|next|tomorrow)|busy|what'?s on|meeting|kalender|afspraak|vrij|bezet|wat staat er)", KeywordOptions)]
+    private static partial Regex CalendarKeywords();
 
     [GeneratedRegex(@"\b(contact|friend|birthday|person|people|relationship|radar|keep in touch|catch up with|haven'?t (talked|spoken)|called|met with|vriend|verjaardag|persoon|mensen|contact|gesproken|gebeld)", KeywordOptions)]
     private static partial Regex PeopleKeywords();

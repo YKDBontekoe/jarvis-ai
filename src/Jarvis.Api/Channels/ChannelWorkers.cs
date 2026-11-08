@@ -104,8 +104,9 @@ public sealed class SignalReceiver(IServiceScopeFactory scopes, IHttpClientFacto
             if (!response.IsSuccessStatusCode) continue;
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            foreach (var (sender, text, externalId) in ParseEnvelopes(document.RootElement, connection.Account))
-                await repository.EnqueueInboundAsync(connection.Id, sender, text, externalId, cancellationToken);
+            foreach (var message in ParseInbound(document.RootElement, connection.Account))
+                await repository.EnqueueInboundAsync(connection.Id, message.Sender, message.Text, message.ExternalId,
+                    cancellationToken, message.MediaJson);
         }
     }
 
@@ -114,7 +115,17 @@ public sealed class SignalReceiver(IServiceScopeFactory scopes, IHttpClientFacto
     /// (delivered to this linked device as sync transcripts) count as messages from the owner.
     /// </summary>
     internal static IEnumerable<(string Sender, string Text, string ExternalId)> ParseEnvelopes(JsonElement root,
-        string? selfAccount = null)
+        string? selfAccount = null) =>
+        ParseInbound(root, selfAccount).Where(message => message.MediaJson is null)
+            .Select(message => (message.Sender, message.Text, message.ExternalId));
+
+    internal sealed record Inbound(string Sender, string Text, string ExternalId, string? MediaJson);
+
+    /// <summary>
+    /// Text messages and attachments. A message that carries attachments keeps their signal-cli ids so the router can
+    /// download photos with the same pipeline as WhatsApp; before, a photo or voice note was dropped without a reply.
+    /// </summary>
+    internal static IEnumerable<Inbound> ParseInbound(JsonElement root, string? selfAccount = null)
     {
         if (root.ValueKind != JsonValueKind.Array) yield break;
         foreach (var item in root.EnumerateArray())
@@ -131,17 +142,40 @@ public sealed class SignalReceiver(IServiceScopeFactory scopes, IHttpClientFacto
                 ChannelAddresses.Normalize(to) == ChannelAddresses.Normalize(selfAccount))
             {
                 var sentAt = sent.TryGetProperty("timestamp", out var sentTime) ? sentTime.ToString() : Guid.NewGuid().ToString("N");
-                yield return (ChannelAddresses.Normalize(selfAccount), selfMessage.GetString()!,
-                    $"{ChannelAddresses.Normalize(selfAccount)}:{sentAt}");
+                yield return new Inbound(ChannelAddresses.Normalize(selfAccount), selfMessage.GetString()!,
+                    $"{ChannelAddresses.Normalize(selfAccount)}:{sentAt}", null);
                 continue;
             }
-            if (!envelope.TryGetProperty("dataMessage", out var data) ||
-                !data.TryGetProperty("message", out var message) || message.ValueKind != JsonValueKind.String ||
-                string.IsNullOrWhiteSpace(sender))
-                continue;
+            if (!envelope.TryGetProperty("dataMessage", out var data) || string.IsNullOrWhiteSpace(sender)) continue;
+            var text = data.TryGetProperty("message", out var message) && message.ValueKind == JsonValueKind.String
+                ? message.GetString() ?? string.Empty
+                : string.Empty;
+            var media = ReadAttachments(data);
+            if (text.Length == 0 && media.Count == 0) continue;
             var timestamp = envelope.TryGetProperty("timestamp", out var time) ? time.ToString() : Guid.NewGuid().ToString("N");
-            yield return (sender!, message.GetString()!, $"{sender}:{timestamp}");
+            yield return new Inbound(sender!, text, $"{sender}:{timestamp}", ChannelMedia.Serialize(media));
         }
+    }
+
+    private static List<ChannelMediaRef> ReadAttachments(JsonElement data)
+    {
+        var media = new List<ChannelMediaRef>();
+        if (!data.TryGetProperty("attachments", out var attachments) || attachments.ValueKind != JsonValueKind.Array)
+            return media;
+        foreach (var attachment in attachments.EnumerateArray())
+        {
+            var id = attachment.TryGetProperty("id", out var idElement) ? idElement.GetString() : null;
+            if (string.IsNullOrWhiteSpace(id) || id.Length > 200) continue;
+            var mime = ChannelMedia.NormalizeMime(
+                attachment.TryGetProperty("contentType", out var type) ? type.GetString() : null);
+            var kind = mime.StartsWith("image/", StringComparison.Ordinal) ? "image"
+                : mime.StartsWith("audio/", StringComparison.Ordinal) ? "audio"
+                : mime.StartsWith("video/", StringComparison.Ordinal) ? "video"
+                : "document";
+            var fileName = attachment.TryGetProperty("filename", out var nameElement) ? nameElement.GetString() : null;
+            media.Add(new ChannelMediaRef(kind, id, mime, null, fileName));
+        }
+        return media;
     }
 }
 

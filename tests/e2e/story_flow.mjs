@@ -47,7 +47,9 @@ assert.ok(story.items.some((i) => i.text.includes(`Pick ${tag} supplier`)), 'the
 assert.ok(story.items.some((i) => i.text.includes(`${tag}`) && i.kind === 'journal'), 'the journal moment is in');
 assert.ok(story.items.every((i) => /^[a-z_]+:/.test(i.sourceRef)), 'every moment points at its record');
 const total = Object.values(story.counts).reduce((a, b) => a + b, 0);
-assert.equal(total, story.items.length, 'counts match the moments');
+// Counts are of every moment in the window; the outline is capped, so it can only be smaller.
+assert.ok(total >= story.items.length, 'counts cover at least the moments shown');
+if (total <= 30) assert.equal(total, story.items.length, 'counts match the moments');
 assert.ok(!story.kinds.includes('expense'), 'money is opt-in');
 
 console.log('Editing, leaving out and reordering change only the story...');
@@ -78,7 +80,7 @@ assert.equal(again.data.libraryItemId, saved.data.libraryItemId, 'saving twice d
 const full = await request('GET', `/stories/${story.id}/export`);
 assert.equal(full.status, 200);
 assert.ok(full.text.includes(`We chose the ${tag} supplier`));
-assert.ok(!full.text.includes('felt calm'), 'a removed moment is in no copy');
+assert.ok(!full.text.includes(`canal ${tag}`), 'a removed moment is in no copy');
 const shared = await request('GET', `/stories/${story.id}/export?redact=journal,people`);
 assert.equal(shared.status, 200);
 assert.ok(shared.text.includes('left out'), shared.text);

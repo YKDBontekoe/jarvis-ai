@@ -4,7 +4,9 @@ import { execFileSync } from 'node:child_process';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 
 const fixture = JSON.parse(readFileSync('artifacts/verification/identity-fixture.json'));
-const base = 'http://localhost:5082/api/v1';
+// The API under test (the AppHost's Development stack by default; see docs/operations/testing.md).
+const origin = process.env.JARVIS_E2E_URL ?? 'http://localhost:5082';
+const base = origin + '/api/v1';
 const reportPath = 'artifacts/verification/extended-flow.json';
 const selected = process.env.JARVIS_EXTENDED_CASES?.split(',');
 const checks = selected && existsSync(reportPath) ? JSON.parse(readFileSync(reportPath)).checks : [];
@@ -49,10 +51,16 @@ async function wait(path, predicate, seconds = 180) {
   }
   throw Error('Timed out: ' + path + ' ' + JSON.stringify(result));
 }
+// The fake MCP server appends each call to this file on the machine running the API (the AppHost runs it as a local
+// process). JARVIS_VERIFICATION_API_CONTAINER reads it from inside a container instead.
 function mcpCalls() {
-  return execFileSync('docker', ['exec', 'jarvis-verification-jarvis-api-1', 'node', '-e',
-    "try{process.stdout.write(require('fs').readFileSync('/tmp/jarvis-verification-mcp-calls.jsonl','utf8'))}catch{}"],
-    { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map(JSON.parse);
+  const container = process.env.JARVIS_VERIFICATION_API_CONTAINER;
+  const log = process.env.JARVIS_VERIFICATION_MCP_CALLS ?? '/tmp/jarvis-verification-mcp-calls.jsonl';
+  const text = container
+    ? execFileSync('docker', ['exec', container, 'node', '-e',
+      `try{process.stdout.write(require('fs').readFileSync(${JSON.stringify(log)},'utf8'))}catch{}`], { encoding: 'utf8' })
+    : existsSync(log) ? readFileSync(log, 'utf8') : '';
+  return text.trim().split('\n').filter(Boolean).map(JSON.parse);
 }
 async function record(name, action) {
   if (selected && !selected.includes(name)) return;
@@ -79,7 +87,7 @@ async function approve(item) { return request('POST', `/approvals/${item.id}/dec
 await request('PUT', '/integrations/verification/credentials/token', { value: 'synthetic-mcp-fixture-token' }, [200, 204]);
 await record('authenticated-signalr-stream-and-owner-isolation', async () => {
   const item = await conversation('Authenticated SignalR verification');
-  const hub = new HubConnectionBuilder().withUrl('http://localhost:5082/hubs/events', { accessTokenFactory: token })
+  const hub = new HubConnectionBuilder().withUrl(origin + '/hubs/events', { accessTokenFactory: token })
     .configureLogging(LogLevel.Error).build();
   const events = [];
   for (const name of ['message.delta', 'message.completed', 'agent.completed']) hub.on(name, value => { events.push({ name, value }); });
@@ -90,7 +98,7 @@ await record('authenticated-signalr-stream-and-owner-isolation', async () => {
     assert.equal(result.content.trim(), 'AUTHENTICATED_STREAM_VERIFIED');
     assert(events.some(e => e.name === 'message.delta'));
     assert(events.some(e => e.name === 'message.completed'));
-    const otherHub = new HubConnectionBuilder().withUrl('http://localhost:5082/hubs/events', {
+    const otherHub = new HubConnectionBuilder().withUrl(origin + '/hubs/events', {
       accessTokenFactory: () => token('jarvis-test-b'),
     }).configureLogging(LogLevel.Error).build();
     try {
@@ -161,7 +169,9 @@ await record('coding-approval-and-isolated-worktree', async () => {
 });
 await record('temporal-condition-watch-delivery', async () => {
   const item = await request('POST', '/watches', { title: 'Public repository metric verification',
-    url: 'https://api.github.com/repos/openai/codex', jsonPath: 'stargazers_count', comparison: 'above',
+    // Any public HTTPS JSON with a positive number works; override where api.github.com is not reachable.
+    url: process.env.JARVIS_E2E_PUBLIC_JSON_URL ?? 'https://api.github.com/repos/openai/codex',
+    jsonPath: process.env.JARVIS_E2E_PUBLIC_JSON_PATH ?? 'stargazers_count', comparison: 'above',
     threshold: 0, intervalMinutes: 5 }, [201]);
   const completed = await wait('/watches/' + item.id, x => ['triggered', 'failed'].includes(x.status));
   assert.equal(completed.status, 'triggered');

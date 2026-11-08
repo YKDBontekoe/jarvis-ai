@@ -310,6 +310,7 @@ public sealed partial class CodexInstallation(
 
         using var process = new Process { StartInfo = start };
         if (!process.Start()) throw new InvalidOperationException("Could not start npm.");
+        process.StandardInput.Close();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(3));
         using var kill = timeout.Token.Register(() => Kill(process));
@@ -354,6 +355,8 @@ public sealed partial class CodexInstallation(
             using var process = new Process { StartInfo = CreateProcess(executablePath, directory) };
             process.StartInfo.ArgumentList.Add("--version");
             if (!process.Start()) throw new InvalidOperationException("Could not start the Codex CLI.");
+            // Nothing is sent: close stdin so a CLI or wrapper that reads it exits instead of waiting out the timeout.
+            process.StandardInput.Close();
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(15));
             using var kill = timeout.Token.Register(() => Kill(process));

@@ -116,6 +116,139 @@ public sealed class HabitTests
     }
 
     [Fact]
+    public async Task Chat_archives_and_restores_a_habit_by_name_without_losing_history()
+    {
+        var (service, _, _, _, _) = Create();
+        var created = await service.CreateAsync(Owner, new HabitDraft("Meditate", null, null, null), null, default);
+        await service.SetDoneAsync(created.Value!.Habit.Id, Owner, null, true, HabitSources.App, default);
+        var audit = new RecordingAudit();
+        var tools = new HabitAgentTools(service, audit, new FixedUser(), NullLogger.Instance);
+
+        var archived = await tools.ArchiveHabitAsync("meditat");
+        var again = await tools.ArchiveHabitAsync("Meditate");
+        var restored = await tools.ArchiveHabitAsync("Meditate", archive: false);
+
+        Assert.Contains("Archived \"Meditate\"", archived, StringComparison.Ordinal);
+        Assert.Contains("no active habits to archive", again, StringComparison.Ordinal);
+        Assert.Contains("is tracked again", restored, StringComparison.Ordinal);
+        var summary = Assert.Single(await service.ListAsync(Owner, false, default));
+        Assert.Equal(1, summary.Stats.TotalCheckIns);
+        Assert.Equal(["habit.archived", "habit.restored"], audit.Actions);
+        Assert.All(audit.Metadata, item => Assert.DoesNotContain("Meditate", item));
+    }
+
+    [Fact]
+    public async Task Archiving_asks_which_habit_when_the_name_is_ambiguous_and_ignores_other_owners()
+    {
+        var (service, _, _, _, _) = Create();
+        await service.CreateAsync(Owner, new HabitDraft("Read 20 pages", null, null, null), null, default);
+        await service.CreateAsync(Owner, new HabitDraft("Read the news", null, null, null), null, default);
+        await service.CreateAsync(Other, new HabitDraft("Piano", null, null, null), null, default);
+        var tools = new HabitAgentTools(service, new RecordingAudit(), new FixedUser(), NullLogger.Instance);
+
+        Assert.Contains("matches more than one habit", await tools.ArchiveHabitAsync("read"), StringComparison.Ordinal);
+        Assert.Contains("No active habit matches", await tools.ArchiveHabitAsync("Piano"), StringComparison.Ordinal);
+        Assert.Equal(2, (await service.ListAsync(Owner, false, default)).Count);
+        Assert.Single(await service.ListAsync(Other, false, default));
+    }
+
+    [Fact]
+    public async Task Chat_deletes_a_habit_only_by_its_exact_name_and_never_another_owners()
+    {
+        var (service, _, _, _, _) = Create();
+        await service.CreateAsync(Owner, new HabitDraft("Read 20 pages", null, null, null), null, default);
+        await service.CreateAsync(Owner, new HabitDraft("Read the news", null, null, null), null, default);
+        await service.CreateAsync(Other, new HabitDraft("Piano", null, null, null), null, default);
+        var audit = new RecordingAudit();
+        var tools = new HabitAgentTools(service, audit, new FixedUser(), NullLogger.Instance);
+
+        Assert.StartsWith("No habit has that exact name", await tools.DeleteHabitAsync("read"), StringComparison.Ordinal);
+        Assert.StartsWith("No habit has that exact name", await tools.DeleteHabitAsync("Piano"), StringComparison.Ordinal);
+        Assert.Equal("The habit and its check-ins are deleted.", await tools.DeleteHabitAsync("read the NEWS"));
+
+        Assert.Equal(["Read 20 pages"], (await service.ListAsync(Owner, true, default)).Select(x => x.Habit.Name));
+        Assert.Single(await service.ListAsync(Other, true, default));
+        Assert.Equal(["habit.deleted"], audit.Actions);
+        Assert.All(audit.Metadata, item => Assert.DoesNotContain("news", item, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void A_pause_bridges_the_paused_days_in_a_daily_streak_but_not_the_days_missed_before_it()
+    {
+        // Checked in 5, 4 and 3 days ago, paused from 2 days ago through tomorrow, nothing since.
+        var dates = new[] { Today.AddDays(-5), Today.AddDays(-4), Today.AddDays(-3) };
+        var paused = Habit(HabitCadences.Daily) with { PausedFrom = Today.AddDays(-2), PausedUntil = Today.AddDays(1) };
+        var notPaused = Habit(HabitCadences.Daily);
+        var pausedLate = Habit(HabitCadences.Daily) with { PausedFrom = Today, PausedUntil = Today.AddDays(5) };
+
+        Assert.Equal(3, HabitStreaks.Compute(paused, dates, Today).CurrentStreak);
+        Assert.Equal(0, HabitStreaks.Compute(notPaused, dates, Today).CurrentStreak);
+        // Pausing today does not rescue days that were already missed.
+        Assert.Equal(0, HabitStreaks.Compute(pausedLate, dates, Today).CurrentStreak);
+        Assert.True(paused.IsPausedOn(Today));
+        Assert.False(paused.IsPausedOn(Today.AddDays(2)));
+        Assert.False(notPaused.IsPausedOn(Today));
+    }
+
+    [Fact]
+    public void A_week_paused_end_to_end_neither_counts_nor_breaks_a_weekly_streak()
+    {
+        // Target 2: weeks of 14 and 21 September met it; the week of 21 September is followed by a fully paused week.
+        var dates = new[] { new DateOnly(2026, 9, 14), new DateOnly(2026, 9, 15), new DateOnly(2026, 9, 21), new DateOnly(2026, 9, 22) };
+        var habit = Habit(HabitCadences.Weekly, target: 2) with
+        {
+            PausedFrom = new DateOnly(2026, 9, 28), PausedUntil = new DateOnly(2026, 10, 4)
+        };
+
+        // A week later: the paused week sits between the current week (still open) and the two weeks that met the target.
+        var later = new DateOnly(2026, 10, 8);
+        Assert.Equal(2, HabitStreaks.Compute(habit, dates, later).CurrentStreak);
+        Assert.Equal(0, HabitStreaks.Compute(Habit(HabitCadences.Weekly, target: 2), dates, later).CurrentStreak);
+    }
+
+    [Fact]
+    public async Task A_paused_habit_is_not_open_today_and_resuming_brings_it_back_with_limits_and_owner_scope()
+    {
+        var (service, _, _, _, _) = Create();
+        var created = await service.CreateAsync(Owner, new HabitDraft("Meditate", null, null, null), null, default);
+        var id = created.Value!.Habit.Id;
+        Assert.True(created.Value.IsOpenToday);
+
+        var paused = await service.SetPausedAsync(id, Owner, Today.AddDays(7), default);
+        var resumed = await service.SetPausedAsync(id, Owner, null, default);
+
+        Assert.False(paused.Value!.IsOpenToday);
+        Assert.Equal(Today, paused.Value.Habit.PausedFrom);
+        Assert.True(resumed.Value!.IsOpenToday);
+        Assert.Null(resumed.Value.Habit.PausedUntil);
+        Assert.Equal("until", (await service.SetPausedAsync(id, Owner, Today.AddDays(-1), default)).Field);
+        Assert.Equal("until", (await service.SetPausedAsync(id, Owner, Today.AddDays(HabitService.MaxPauseDays + 1), default)).Field);
+        Assert.Equal(HabitFailure.NotFound, (await service.SetPausedAsync(id, Other, Today.AddDays(2), default)).Failure);
+    }
+
+    [Fact]
+    public async Task Chat_pauses_and_resumes_a_habit_by_name_and_reports_bad_input()
+    {
+        var (service, _, _, _, _) = Create();
+        await service.CreateAsync(Owner, new HabitDraft("Meditate", null, null, null), null, default);
+        var audit = new RecordingAudit();
+        var tools = new HabitAgentTools(service, audit, new FixedUser(), NullLogger.Instance);
+
+        var paused = await tools.PauseHabitAsync("medit", "2026-10-10");
+        var open = (await service.ListAsync(Owner, false, default)).Single();
+        var resumed = await tools.PauseHabitAsync("Meditate");
+
+        Assert.Contains("Paused \"Meditate\" until 2026-10-10", paused, StringComparison.Ordinal);
+        Assert.False(open.IsOpenToday);
+        Assert.Contains("active again", resumed, StringComparison.Ordinal);
+        Assert.StartsWith("I could not read that date", await tools.PauseHabitAsync("Meditate", "soon"), StringComparison.Ordinal);
+        Assert.StartsWith("No active habit matches", await tools.PauseHabitAsync("Piano", "2026-10-10"), StringComparison.Ordinal);
+        Assert.StartsWith("I could not change that habit", await tools.PauseHabitAsync("Meditate", "2030-01-01"), StringComparison.Ordinal);
+        Assert.Equal(["habit.paused", "habit.resumed"], audit.Actions);
+        Assert.Contains("PauseHabit", Jarvis.Agents.ToolGroups.All.Single(g => g.Id == "habits").Tools);
+    }
+
+    [Fact]
     public async Task Chat_checks_habits_in_by_name_and_reports_misses()
     {
         var (service, _, _, _, _) = Create();

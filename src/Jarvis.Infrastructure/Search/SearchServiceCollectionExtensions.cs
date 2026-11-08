@@ -11,24 +11,33 @@ public static class SearchServiceCollectionExtensions
     {
         services.Configure<FederatedSearchOptions>(configuration.GetSection(FederatedSearchOptions.SectionName));
         services.AddScoped<IFederatedSearchService, FederatedSearchService>();
-        services.AddScoped<IFederatedSearchProvider, ConversationSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, MemorySearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, FileSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, TaskSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, ReminderSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, SkillSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, GraphEntitySearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, ChannelThreadSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, CodingRunSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, MessageSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, PersonSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, CommitmentSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, DecisionSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, JournalSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, ProjectSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, MissionSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, GoalSearchProvider>();
-        services.AddScoped<IFederatedSearchProvider, TripSearchProvider>();
+        AddProvider<ConversationSearchProvider>(services);
+        AddProvider<MemorySearchProvider>(services);
+        AddProvider<FileSearchProvider>(services);
+        AddProvider<TaskSearchProvider>(services);
+        AddProvider<ReminderSearchProvider>(services);
+        AddProvider<SkillSearchProvider>(services);
+        AddProvider<GraphEntitySearchProvider>(services);
+        AddProvider<ChannelThreadSearchProvider>(services);
+        AddProvider<CodingRunSearchProvider>(services);
+        AddProvider<MessageSearchProvider>(services);
+        AddProvider<PersonSearchProvider>(services);
+        AddProvider<CommitmentSearchProvider>(services);
+        AddProvider<DecisionSearchProvider>(services);
+        AddProvider<JournalSearchProvider>(services);
+        AddProvider<ProjectSearchProvider>(services);
+        AddProvider<MissionSearchProvider>(services);
+        AddProvider<GoalSearchProvider>(services);
+        AddProvider<ListSearchProvider>(services);
+        AddProvider<TripSearchProvider>(services);
         return services;
+    }
+
+    // Registered by its own type too, so search can build one provider per scope without building them all.
+    private static void AddProvider<TProvider>(IServiceCollection services)
+        where TProvider : class, IFederatedSearchProvider
+    {
+        services.AddScoped<TProvider>();
+        services.AddScoped<IFederatedSearchProvider>(provider => provider.GetRequiredService<TProvider>());
     }
 }

@@ -27,4 +27,34 @@ public sealed class CodexSignInTests
     public void Waits_until_both_the_link_and_the_code_have_arrived() =>
         Assert.Null(CodexSignIn.ParseDeviceCode("1. Open this link\n   https://auth.openai.com/codex/device\n",
             DateTimeOffset.UtcNow));
+
+    [Fact]
+    public async Task Status_checks_share_one_cli_call_and_reads_stdin_free()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var directory = Directory.CreateTempSubdirectory("jarvis-sign-in-").FullName;
+        try
+        {
+            var cli = Path.Combine(directory, "codex");
+            // Reads stdin like a wrapper would, so this also checks stdin is closed.
+            File.WriteAllText(cli, "#!/bin/sh\necho call >> \"$(dirname \"$0\")/calls.log\"\ncat > /dev/null\nexit 0\n");
+            File.SetUnixFileMode(cli, UnixFileMode.UserRead | UnixFileMode.UserExecute | UnixFileMode.UserWrite);
+            using var signIn = new CodexSignIn(new CodexExecutable(cli, Path.Combine(directory, "managed")),
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<CodexSignIn>.Instance);
+
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            var statuses = await Task.WhenAll(Enumerable.Range(0, 8)
+                .Select(_ => signIn.GetStatusAsync(TestContext.Current.CancellationToken)));
+            var again = await signIn.GetStatusAsync(TestContext.Current.CancellationToken);
+
+            Assert.All(statuses, status => Assert.True(status.SignedIn));
+            Assert.True(again.SignedIn);
+            Assert.Single(File.ReadAllLines(Path.Combine(directory, "calls.log")));
+            Assert.True(started.Elapsed < TimeSpan.FromSeconds(10), $"took {started.Elapsed}");
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
 }

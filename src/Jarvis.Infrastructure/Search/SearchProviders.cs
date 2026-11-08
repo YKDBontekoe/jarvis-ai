@@ -37,6 +37,9 @@ internal static class SearchRoutes
         return new("reminder", parameters);
     }
 
+    public static SearchRouteTarget List(Guid listId) => new("list",
+        new Dictionary<string, string> { ["listId"] = listId.ToString() });
+
     public static SearchRouteTarget Skill(Guid skillId) => new("skill",
         new Dictionary<string, string> { ["skillId"] = skillId.ToString() });
 
@@ -511,6 +514,34 @@ public sealed class GoalSearchProvider(IGoalService goals) : IFederatedSearchPro
             hits.Add(new FederatedSearchResult(SearchResultKinds.Goal, goal.Id.ToString(), goal.Title,
                 goal.CheckInDue ? $"{goal.Status} · check-in due" : goal.Status, null, SearchRoutes.Goal(goal.Id),
                 SearchRanking.TextRelevance(goal.Title, normalized), false));
+        }
+        return SearchRanking.Best(hits, limit);
+    }
+}
+
+/// <summary>Finds a list by its name or by an item on it ("milk" finds the shopping list).</summary>
+public sealed class ListSearchProvider(Jarvis.Application.Lists.IListService lists) : IFederatedSearchProvider
+{
+    public string ProviderId => "lists";
+    public IReadOnlySet<string> ResultKinds => new HashSet<string> { SearchResultKinds.List };
+
+    public async Task<IReadOnlyList<FederatedSearchResult>> SearchAsync(Guid ownerId, string query, int limit,
+        CancellationToken cancellationToken)
+    {
+        var normalized = SearchRanking.NormalizeQuery(query);
+        var hits = new List<FederatedSearchResult>();
+        foreach (var list in await lists.ListAsync(ownerId, cancellationToken))
+        {
+            var item = list.Items.FirstOrDefault(i => SearchRanking.MatchesQuery(i.Text, normalized));
+            var nameMatches = SearchRanking.MatchesQuery(list.Name, normalized);
+            if (!nameMatches && item is null) continue;
+            var open = list.Items.Count(i => !i.Done);
+            var summary = nameMatches || item is null
+                ? $"{open} open"
+                : $"{open} open · has “{item.Text}”";
+            hits.Add(new FederatedSearchResult(SearchResultKinds.List, list.Id.ToString(), list.Name, summary,
+                list.UpdatedAt, SearchRoutes.List(list.Id),
+                SearchRanking.TextRelevance(nameMatches ? list.Name : item!.Text, normalized), false));
         }
         return SearchRanking.Best(hits, limit);
     }

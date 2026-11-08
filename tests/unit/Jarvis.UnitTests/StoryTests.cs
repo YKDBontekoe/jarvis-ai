@@ -246,4 +246,25 @@ public sealed class StoryTests
     {
         public Guid OwnerId => Owner;
     }
+
+    [Fact]
+    public void A_busy_week_of_tasks_and_decisions_still_leaves_room_for_journal_moments_and_prefers_the_newest()
+    {
+        var start = new DateTimeOffset(2026, 11, 1, 9, 0, 0, TimeSpan.Zero);
+        TimelineEvent Event(string kind, int hour, string title) => new($"{kind}{hour}", kind, title, null,
+            start.AddHours(hour), DateOnly.FromDateTime(start.AddHours(hour).UtcDateTime));
+        var events = Enumerable.Range(0, 40).Select(i => Event(TimelineKinds.Decision, i, $"decision {i}"))
+            .Concat(Enumerable.Range(0, 40).Select(i => Event(TimelineKinds.Task, i, $"task {i}")))
+            .Append(Event(TimelineKinds.Journal, 3, "Journal entry"))
+            .ToArray();
+
+        var (items, counts) = StoryBuilder.Outline(events);
+
+        Assert.Equal(StoryRules.MaxItems, items.Count);
+        Assert.Contains(items, item => item.Kind == TimelineKinds.Journal);
+        Assert.Contains(items, item => item.Text == "decision 39");
+        Assert.DoesNotContain(items, item => item.Text == "decision 0");
+        Assert.Equal(81, counts.Values.Sum());
+        Assert.True(items.Zip(items.Skip(1)).All(pair => pair.First.Date <= pair.Second.Date));
+    }
 }

@@ -767,6 +767,9 @@ mixin _ChatScreenUi on _ChatScreenController {
                                 // Tapping the conversation puts the keyboard
                                 // away; taps on messages still reach them.
                                 behavior: HitTestBehavior.translucent,
+                                // A screen reader would announce it as an
+                                // unnamed button covering the whole chat.
+                                excludeFromSemantics: true,
                                 onTap: _dismissKeyboard,
                                 child: ValueListenableBuilder<int>(
                                   valueListenable: _transcriptTick,

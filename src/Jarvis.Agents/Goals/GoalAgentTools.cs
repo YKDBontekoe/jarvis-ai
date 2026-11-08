@@ -12,6 +12,9 @@ internal sealed class GoalToolContributor(IGoalService goals, ICurrentUser curre
     {
         var tools = new GoalAgentTools(goals, currentUser);
         yield return AIFunctionFactory.Create(tools.GetGoalsAsync);
+        yield return AIFunctionFactory.Create(tools.CreateGoalAsync);
+        yield return AIFunctionFactory.Create(tools.UpdateGoalAsync);
+        yield return new ApprovalRequiredAIFunction(AIFunctionFactory.Create(tools.DeleteGoalAsync));
         yield return AIFunctionFactory.Create(tools.AddGoalCheckInAsync);
         yield return AIFunctionFactory.Create(tools.ProposeGoalPlanAsync);
     }
@@ -40,6 +43,83 @@ internal sealed class GoalAgentTools(IGoalService goals, ICurrentUser currentUse
             text.AppendLine();
         }
         return text.ToString();
+    }
+
+    [Description("Create a goal when the user asks for one in their own words (\"set a goal: run a 10k by the end of March\"). Use their wording for the title. Pass motivation, target, horizon and minutes only if they said them; never invent a goal from something they merely mentioned, and never pad it with a plan: proposing a plan is a separate step they accept in the app.")]
+    public async Task<string> CreateGoalAsync(
+        [Description("The goal in a few words, as the user said it, such as 'Run a 10k'.")] string title,
+        [Description("Why it matters to them, only if they said.")] string? motivation = null,
+        [Description("What done looks like, such as '10 km without stopping', only if they said.")] string? target = null,
+        [Description("The date they want it done by, YYYY-MM-DD, only if they gave one. Resolve 'end of March' to the next 31 March.")] string? horizon = null,
+        [Description("Minutes per week they want to give it, only if they said.")] int? weeklyMinutes = null,
+        [Description("Days between check-ins, only if they said.")] int? checkInEveryDays = null,
+        CancellationToken cancellationToken = default)
+    {
+        DateOnly? due = null;
+        if (!string.IsNullOrWhiteSpace(horizon))
+        {
+            if (!DateOnly.TryParseExact(horizon.Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsed))
+                return "I could not read that date. Use YYYY-MM-DD, or leave the date out.";
+            due = parsed;
+        }
+        var result = await goals.CreateAsync(currentUser.OwnerId,
+            new GoalInput(title, motivation, due, target, checkInEveryDays, weeklyMinutes, null, null, null, null),
+            cancellationToken);
+        return result.Failure switch
+        {
+            GoalFailure.None => $"Goal created: \"{result.Value!.Goal.Title}\" [goal:{result.Value.Goal.Id}]" +
+                                (result.Value.Goal.Horizon is { } h ? $", due {h:yyyy-MM-dd}." : "."),
+            _ => $"I could not create the goal: {result.Message}"
+        };
+    }
+
+    [Description("Change a goal the user asked you to change: pause it, resume it, mark it achieved, archive it, or reword it, move its date or change its target. Pass only what they asked to change. Never archive or pause a goal on your own because it looks neglected. Deleting a goal is not possible here.")]
+    public async Task<string> UpdateGoalAsync(
+        [Description("The goal's ID from GetGoals.")] string goalId,
+        [Description("active, paused, achieved or archived. Only if the user asked to change the state.")] string? status = null,
+        [Description("A new title, only if the user asked to reword it.")] string? title = null,
+        [Description("A new target, only if the user said.")] string? target = null,
+        [Description("A new date, YYYY-MM-DD, only if the user gave one.")] string? horizon = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(goalId, out var id)) return "That goal ID is not valid. Call GetGoals first.";
+        var normalizedStatus = status?.Trim().ToLowerInvariant();
+        if (normalizedStatus is { Length: > 0 } && !GoalStatuses.All.Contains(normalizedStatus))
+            return $"Status must be one of: {string.Join(", ", GoalStatuses.All)}.";
+        DateOnly? due = null;
+        if (!string.IsNullOrWhiteSpace(horizon))
+        {
+            if (!DateOnly.TryParseExact(horizon.Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var parsed))
+                return "I could not read that date. Use YYYY-MM-DD, or leave the date out.";
+            due = parsed;
+        }
+        if (normalizedStatus is not { Length: > 0 } && string.IsNullOrWhiteSpace(title) &&
+            string.IsNullOrWhiteSpace(target) && due is null)
+            return "Nothing to change. Say what should change: the state, title, target or date.";
+        var result = await goals.UpdateAsync(currentUser.OwnerId, id,
+            new GoalInput(string.IsNullOrWhiteSpace(title) ? null : title, null, due,
+                string.IsNullOrWhiteSpace(target) ? null : target, null, null,
+                normalizedStatus is { Length: > 0 } ? normalizedStatus : null, null, null, null),
+            cancellationToken);
+        return result.Failure switch
+        {
+            GoalFailure.None => $"Goal updated: \"{result.Value!.Goal.Title}\" is {result.Value.Goal.Status}.",
+            GoalFailure.NotFound => "I could not find that goal.",
+            _ => $"I could not update the goal: {result.Message}"
+        };
+    }
+
+    [Description("Permanently delete a goal and its check-ins, only when the user clearly asks to delete it (not to pause or archive it; use UpdateGoal for that). The user is asked to approve first.")]
+    public async Task<string> DeleteGoalAsync(
+        [Description("The goal's ID from GetGoals.")] string goalId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(goalId, out var id)) return "That goal ID is not valid. Call GetGoals first.";
+        return await goals.DeleteAsync(currentUser.OwnerId, id, cancellationToken)
+            ? "The goal and its check-ins are deleted."
+            : "I could not find that goal.";
     }
 
     [Description("Record a check-in on a goal in the user's own words: what moved (even if small), what got in the way, and what to adjust. Only call it when the user told you this; never invent progress. Feeling is on_track, slipping or stuck.")]

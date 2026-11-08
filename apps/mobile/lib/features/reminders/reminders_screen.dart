@@ -294,7 +294,8 @@ abstract class _RemindersController extends State<RemindersScreen>
           'title': created.title,
           'dueAt': localDueAt.toUtc().toIso8601String(),
           if (created.recurrence != 'once') 'recurrence': created.recurrence,
-          if (created.recurrence == 'weekly') 'weekdays': created.weekdays,
+          if (created.recurrence == 'weekly' || created.recurrence == 'biweekly')
+            'weekdays': created.weekdays,
           'timeZoneId': timeZoneId,
           'localTime': localTime,
         },

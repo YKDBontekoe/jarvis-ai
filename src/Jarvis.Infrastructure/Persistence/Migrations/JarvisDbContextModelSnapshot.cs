@@ -19,7 +19,7 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
@@ -1960,6 +1960,10 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lease_until");
 
+                    b.Property<string>("MediaJson")
+                        .HasColumnType("text")
+                        .HasColumnName("media_json");
+
                     b.Property<string>("Peer")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -2963,6 +2967,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
+
+                    b.Property<DateOnly?>("PausedFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("paused_from");
+
+                    b.Property<DateOnly?>("PausedUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("paused_until");
 
                     b.Property<int>("TargetPerWeek")
                         .HasColumnType("integer")

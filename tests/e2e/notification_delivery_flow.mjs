@@ -44,17 +44,23 @@ assert.deepEqual(steps.map((s) => s.state), ['created', 'not_pushed', 'unread'])
 assert.match(steps[1].text, /No phone was registered/);
 
 console.log('With a phone registered but push not configured...');
-assert.equal((await request('PUT', '/push-devices', { token: `token-${tag}`, platform: 'ios' })).status, 200);
-const second = await dueReminderNotification(`Second ${tag}`);
-const waiting = (await request('GET', `/notifications/${second.id}/delivery`)).data.steps;
-assert.equal(waiting[1].state, 'waiting', 'a push nobody sent is never called sent');
-assert.equal(waiting[2].state, 'unread');
+const phone = { token: `token-${tag}`, platform: 'ios' };
+assert.equal((await request('PUT', '/push-devices', phone)).status, 200);
+try {
+  const second = await dueReminderNotification(`Second ${tag}`);
+  const waiting = (await request('GET', `/notifications/${second.id}/delivery`)).data.steps;
+  assert.equal(waiting[1].state, 'waiting', 'a push nobody sent is never called sent');
+  assert.equal(waiting[2].state, 'unread');
 
-console.log('Opening it is recorded as read...');
-assert.equal((await request('POST', `/notifications/${second.id}/read`)).status, 204);
-const read = (await request('GET', `/notifications/${second.id}/delivery`)).data.steps;
-assert.equal(read[2].state, 'read');
-assert.ok(read[2].at);
+  console.log('Opening it is recorded as read...');
+  assert.equal((await request('POST', `/notifications/${second.id}/read`)).status, 204);
+  const read = (await request('GET', `/notifications/${second.id}/delivery`)).data.steps;
+  assert.equal(read[2].state, 'read');
+  assert.ok(read[2].at);
+} finally {
+  // Left registered, the phone would break the "no phone registered" step on the next run.
+  await request('DELETE', '/push-devices', phone);
+}
 
 console.log('Summary time and unknown ids...');
 assert.equal((await request('PUT', '/notifications/digest', { time: '25:00' })).status, 400);

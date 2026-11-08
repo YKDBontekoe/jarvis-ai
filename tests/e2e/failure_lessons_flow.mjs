@@ -12,9 +12,20 @@ const container = process.env.JARVIS_E2E_PG_CONTAINER;
 assert.ok(container, 'set JARVIS_E2E_PG_CONTAINER to the Postgres container name');
 const tool = `FixtureSearch${randomUUID().slice(0, 6)}`;
 
+// Each run signs up a fresh account, so what an earlier run learned (lessons, rejected changes) does not carry over.
+async function freshAccount(apiBase) {
+  const response = await fetch(apiBase + '/auth/register', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: `e2e-${randomUUID()}@example.invalid`, password: `${randomUUID()}Aa1!` }),
+  });
+  assert.equal(response.status, 200, `register: ${response.status} ${await response.clone().text()}`);
+  return `Bearer ${(await response.json()).accessToken}`;
+}
+const authorization = await freshAccount(base);
+
 async function request(method, path, body) {
   const response = await fetch(base + path, {
-    method, headers: body ? { 'Content-Type': 'application/json' } : {},
+    method, headers: { Authorization: authorization, ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(240_000),
   });
   const text = await response.text();

@@ -117,6 +117,27 @@ public sealed class ApiProblemDetailsTests
         Assert.True(LegacyErrorResponseParser.AlreadyProblemContract("{\"code\":\"conflict\"}"));
     }
 
+    [Theory]
+    [InlineData("\"Missing OAuth state.\"")]
+    [InlineData("[\"one\",\"two\"]")]
+    [InlineData("42")]
+    [InlineData("null")]
+    public void LegacyErrorResponseParser_accepts_error_bodies_that_are_not_objects(string body)
+    {
+        // Results.BadRequest("text") writes a JSON string; reading it as an object used to turn the 400 into a 500.
+        Assert.False(LegacyErrorResponseParser.AlreadyProblemContract(body));
+        Assert.False(LegacyErrorResponseParser.TryParseValidationErrors(body, out _));
+        _ = LegacyErrorResponseParser.ExtractClientDetail(body);
+    }
+
+    [Fact]
+    public void LegacyErrorResponseParser_uses_a_plain_string_body_as_the_detail()
+    {
+        Assert.Equal("Missing OAuth state.",
+            LegacyErrorResponseParser.ExtractClientDetail("\"Missing OAuth state.\""));
+        Assert.Null(LegacyErrorResponseParser.ExtractClientDetail("[\"one\"]"));
+    }
+
     [Fact]
     public void ApplyProductionRedaction_hides_internal_failure_details()
     {

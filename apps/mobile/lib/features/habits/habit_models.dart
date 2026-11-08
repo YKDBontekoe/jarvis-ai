@@ -59,6 +59,7 @@ class HabitView {
     required this.totalCheckIns,
     required this.openToday,
     required this.recentDates,
+    this.pausedUntil,
   });
 
   factory HabitView.fromJson(Map<String, dynamic> json) {
@@ -84,6 +85,7 @@ class HabitView {
       totalCheckIns: asJsonInt(stats['totalCheckIns']),
       openToday: stats['openToday'] == true,
       recentDates: dates,
+      pausedUntil: parseHabitDate(json['pausedUntil']),
     );
   }
 
@@ -102,6 +104,11 @@ class HabitView {
   final int totalCheckIns;
   final bool openToday;
   final Set<DateTime> recentDates;
+
+  /// The last day of a pause that is on today; null when the habit is not paused.
+  final DateTime? pausedUntil;
+
+  bool get paused => pausedUntil != null;
 
   bool get isWeekly => cadence == 'weekly';
   String get displayIcon => (icon == null || icon!.isEmpty) ? '✅' : icon!;
@@ -155,6 +162,7 @@ class HabitView {
       totalCheckIns: totalCheckIns + delta,
       openToday: !done && (!isWeekly || week < targetPerWeek),
       recentDates: dates,
+      pausedUntil: pausedUntil,
     );
   }
 

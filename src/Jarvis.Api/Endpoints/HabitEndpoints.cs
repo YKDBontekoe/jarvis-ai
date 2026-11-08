@@ -58,6 +58,15 @@ internal static class HabitEndpoints
             return Results.Ok(result.Value!.ToDto());
         }).WithName("ArchiveHabit");
 
+        habits.MapPut("/{id:guid}/pause", async (Guid id, HabitPauseRequest request, IHabitService service,
+            IAuditEventStore audit, ICurrentUser currentUser, CancellationToken ct) =>
+        {
+            var result = await service.SetPausedAsync(id, currentUser.OwnerId, request.Until, ct);
+            if (Failed(result) is { } failure) return failure;
+            await AuditAsync(audit, logger, currentUser, request.Until is null ? "habit.resumed" : "habit.paused", id, ct);
+            return Results.Ok(result.Value!.ToDto());
+        }).WithName("PauseHabit");
+
         habits.MapDelete("/{id:guid}", async (Guid id, IHabitService service, IAuditEventStore audit,
             ICurrentUser currentUser, CancellationToken ct) =>
         {

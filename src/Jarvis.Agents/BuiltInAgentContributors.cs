@@ -153,13 +153,14 @@ internal sealed class CoreAgentContext(
     IAutomationRuleRepository automations,
     IMemoryRecallTracker recalls,
     TimeProvider? timeProvider = null,
-    Jarvis.Application.Learning.ITurnTraceCollector? trace = null) : IAgentContextContributor
+    Jarvis.Application.Learning.ITurnTraceCollector? trace = null,
+    Jarvis.Application.Settings.IOwnerSettingsStore? settings = null) : IAgentContextContributor
 {
     public int Order => 0;
 
     public IEnumerable<AIContextProvider> CreateProviders(AgentBuildContext context) =>
     [
-        new ClockContextProvider(briefings, context.OwnerId, timeProvider ?? TimeProvider.System),
+        new ClockContextProvider(settings, briefings, context.OwnerId, timeProvider ?? TimeProvider.System),
         new PersonalMemoryContextProvider(memories, context.OwnerId, recalls, context.Profile, trace),
         new ActiveTasksContextProvider(tasks, context.OwnerId, context.ExecutingTaskId),
         new ActiveConditionWatchesContextProvider(watches, context.OwnerId),

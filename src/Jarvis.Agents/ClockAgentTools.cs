@@ -52,10 +52,11 @@ internal sealed class ClockAgentTools(TimeProvider clock)
 }
 
 /// <summary>
-/// Supplies the current time on every turn, including the owner's configured local time zone
-/// (taken from their briefing preference) so relative dates resolve without asking.
+/// Supplies the current time on every turn, including the owner's local time zone so relative dates resolve without
+/// asking: the home zone they chose in Settings, else their briefing's zone (the same order reminders use).
 /// </summary>
-internal sealed class ClockContextProvider(IDailyBriefingRepository briefings, Guid ownerId, TimeProvider clock)
+internal sealed class ClockContextProvider(Jarvis.Application.Settings.IOwnerSettingsStore? settings,
+    IDailyBriefingRepository briefings, Guid ownerId, TimeProvider clock)
     : MessageAIContextProvider
 {
     protected override async ValueTask<IEnumerable<ChatMessage>> ProvideMessagesAsync(
@@ -64,10 +65,11 @@ internal sealed class ClockContextProvider(IDailyBriefingRepository briefings, G
     {
         var now = clock.GetUtcNow();
         var text = "Current time reference: " + ClockAgentTools.Describe(now, TimeZoneInfo.Utc, includeSeconds: false) + ".";
-        var preference = await briefings.GetAsync(ownerId, cancellationToken);
-        if (preference is not null && ClockAgentTools.TryFindTimeZone(preference.TimeZoneId, out var zone) &&
-            zone != TimeZoneInfo.Utc)
-            text += " The user's configured local time zone is " + ClockAgentTools.Describe(now, zone, includeSeconds: false) + ".";
+        // Only the briefing's zone used to be read, so a home zone chosen in Settings was ignored and Jarvis asked.
+        var home = await Jarvis.Application.Preferences.OwnerZoneResolver.ResolveAsync(settings, briefings, ownerId,
+            cancellationToken);
+        if (home.Source != Jarvis.Application.Preferences.ZoneSources.Default && home.Zone != TimeZoneInfo.Utc)
+            text += " The user's configured local time zone is " + ClockAgentTools.Describe(now, home.Zone, includeSeconds: false) + ".";
         else
             text += " The user's local time zone is not configured; ask for it when a local time matters.";
         return [new ChatMessage(ChatRole.User, text)];

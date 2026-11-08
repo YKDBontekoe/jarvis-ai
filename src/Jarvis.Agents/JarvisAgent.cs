@@ -16,7 +16,8 @@ namespace Jarvis.Agents;
 public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientResolver chatClients, McpToolHost mcpToolHost,
     IConversationStore conversations, IJarvisTaskRepository tasks, IAssistantProfileService profiles,
     IOwnerSettingsStore settings, ICurrentUser currentUser, IFileService files,
-    IStandingApprovalService standingApprovals, IApprovalPolicy approvalPolicy) : IJarvisAgent
+    IStandingApprovalService standingApprovals, IApprovalPolicy approvalPolicy,
+    IConversationFileContextRepository fileContext) : IJarvisAgent
 {
     private const int MaxAutomaticApprovalsPerTurn = 16;
     private bool _backgroundTask;
@@ -31,7 +32,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
     {
         var agent = await GetAgentAsync(conversationId, cancellationToken);
         var sessionJson = await conversations.GetAgentSessionAsync(conversationId, cancellationToken);
-        ChatMessage[] input = [await BuildUserMessageAsync(currentUserMessage, cancellationToken)];
+        ChatMessage[] input = [await BuildUserMessageAsync(conversationId, currentUserMessage, cancellationToken)];
         if (sessionJson is not null &&
             AgentSessionJson.HasInFlightProgressAfterUser(sessionJson, currentUserMessage.Content))
             input = [];
@@ -83,23 +84,53 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
     }
 
     /// <summary>
-    /// The user's text plus any photos they sent, loaded from their own files. A photo that is gone or too
-    /// large becomes a short note so the turn still runs.
+    /// The user's text plus the images the model should see, as real images: photos sent with the message, image
+    /// files attached as sources, and a couple of recent earlier photos so follow-up questions about them work
+    /// (see <see cref="ImageSelection"/>). An image that is gone or too large becomes a short note so the turn still
+    /// runs.
     /// </summary>
-    private async Task<ChatMessage> BuildUserMessageAsync(Message message, CancellationToken cancellationToken)
+    private async Task<ChatMessage> BuildUserMessageAsync(Guid conversationId, Message message,
+        CancellationToken cancellationToken)
     {
-        var attachments = MessageAttachments.Parse(message.AttachmentsJson);
-        if (attachments.Count == 0) return new ChatMessage(ChatRole.User, message.Content);
+        var ownerId = currentUser.OwnerId;
+        var own = MessageAttachments.Parse(message.AttachmentsJson).Take(MessageAttachments.MaxPerMessage).ToArray();
+
+        var sources = new List<(Guid, string, string)>();
+        var attached = await fileContext.GetSourcesAsync(conversationId, ownerId, cancellationToken);
+        foreach (var source in attached.Files)
+        {
+            var file = await files.GetAsync(source.FileId, ownerId, cancellationToken);
+            if (file is not null && MessageAttachments.IsSupportedImage(file.ContentType) &&
+                file.SizeBytes <= MessageAttachments.MaxImageBytes)
+                sources.Add((file.Id, file.FileName, file.ContentType));
+        }
+
+        var earlier = new List<IReadOnlyList<MessageAttachment>>();
+        if (own.Length == 0)
+        {
+            var history = await conversations.GetMessagesAsync(conversationId, cancellationToken);
+            earlier.AddRange(history.Where(item => item.Id != message.Id && item.AttachmentsJson is not null)
+                .OrderByDescending(item => item.CreatedAt)
+                .Take(ImageSelection.EarlierMessageWindow)
+                .Select(item => (IReadOnlyList<MessageAttachment>)MessageAttachments.Parse(item.AttachmentsJson)));
+        }
+
+        var plan = ImageSelection.Plan(own, sources, earlier);
+        if (plan.Count == 0 && own.Length == 0) return new ChatMessage(ChatRole.User, message.Content);
 
         List<AIContent> contents = [new TextContent(message.Content)];
-        foreach (var attachment in attachments.Take(MessageAttachments.MaxPerMessage))
+        var shown = plan.ToDictionary(image => image.FileId);
+        // Photos of this message that did not make the plan (unsupported type) still get their note below.
+        foreach (var attachment in own.Where(item => !shown.ContainsKey(item.FileId)))
+            contents.Add(new TextContent("[A photo the user attached is no longer available.]"));
+        foreach (var image in plan)
         {
-            var opened = await files.OpenReadAsync(attachment.FileId, currentUser.OwnerId, cancellationToken);
-            if (opened is not { } file || !MessageAttachments.IsSupportedImage(file.File.ContentType) ||
-                file.File.SizeBytes > MessageAttachments.MaxImageBytes)
+            var opened = await files.OpenReadAsync(image.FileId, ownerId, cancellationToken);
+            if (opened is not { } file || file.File.SizeBytes > MessageAttachments.MaxImageBytes)
             {
                 if (opened is { } unused) await unused.Content.DisposeAsync();
-                contents.Add(new TextContent("[A photo the user attached is no longer available.]"));
+                if (image.Reason == ImageReason.ThisMessage)
+                    contents.Add(new TextContent("[A photo the user attached is no longer available.]"));
                 continue;
             }
             await using var stream = file.Content;
@@ -107,9 +138,11 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
             await stream.CopyToAsync(buffer, cancellationToken);
             if (buffer.Length > MessageAttachments.MaxImageBytes)
             {
-                contents.Add(new TextContent("[A photo the user attached is too large to show.]"));
+                if (image.Reason == ImageReason.ThisMessage)
+                    contents.Add(new TextContent("[A photo the user attached is too large to show.]"));
                 continue;
             }
+            contents.Add(new TextContent(ImageSelection.Caption(image)));
             contents.Add(new DataContent(buffer.ToArray(), file.File.ContentType));
         }
         return new ChatMessage(ChatRole.User, contents);
