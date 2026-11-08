@@ -109,7 +109,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('This device')),
+    appBar: AppBar(title: const PageTitle('This device')),
     body: _loading
         ? const SkeletonList()
         : OrbRefresh(

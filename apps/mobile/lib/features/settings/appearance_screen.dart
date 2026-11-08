@@ -24,7 +24,7 @@ class AppearanceScreen extends StatelessWidget {
     };
 
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.appearanceTitle)),
+      appBar: AppBar(title: PageTitle(context.l10n.appearanceTitle)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

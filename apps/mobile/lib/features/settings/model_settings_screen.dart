@@ -463,7 +463,7 @@ class _ModelSettingsScreenState extends _ModelSettingsController
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Models')),
+    appBar: AppBar(title: const PageTitle('Models')),
     body: _loading
         ? const LoadingState()
         : SafeArea(

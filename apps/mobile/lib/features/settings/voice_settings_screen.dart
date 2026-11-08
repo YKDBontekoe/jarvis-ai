@@ -105,7 +105,7 @@ class _VoiceSettingsScreenState extends State<VoiceSettingsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Voice')),
+    appBar: AppBar(title: const PageTitle('Voice')),
     body: _loading
         ? const LoadingState()
         : ListView(

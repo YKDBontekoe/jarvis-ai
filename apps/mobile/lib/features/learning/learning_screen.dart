@@ -272,7 +272,7 @@ class _LearningScreenState extends _LearningController with _LearningCards {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Learning')),
+    appBar: AppBar(title: const PageTitle('Learning')),
     body: _loading
         ? const SkeletonList()
         : OrbRefresh(

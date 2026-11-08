@@ -111,7 +111,7 @@ class _UsageScreenState extends State<UsageScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Usage')),
+    appBar: AppBar(title: const PageTitle('Usage')),
     body: _loading && _usage == null
         ? const SkeletonList()
         : _error != null && _usage == null

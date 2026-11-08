@@ -53,7 +53,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
     final controller = AppLockScope.maybeOf(context);
     final colors = JarvisColors.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Face ID lock')),
+      appBar: AppBar(title: const PageTitle('Face ID lock')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

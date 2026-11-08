@@ -141,7 +141,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Morning briefing')),
+      appBar: AppBar(title: const PageTitle('Morning briefing')),
       body: _loading
           ? const SkeletonList(shape: SkeletonShape.detail)
           : !_loaded

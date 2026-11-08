@@ -127,7 +127,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
     final data = _data;
     final colors = JarvisColors.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Timeline')),
+      appBar: AppBar(title: const PageTitle('Timeline')),
       body: ContentWidth(
         child: ListScreenBody(
           loading: _loading,
