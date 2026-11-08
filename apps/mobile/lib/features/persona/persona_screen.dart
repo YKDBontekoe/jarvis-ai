@@ -227,7 +227,9 @@ class _PersonaScreenState extends State<PersonaScreen> {
                       SectionHeader(
                         'What Jarvis has learned',
                         trailing: Text(
-                          '${_traits.length} rules',
+                          _traits.length == 1
+                              ? '1 rule'
+                              : '${_traits.length} rules',
                           style: TextStyle(
                             color: JarvisColors.of(context).muted,
                           ),

@@ -561,7 +561,7 @@ class _FilesScreenState extends State<FilesScreen> {
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           Text(
-                            '$count files',
+                            count == 1 ? '1 file' : '$count files',
                             style: TextStyle(
                               color: JarvisColors.of(context).muted,
                               fontSize: 13,

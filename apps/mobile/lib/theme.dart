@@ -689,7 +689,13 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       linearMinHeight: 4,
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.all(colors.surface),
+      // In dark mode an off thumb in the surface colour vanished into the
+      // dark track; it takes the soft ink there instead.
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) || !colors.isDark
+            ? colors.surface
+            : colors.inkSoft,
+      ),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
             ? colors.ink

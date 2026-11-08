@@ -471,7 +471,7 @@ List<ToolSegment> foldToolSteps(List<ToolStep> steps) {
 /// "4 steps done" or "4 steps done · made 2 things": the outcome of a folded run.
 String foldedStepsSummary(List<ToolStep> steps) {
   final made = steps.fold<int>(0, (sum, step) => sum + step.refs.length);
-  final base = '${steps.length} steps done';
+  final base = steps.length == 1 ? '1 step done' : '${steps.length} steps done';
   return made == 0
       ? base
       : '$base · made $made ${made == 1 ? 'thing' : 'things'}';

@@ -135,7 +135,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
       title: asJsonString(goal['title']) ?? 'Goal',
       subtitle: [
         if (goal['feeling'] != null) goalFeelingLabels[goal['feeling']] ?? '',
-        if (open > 0) '$open steps this week',
+        if (open > 0) open == 1 ? '1 step this week' : '$open steps this week',
         if (review != null) asJsonString(review['reason']) ?? '',
       ].where((x) => x.isNotEmpty).join('\n'),
       trailing: due
