@@ -109,7 +109,7 @@ class _CodingRunsScreenState extends State<CodingRunsScreen> {
 
   Widget _runCard(Map<String, dynamic> run) {
     final status = asJsonString(run['status']) ?? '';
-    final style = statusStyle(status);
+    final style = statusStyle(status, JarvisColors.of(context));
     final files = jsonStrings(run['changedFiles']);
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),

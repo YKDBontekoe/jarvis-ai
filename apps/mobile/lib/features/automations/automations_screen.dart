@@ -481,7 +481,7 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       upcoming = 'Switch it on to let it run.';
     } else if (next != null && next.isAfter(DateTime.now())) {
       upcoming =
-          'Next run ${friendlyWhen(context, next)} · ${relativeFromNow(next)}';
+          'Next run ${friendlyWhen(context, next, inSentence: true)} · ${relativeFromNow(next)}';
     } else if (kind == 'schedule') {
       upcoming = 'Scheduling the next run…';
     } else if (kind == 'manual') {
@@ -688,7 +688,9 @@ Color runStatusColor(BuildContext context, String? status) {
 /// not met", "Waiting for your approval since …".
 String describeLastRun(BuildContext context, Map<String, dynamic> run) {
   final started = jsonDate(run['startedAt'], local: true);
-  final when = started == null ? '' : ' ${friendlyWhen(context, started)}';
+  final when = started == null
+      ? ''
+      : ' ${friendlyWhen(context, started, inSentence: true)}';
   final test = run['testRun'] == true ? 'Test run' : 'Last run';
   final summary = asJsonString(run['failureSummary']);
   return switch (asJsonString(run['status'])) {

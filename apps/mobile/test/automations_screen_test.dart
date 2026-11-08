@@ -74,8 +74,8 @@ void main() {
 
     expect(find.text('Every weekday at 07:30'), findsOneWidget);
     expect(find.text('Notify you “Coffee”'), findsOneWidget);
-    expect(find.textContaining('Next run Tomorrow'), findsOneWidget);
-    expect(find.textContaining('Skipped Today').first, findsOneWidget);
+    expect(find.textContaining('Next run tomorrow'), findsOneWidget);
+    expect(find.textContaining('Skipped today').first, findsOneWidget);
     expect(find.textContaining('its conditions were not met'), findsOneWidget);
   });
 

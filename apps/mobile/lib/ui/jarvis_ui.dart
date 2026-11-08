@@ -233,18 +233,27 @@ class IconBadge extends StatelessWidget {
 
 /// A compact status label with a leading dot.
 class StatusPill extends StatelessWidget {
-  const StatusPill({required this.label, required this.color, super.key});
+  const StatusPill({required this.label, required this.color, super.key})
+    : status = null;
 
-  StatusPill.forStatus(String status, {super.key})
+  StatusPill.forStatus(String this.status, {super.key})
     : label = statusStyle(status).label,
       color = statusStyle(status).color;
 
   final String label;
   final Color color;
 
+  /// When built from a status, the dot takes that status's colour in the
+  /// current theme rather than the light palette.
+  final String? status;
+
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
+    final color = switch (status) {
+      final status? => statusStyle(status, colors).color,
+      null => this.color,
+    };
     return Container(
       padding: const EdgeInsets.fromLTRB(7, 3, 9, 3),
       decoration: BoxDecoration(
@@ -279,59 +288,65 @@ class StatusPill extends StatelessWidget {
 
 typedef StatusStyle = ({String label, Color color, IconData icon});
 
-/// Shared visual language for task, reminder, watch, and file statuses.
-StatusStyle statusStyle(String status) => switch (status) {
-  'running' || 'processing' => (
-    label: status == 'running' ? 'In progress' : 'Processing',
-    color: JarvisColors.light.info,
-    icon: PhosphorIconsRegular.hourglassMedium,
-  ),
-  'needs_approval' => (
-    label: 'Needs approval',
-    color: JarvisColors.light.warning,
-    icon: PhosphorIconsRegular.shieldWarning,
-  ),
-  'completed' ||
-  'delivered' ||
-  'indexed' ||
-  'triggered' ||
-  'sent' ||
-  'ready' => (
-    label: status == 'ready' ? 'Ready' : _titleCase(status),
-    color: JarvisColors.light.success,
-    icon: PhosphorIconsRegular.checkCircle,
-  ),
-  'failed' || 'error' || 'rejected' => (
-    label: _titleCase(status),
-    color: JarvisColors.light.danger,
-    icon: PhosphorIconsRegular.warningCircle,
-  ),
-  'cancelled' || 'canceled' || 'stopped' || 'expired' => (
-    label: _titleCase(status),
-    color: JarvisColors.light.muted,
-    icon: PhosphorIconsRegular.prohibit,
-  ),
-  'active' || 'pending' || 'scheduled' => (
-    label: _titleCase(status),
-    color: JarvisColors.light.accent,
-    icon: PhosphorIconsRegular.clock,
-  ),
-  'waiting' => (
-    label: 'Waiting',
-    color: JarvisColors.light.violet,
-    icon: PhosphorIconsRegular.pauseCircle,
-  ),
-  'queued' => (
-    label: 'Queued',
-    color: JarvisColors.light.inkSoft,
-    icon: PhosphorIconsRegular.clock,
-  ),
-  _ => (
-    label: status.isEmpty ? 'Unknown' : _titleCase(status),
-    color: JarvisColors.light.inkSoft,
-    icon: PhosphorIconsRegular.circle,
-  ),
-};
+/// Shared visual language for task, reminder, watch, and file statuses. Pass
+/// the current [palette] (`JarvisColors.of(context)`) so the colour reads in
+/// dark mode too; without it the light palette is used.
+StatusStyle statusStyle(String status, [JarvisColors? palette]) =>
+    _statusStyle(status, palette ?? JarvisColors.light);
+
+StatusStyle _statusStyle(String status, JarvisColors palette) =>
+    switch (status) {
+      'running' || 'processing' => (
+        label: status == 'running' ? 'In progress' : 'Processing',
+        color: palette.info,
+        icon: PhosphorIconsRegular.hourglassMedium,
+      ),
+      'needs_approval' => (
+        label: 'Needs approval',
+        color: palette.warning,
+        icon: PhosphorIconsRegular.shieldWarning,
+      ),
+      'completed' ||
+      'delivered' ||
+      'indexed' ||
+      'triggered' ||
+      'sent' ||
+      'ready' => (
+        label: status == 'ready' ? 'Ready' : _titleCase(status),
+        color: palette.success,
+        icon: PhosphorIconsRegular.checkCircle,
+      ),
+      'failed' || 'error' || 'rejected' => (
+        label: _titleCase(status),
+        color: palette.danger,
+        icon: PhosphorIconsRegular.warningCircle,
+      ),
+      'cancelled' || 'canceled' || 'stopped' || 'expired' => (
+        label: _titleCase(status),
+        color: palette.muted,
+        icon: PhosphorIconsRegular.prohibit,
+      ),
+      'active' || 'pending' || 'scheduled' => (
+        label: _titleCase(status),
+        color: palette.accent,
+        icon: PhosphorIconsRegular.clock,
+      ),
+      'waiting' => (
+        label: 'Waiting',
+        color: palette.violet,
+        icon: PhosphorIconsRegular.pauseCircle,
+      ),
+      'queued' => (
+        label: 'Queued',
+        color: palette.inkSoft,
+        icon: PhosphorIconsRegular.clock,
+      ),
+      _ => (
+        label: status.isEmpty ? 'Unknown' : _titleCase(status),
+        color: palette.inkSoft,
+        icon: PhosphorIconsRegular.circle,
+      ),
+    };
 
 String _titleCase(String value) {
   final text = value.replaceAll('_', ' ');

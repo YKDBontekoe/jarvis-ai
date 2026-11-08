@@ -275,7 +275,7 @@ mixin _ChatScreenNav on _ChatScreenController {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _error = 'Sign in failed: $error';
+          _error = 'Could not sign in. Check your connection and try again.';
           _signedOut = true;
           _restoringSession = false;
         });
@@ -412,7 +412,11 @@ mixin _ChatScreenNav on _ChatScreenController {
             !_signedOut &&
             !_signingOut &&
             _conversationId == conversationId) {
-          setState(() => _error = 'Could not connect to Jarvis: $error');
+          setState(
+            () => _error =
+                'Could not connect to Jarvis. Check your connection and try '
+                'again.',
+          );
         }
       }
       return;

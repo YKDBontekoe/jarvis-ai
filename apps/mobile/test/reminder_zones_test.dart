@@ -85,7 +85,7 @@ void main() {
     final line = find.byKey(const Key('reminder-zone-line'));
     expect(line, findsOneWidget);
     expect(tester.widget<Text>(line).data, contains('in Tokyo'));
-    expect(tester.widget<Text>(line).data, contains('9:00 PM'));
+    expect(tester.widget<Text>(line).data, contains('21:00'));
   });
 
   testWidgets('a reminder on the phone clock gets no extra zone line', (

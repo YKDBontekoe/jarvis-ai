@@ -10,7 +10,7 @@ import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../shell/utility_pages.dart';
-import '../../schedule_format.dart' show deviceTimeZoneLookup;
+import '../../schedule_format.dart' show clockOf, deviceTimeZoneLookup;
 
 class ProactiveScreen extends StatefulWidget {
   const ProactiveScreen({
@@ -509,7 +509,7 @@ class _ProactiveScreenState extends State<ProactiveScreen> {
     final date = jsonDate(raw, local: true);
     if (date == null) return '';
     final local = MaterialLocalizations.of(context);
-    return '${local.formatMediumDate(date)} ${local.formatTimeOfDay(TimeOfDay.fromDateTime(date))}';
+    return '${local.formatMediumDate(date)} ${clockOf(context, date)}';
   }
 }
 

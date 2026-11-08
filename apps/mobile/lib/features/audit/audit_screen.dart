@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../ui/phosphor_icons.dart';
 
+import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
@@ -188,7 +189,7 @@ class _AuditRow extends StatelessWidget {
                       ),
                       if (timestamp != null)
                         Text(
-                          _formatTime(timestamp),
+                          '${MaterialLocalizations.of(context).formatMediumDate(timestamp)} · ${clockOf(context, timestamp)}',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: JarvisColors.of(context).muted),
                         ),
@@ -200,7 +201,10 @@ class _AuditRow extends StatelessWidget {
                     runSpacing: 6,
                     children: [
                       _Tag(asJsonString(event['tool']) ?? 'Jarvis'),
-                      StatusPill(label: risk, color: _riskColor(risk)),
+                      StatusPill(
+                        label: risk,
+                        color: _riskColor(risk, JarvisColors.of(context)),
+                      ),
                     ],
                   ),
                   if (metadata != null && metadata != '{}') ...[
@@ -225,23 +229,19 @@ class _AuditRow extends StatelessWidget {
     );
   }
 
-  static Color _riskColor(String risk) {
+  static Color _riskColor(String risk, JarvisColors palette) {
     final value = risk.toLowerCase();
     if (value.contains('high') || value.contains('destructive')) {
-      return JarvisColors.light.danger;
+      return palette.danger;
     }
     if (value.contains('medium') || value.contains('write')) {
-      return JarvisColors.light.warning;
+      return palette.warning;
     }
     if (value.contains('low') || value.contains('read')) {
-      return JarvisColors.light.success;
+      return palette.success;
     }
-    return JarvisColors.light.inkSoft;
+    return palette.inkSoft;
   }
-
-  static String _formatTime(DateTime value) =>
-      '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')} '
-      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 }
 
 class _Tag extends StatelessWidget {

@@ -14,24 +14,29 @@ part 'skill_detail_screen.dart';
 part 'skill_editor_sheet.dart';
 
 /// Visual label for where a skill came from.
-({String label, IconData icon, Color color}) skillSource(String source) =>
-    switch (source) {
-      'learned' => (
-        label: 'Learned',
-        icon: PhosphorIconsRegular.sparkle,
-        color: JarvisColors.light.violet,
-      ),
-      'imported' => (
-        label: 'Imported',
-        icon: PhosphorIconsRegular.downloadSimple,
-        color: JarvisColors.light.info,
-      ),
-      _ => (
-        label: 'Yours',
-        icon: PhosphorIconsRegular.user,
-        color: JarvisColors.light.accent,
-      ),
-    };
+({String label, IconData icon, Color color}) skillSource(
+  String source, [
+  JarvisColors? palette,
+]) {
+  final colors = palette ?? JarvisColors.light;
+  return switch (source) {
+    'learned' => (
+      label: 'Learned',
+      icon: PhosphorIconsRegular.sparkle,
+      color: colors.violet,
+    ),
+    'imported' => (
+      label: 'Imported',
+      icon: PhosphorIconsRegular.downloadSimple,
+      color: colors.info,
+    ),
+    _ => (
+      label: 'Yours',
+      icon: PhosphorIconsRegular.user,
+      color: colors.accent,
+    ),
+  };
+}
 
 class SkillsScreen extends StatefulWidget {
   const SkillsScreen({required this.http, super.key});
@@ -182,7 +187,10 @@ class _SkillsScreenState extends State<SkillsScreen> {
   );
 
   Widget _tile(Map<String, dynamic> skill) {
-    final source = skillSource(asJsonString(skill['source']) ?? 'user');
+    final source = skillSource(
+      asJsonString(skill['source']) ?? 'user',
+      JarvisColors.of(context),
+    );
     final uses = asJsonInt(skill['useCount']);
     return ListTile(
       key: Key('skill-${skill['name']}'),

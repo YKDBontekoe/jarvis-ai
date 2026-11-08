@@ -190,7 +190,10 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
 
   Widget _header(Map<String, dynamic> skill) {
     final status = asJsonString(skill['status']) ?? 'active';
-    final source = skillSource(asJsonString(skill['source']) ?? 'user');
+    final source = skillSource(
+      asJsonString(skill['source']) ?? 'user',
+      JarvisColors.of(context),
+    );
     final locked = asJsonBool(skill['isLocked']);
     return SurfaceCard(
       child: Column(

@@ -197,7 +197,7 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
 
   Widget _body(Map<String, dynamic> run) {
     final status = asJsonString(run['status']) ?? '';
-    final style = statusStyle(status);
+    final style = statusStyle(status, JarvisColors.of(context));
     final summary = asJsonString(run['summary']);
     final error = asJsonString(run['error']);
     final files = jsonMaps(_diff?['files']);

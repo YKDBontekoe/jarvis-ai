@@ -315,8 +315,13 @@ class _FilesScreenState extends State<FilesScreen> {
       } else if (mounted) {
         _showError('Download cancelled.');
       }
-    } catch (error) {
-      if (mounted) _showError('Could not open this file: $error');
+    } catch (_) {
+      if (mounted) {
+        _showError(
+          'Could not open this file. Try again, or download it to open it '
+          'in another app.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _downloads.remove(id));
     }

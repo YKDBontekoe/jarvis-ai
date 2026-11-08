@@ -322,7 +322,7 @@ class _TasksScreenState extends State<TasksScreen> {
   Widget _taskCard(Map<String, dynamic> task) {
     final colors = JarvisColors.of(context);
     final status = asJsonString(task['status']) ?? 'queued';
-    final style = statusStyle(status);
+    final style = statusStyle(status, JarvisColors.of(context));
     final canCancel = ['queued', 'running', 'needs_approval'].contains(status);
     final needsYou = status == 'needs_approval';
     final summary = asJsonString(task['summary']);

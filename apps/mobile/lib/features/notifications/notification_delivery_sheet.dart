@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../json_maps.dart';
+import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../ui/feature_kit.dart';
 import '../../ui/phosphor_icons.dart';
@@ -92,11 +93,7 @@ class _NotificationDeliverySheetState extends State<NotificationDeliverySheet> {
                   title: asJsonString(step['text']) ?? '',
                   subtitle: jsonDate(step['at'], local: true) == null
                       ? null
-                      : MaterialLocalizations.of(context).formatTimeOfDay(
-                          TimeOfDay.fromDateTime(
-                            jsonDate(step['at'], local: true)!,
-                          ),
-                        ),
+                      : clockOf(context, jsonDate(step['at'], local: true)!),
                 ),
           ],
         ),

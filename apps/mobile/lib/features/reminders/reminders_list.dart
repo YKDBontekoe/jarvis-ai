@@ -347,8 +347,9 @@ class _RemindersScreenState extends _RemindersController {
     if (pending && place != null) {
       primary = place.repeats ? '${place.label} · every visit' : place.label;
     } else if (pending && due != null) {
-      final when = friendlyWhen(context, due);
-      primary = repeat == null ? when : '$repeat · next $when';
+      primary = repeat == null
+          ? friendlyWhen(context, due)
+          : '$repeat · next ${friendlyWhen(context, due, inSentence: true)}';
     } else {
       primary = outcome.label;
     }
@@ -437,14 +438,15 @@ class _RemindersScreenState extends _RemindersController {
     final completed = jsonDate(reminder['completedAt'], local: true);
     return switch (status) {
       'completed' || 'delivered' when delivered != null => (
-        label: 'Reminded you ${friendlyWhen(context, delivered)}',
+        label:
+            'Reminded you ${friendlyWhen(context, delivered, inSentence: true)}',
         icon: PhosphorIconsRegular.checkCircle,
         color: colors.success,
       ),
       'completed' || 'delivered' => (
         label: completed == null
             ? 'Done'
-            : 'Marked done ${friendlyWhen(context, completed)}',
+            : 'Marked done ${friendlyWhen(context, completed, inSentence: true)}',
         icon: PhosphorIconsRegular.checkCircle,
         color: colors.success,
       ),

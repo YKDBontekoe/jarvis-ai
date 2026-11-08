@@ -118,7 +118,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (!mounted || revision != _revision) return;
       setState(() {
         _loading = false;
-        _error = 'Search failed: $error';
+        _error = 'Search did not finish. Check your connection and try again.';
       });
     }
   }

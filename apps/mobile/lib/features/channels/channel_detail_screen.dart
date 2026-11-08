@@ -252,7 +252,10 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final channel = _channel;
-    final kind = channelKind(asJsonString(channel?['kind']) ?? '');
+    final kind = channelKind(
+      asJsonString(channel?['kind']) ?? '',
+      JarvisColors.of(context),
+    );
     return Scaffold(
       appBar: AppBar(
         title: PageTitle(asJsonString(channel?['displayName']) ?? 'Channel'),

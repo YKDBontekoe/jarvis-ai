@@ -31,7 +31,9 @@ String describeApiError(DioException error) {
   }
   final problemText = firstProblemMessage(response?.data);
   if (problemText != null && problemText.isNotEmpty) return problemText;
-  if (status != null) return 'Jarvis returned HTTP $status.';
+  if (status != null) {
+    return 'Jarvis could not finish this (error $status). Try again in a moment.';
+  }
   return switch (error.type) {
     DioExceptionType.connectionTimeout ||
     DioExceptionType.sendTimeout ||

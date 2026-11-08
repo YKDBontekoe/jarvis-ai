@@ -7,6 +7,7 @@ import '../../ui/phosphor_icons.dart';
 import 'conversation_export.dart';
 import 'conversation_groups.dart';
 import '../projects/move_to_project.dart';
+import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
@@ -516,10 +517,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     final sameDay =
         date.year == now.year && date.month == now.month && date.day == now.day;
     if (sameDay) {
-      final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
-      return 'Today at $hour:${date.minute.toString().padLeft(2, '0')} ${date.hour < 12 ? 'AM' : 'PM'}';
+      return 'Today ${clockOf(context, date)}';
     }
-    return '${date.day}/${date.month}/${date.year}';
+    return MaterialLocalizations.of(context).formatMediumDate(date);
   }
 }
 

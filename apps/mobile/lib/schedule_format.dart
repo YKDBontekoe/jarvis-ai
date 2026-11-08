@@ -26,17 +26,31 @@ const weekdayNames = [
   (64, 'Sun'),
 ];
 
+/// "14:30". Jarvis shows times on the 24-hour clock everywhere, so a reminder
+/// list, a chat row and the Right now card never disagree about the format.
+String clockOf(BuildContext context, DateTime local) =>
+    MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay.fromDateTime(local),
+      alwaysUse24HourFormat: true,
+    );
+
 /// "Today 14:30", "Tomorrow 08:00", "Wed 14:30" within a week, otherwise the
-/// medium date with the time.
-String friendlyWhen(BuildContext context, DateTime local, {DateTime? now}) {
+/// medium date with the time. [inSentence] lowercases today, tomorrow and
+/// yesterday for use after other words ("Reminded you yesterday 20:00").
+String friendlyWhen(
+  BuildContext context,
+  DateTime local, {
+  DateTime? now,
+  bool inSentence = false,
+}) {
   final localizations = MaterialLocalizations.of(context);
-  final time = localizations.formatTimeOfDay(TimeOfDay.fromDateTime(local));
+  final time = clockOf(context, local);
   final today = _day(now ?? DateTime.now());
   final days = _day(local).difference(today).inDays;
   final day = switch (days) {
-    0 => 'Today',
-    1 => 'Tomorrow',
-    -1 => 'Yesterday',
+    0 => inSentence ? 'today' : 'Today',
+    1 => inSentence ? 'tomorrow' : 'Tomorrow',
+    -1 => inSentence ? 'yesterday' : 'Yesterday',
     > 1 && < 7 => _weekdayName(local.weekday),
     _ => localizations.formatMediumDate(local),
   };
@@ -128,7 +142,7 @@ DateTime? wallClockInZone(DateTime instant, String? zoneId) {
 String zoneCity(String zoneId) => zoneId.split('/').last.replaceAll('_', ' ');
 
 /// How a scheduled [instant] reads on the clock of its own [zoneId], for example
-/// "Tomorrow 9:00 AM in Lisbon". Null when that is the same time the phone
+/// "Tomorrow 09:00 in Lisbon". Null when that is the same time the phone
 /// shows (so there is nothing to explain) or the zone is unknown.
 String? zoneEquivalentLine(
   BuildContext context,
