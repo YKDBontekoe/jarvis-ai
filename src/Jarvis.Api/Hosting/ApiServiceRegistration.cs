@@ -166,12 +166,8 @@ internal static class ApiServiceRegistration
         services.AddSingleton<VoiceBackendSession>();
         services.AddSingleton<VoiceRuntime>();
         services.AddHostedService(provider => provider.GetRequiredService<VoiceRuntime>());
-        services.AddHttpClient("npm-registry", client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(20);
-            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("jarvis", "1.0"));
-        });
         services.AddSingleton<CodexInstallation>();
+        services.AddHostedService<CodexVersionGuard>();
         services.AddSingleton<CodexSignIn>();
         services.AddHttpClient("firebase-messaging", client => client.Timeout = TimeSpan.FromSeconds(15));
         services.AddHostedService<NotificationPushWorker>();

@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Jarvis.Agents;
@@ -16,12 +14,9 @@ public sealed class CodexInstallationTests : IDisposable
     public void Version_parsing_accepts_cli_output_and_stable_releases_only()
     {
         Assert.Equal("0.145.0", CodexInstallation.ReadVersion("codex-cli 0.145.0\n"));
-        Assert.True(CodexInstallation.IsNewerRelease("0.157.0", "0.145.0"));
-        Assert.False(CodexInstallation.IsNewerRelease("0.145.0", "0.145.0"));
-        Assert.True(CodexInstallation.IsNewerRelease("0.157.0", null));
         Assert.False(CodexInstallation.IsStableRelease("0.158.0-alpha.1"));
         Assert.False(CodexInstallation.IsStableRelease("0.1.0; rm -rf /"));
-        Assert.False(CodexInstallation.IsNewerRelease("latest", "0.1.0"));
+        Assert.True(CodexInstallation.IsStableRelease("0.167.0"));
     }
 
     [Fact]
@@ -84,15 +79,14 @@ public sealed class CodexInstallationTests : IDisposable
     [Fact]
     public async Task Status_lists_models_from_the_installed_cli_and_caches_them()
     {
-        var installation = CreateInstallation("""{"version":"0.157.0"}""");
+        var installation = CreateInstallation();
 
         var first = await installation.Status.GetStatusAsync(CancellationToken.None);
         var second = await installation.Status.GetStatusAsync(CancellationToken.None);
 
         Assert.Equal("0.145.0", first.InstalledVersion);
-        Assert.Equal("0.157.0", first.LatestVersion);
-        Assert.True(first.UpdateAvailable);
-        Assert.True(first.CanUpdate);
+        Assert.Equal(CodexVersion.Pinned, first.PinnedVersion);
+        Assert.False(first.MatchesPinnedVersion);
         Assert.Equal(["gpt-5.4", "gpt-5.4-mini", "hidden-model"], first.Models.Select(model => model.Model));
         Assert.Equal(["juniper", "cove", "spruce"], first.Voices.Voices.Select(voice => voice.Id));
         Assert.Equal("cove", first.Voices.DefaultVoice);
@@ -112,7 +106,7 @@ public sealed class CodexInstallationTests : IDisposable
         Assert.Contains(versionBranch, CurrentCliScript, StringComparison.Ordinal);
         var script = CurrentCliScript.Replace(versionBranch, versionBranch + "    sys.stdin.read()\n",
             StringComparison.Ordinal);
-        var installation = CreateInstallation("""{"version":"0.157.0"}""", cliScript: script);
+        var installation = CreateInstallation(cliScript: script);
 
         var started = System.Diagnostics.Stopwatch.StartNew();
         var status = await installation.Status.GetStatusAsync(TestContext.Current.CancellationToken);
@@ -122,64 +116,88 @@ public sealed class CodexInstallationTests : IDisposable
     }
 
     [Fact]
-    public async Task Update_installs_the_registry_release_and_loads_its_models()
+    public async Task A_stock_cli_of_another_version_gets_the_pinned_release_installed()
     {
-        var installation = CreateInstallation("""{"version":"0.157.0"}""");
+        var installation = CreateInstallation();
 
-        var updated = await installation.Status.UpdateAsync(CancellationToken.None);
+        await installation.Status.EnsurePinnedAsync(CancellationToken.None);
+        var status = await installation.Status.GetStatusAsync(CancellationToken.None);
 
         var log = await File.ReadAllTextAsync(Path.Combine(installation.ManagedDirectory, "install.log"));
-        Assert.Contains("@openai/codex@0.157.0", log, StringComparison.Ordinal);
-        Assert.Contains("--prefix", log, StringComparison.Ordinal);
-        Assert.Contains(installation.ManagedDirectory, log, StringComparison.Ordinal);
+        Assert.Contains("@openai/codex@" + CodexVersion.Pinned, log, StringComparison.Ordinal);
         Assert.DoesNotContain("sh -c", log, StringComparison.Ordinal);
-        Assert.Equal("0.157.0", updated.InstalledVersion);
-        Assert.False(updated.UpdateAvailable);
-        Assert.True(updated.UsingManagedInstall);
-        Assert.Equal("gpt-5.6-sol", Assert.Single(updated.Models).Model);
+        Assert.Equal(CodexVersion.Pinned, status.InstalledVersion);
+        Assert.True(status.MatchesPinnedVersion);
+        Assert.True(status.UsingManagedInstall);
+        Assert.Equal("gpt-5.6-sol", Assert.Single(status.Models).Model);
         Assert.Equal(Path.Combine(installation.ManagedDirectory, "bin", "codex"), installation.Executable.Resolve());
+        // Installed beside the managed directory and moved into place, so nothing half-installed is left behind.
+        Assert.False(Directory.Exists(installation.ManagedDirectory + ".installing"));
     }
 
     [Fact]
-    public async Task Update_does_nothing_when_the_installed_release_is_current()
+    public async Task A_stock_cli_at_the_pinned_release_is_used_as_is()
     {
-        var installation = CreateInstallation("""{"version":"0.145.0"}""");
+        var installation = CreateInstallation(stockVersion: CodexVersion.Pinned);
 
-        var status = await installation.Status.UpdateAsync(CancellationToken.None);
+        await installation.Status.EnsurePinnedAsync(CancellationToken.None);
 
-        Assert.Equal("0.145.0", status.InstalledVersion);
-        Assert.False(status.UpdateAvailable);
-        Assert.False(status.UsingManagedInstall);
-        Assert.False(File.Exists(Path.Combine(installation.ManagedDirectory, "install.log")));
-    }
-
-    [Fact]
-    public async Task Update_refuses_an_unrecognized_registry_version()
-    {
-        var installation = CreateInstallation("""{"version":"0.1.0;touch /tmp/pwned"}""");
-
-        var status = await installation.Status.GetStatusAsync(CancellationToken.None);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            installation.Status.UpdateAsync(CancellationToken.None));
-
-        Assert.Null(status.LatestVersion);
-        Assert.False(status.UpdateAvailable);
-        Assert.Contains("stable", error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.False(File.Exists(Path.Combine(installation.ManagedDirectory, "install.log")));
-    }
-
-    [Fact]
-    public async Task Update_leaves_a_custom_executable_in_place()
-    {
-        var installation = CreateInstallation("""{"version":"0.157.0"}""", stockName: false);
-
-        var status = await installation.Status.GetStatusAsync(CancellationToken.None);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            installation.Status.UpdateAsync(CancellationToken.None));
-
-        Assert.False(status.CanUpdate);
-        Assert.Contains("custom Codex executable", error.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(installation.ManagedDirectory));
         Assert.Equal(installation.Executable.ConfiguredPath, installation.Executable.Resolve());
+    }
+
+    [Fact]
+    public async Task A_managed_install_of_another_version_is_removed()
+    {
+        // An earlier Jarvis let the owner install the latest release; Jarvis now runs the version it pins.
+        var installation = CreateInstallation(stockVersion: CodexVersion.Pinned);
+        Directory.CreateDirectory(Path.Combine(installation.ManagedDirectory, "bin"));
+        WriteExecutable(Path.Combine(installation.ManagedDirectory, "bin", "codex"),
+            "#!/bin/sh\necho codex-cli 0.199.0\n");
+
+        await installation.Status.EnsurePinnedAsync(CancellationToken.None);
+
+        Assert.False(Directory.Exists(installation.ManagedDirectory));
+        Assert.Equal(installation.Executable.ConfiguredPath, installation.Executable.Resolve());
+    }
+
+    [Fact]
+    public async Task A_managed_install_at_the_pinned_release_is_kept()
+    {
+        var installation = CreateInstallation();
+        Directory.CreateDirectory(Path.Combine(installation.ManagedDirectory, "bin"));
+        var managed = Path.Combine(installation.ManagedDirectory, "bin", "codex");
+        WriteExecutable(managed, $"#!/bin/sh\necho codex-cli {CodexVersion.Pinned}\n");
+
+        await installation.Status.EnsurePinnedAsync(CancellationToken.None);
+
+        Assert.Equal(managed, installation.Executable.Resolve());
+        Assert.False(File.Exists(Path.Combine(installation.ManagedDirectory, "install.log")));
+    }
+
+    [Fact]
+    public async Task A_custom_executable_is_left_alone()
+    {
+        var installation = CreateInstallation(stockName: false);
+
+        var outcome = await installation.Status.EnsurePinnedAsync(CancellationToken.None);
+
+        Assert.Contains("custom", outcome, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(installation.ManagedDirectory));
+        Assert.Equal(installation.Executable.ConfiguredPath, installation.Executable.Resolve());
+    }
+
+    [Fact]
+    public void The_container_image_installs_the_pinned_release()
+    {
+        var root = AppContext.BaseDirectory;
+        while (!File.Exists(Path.Combine(root, "infra", "compose", "Dockerfile")))
+            root = Path.GetDirectoryName(root) ?? throw new InvalidOperationException("Repository root not found.");
+        var dockerfile = File.ReadAllText(Path.Combine(root, "infra", "compose", "Dockerfile"));
+
+        Assert.Contains("@openai/codex@" + CodexVersion.Pinned + "\n", dockerfile.ReplaceLineEndings("\n"),
+            StringComparison.Ordinal);
+        Assert.True(CodexInstallation.IsStableRelease(CodexVersion.Pinned));
     }
 
     public void Dispose()
@@ -198,47 +216,29 @@ public sealed class CodexInstallationTests : IDisposable
     private static int CountCalls(string directory, string argument) =>
         File.ReadAllLines(Path.Combine(directory, "calls.log")).Count(line => line.Contains(argument, StringComparison.Ordinal));
 
-    private Installation CreateInstallation(string registryBody, bool stockName = true, string? cliScript = null)
+    private Installation CreateInstallation(bool stockName = true, string? cliScript = null,
+        string stockVersion = "0.145.0")
     {
         var directory = Directory.CreateDirectory(Path.Combine(_root, Guid.NewGuid().ToString("N"))).FullName;
         var cliDirectory = Path.Combine(directory, "current");
         Directory.CreateDirectory(cliDirectory);
         var executableName = stockName ? "codex" : "fake_codex_app_server.mjs";
         var executablePath = Path.Combine(cliDirectory, executableName);
-        WriteExecutable(executablePath, cliScript ?? CurrentCliScript);
+        WriteExecutable(executablePath, (cliScript ?? CurrentCliScript).Replace("codex-cli 0.145.0",
+            "codex-cli " + stockVersion, StringComparison.Ordinal));
 
         var npmPath = Path.Combine(directory, "npm");
         WriteExecutable(npmPath, NpmScript);
 
         var managed = Path.Combine(directory, "managed");
         var executable = new CodexExecutable(executablePath, managed, npmPath);
-        var handler = new RegistryHandler(registryBody);
-        var http = new HttpClient(handler);
-        var installation = new CodexInstallation(new ClientFactory(http), executable, new CodexProcessLimiter(),
+        var installation = new CodexInstallation(executable, new CodexProcessLimiter(),
             NullLogger<CodexInstallation>.Instance);
         return new Installation(installation, executable, cliDirectory, managed);
     }
 
     private sealed record Installation(CodexInstallation Status, CodexExecutable Executable, string CliDirectory,
         string ManagedDirectory);
-
-    private sealed class ClientFactory(HttpClient client) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => client;
-    }
-
-    private sealed class RegistryHandler(string body) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Assert.Contains("@openai/codex/latest", Uri.UnescapeDataString(request.RequestUri!.ToString()),
-                StringComparison.Ordinal);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(body, Encoding.UTF8, "application/json")
-            });
-        }
-    }
 
     private const string CurrentCliScript = """
         #!/usr/bin/env python3

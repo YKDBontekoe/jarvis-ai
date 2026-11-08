@@ -3,8 +3,8 @@ using Microsoft.Extensions.Configuration;
 namespace Jarvis.Agents;
 
 /// <summary>
-/// Resolves the Codex CLI. A Settings update installs into <see cref="ManagedDirectory"/> and is preferred
-/// when Jarvis is still pointed at the stock <c>codex</c> executable.
+/// Resolves the Codex CLI. When the stock <c>codex</c> is not the release Jarvis pins, Jarvis installs that release into
+/// <see cref="ManagedDirectory"/>, which is then preferred (see <see cref="CodexInstallation.EnsurePinnedAsync"/>).
 /// </summary>
 public sealed class CodexExecutable
 {
@@ -73,11 +73,14 @@ public sealed class CodexExecutable
         return null;
     }
 
-    public string? FindManagedExecutable()
+    public string? FindManagedExecutable() => FindExecutableIn(ManagedDirectory);
+
+    /// <summary>The CLI binary an npm install with <c>--prefix</c> <paramref name="directory"/> leaves behind.</summary>
+    public static string? FindExecutableIn(string directory)
     {
         foreach (var relative in new[] { Path.Combine("bin", "codex"), Path.Combine("node_modules", ".bin", "codex") })
         {
-            var path = Path.Combine(ManagedDirectory, relative);
+            var path = Path.Combine(directory, relative);
             if (!File.Exists(path)) continue;
             EnsureExecutable(path);
             return path;

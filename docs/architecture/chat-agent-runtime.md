@@ -72,6 +72,6 @@ Voice uses LiveKit rooms and an in-process C# runtime (`Jarvis.Api/Realtime`). C
 
 ## Model routing
 
-Per-owner settings (`/api/v1/settings/models`) choose Codex vs OpenRouter, model IDs per class (fast, reasoning, coding, vision, embedding), and optional Codex CLI self-update under `$CODEX_HOME/cli`.
+Per-owner settings (`/api/v1/settings/models`) choose Codex vs OpenRouter, model IDs per class (fast, reasoning, coding, vision, embedding), and which listed Codex model to use. The Codex CLI version itself is not an owner choice: Jarvis runs `CodexVersion.Pinned` (`src/Jarvis.Agents/CodexInstallation.cs`, kept in step with `infra/compose/Dockerfile` by a unit test), because it relies on that release's app-server protocol (service tiers, thread continuation). `CodexVersionGuard` enforces it at API startup: a managed install under `$CODEX_HOME/cli` with another version is removed, and when the stock `codex` is another version, the pinned one is installed there (atomically, under a lock file shared with the worker). A custom `Codex:ExecutablePath` (a wrapper or test fixture) is left alone.
 
 See [backend/agent-tools.md](../backend/agent-tools.md), [backend/assistant-profiles.md](../backend/assistant-profiles.md), and [operations/configuration.md](../operations/configuration.md).

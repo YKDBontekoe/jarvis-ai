@@ -21,9 +21,9 @@ public sealed record SaveModelSettingsRequest(string? Provider, string? ChatMode
 public sealed record CodexModelDto(string Id, string Model, string DisplayName, string? Description, bool IsDefault,
     bool Hidden, bool SupportsImages, IReadOnlyList<string> InputModalities,
     IReadOnlyList<ReasoningEffortOption> SupportedReasoningEfforts, string? DefaultReasoningEffort);
-public sealed record CodexInstallationDto(string? InstalledVersion, string? LatestVersion, bool UpdateAvailable,
-    bool CanUpdate, bool UsingManagedInstall, string? UpdateBlockedReason, string? Error,
-    IReadOnlyList<CodexModelDto> Models);
+/// <summary>The Codex CLI Jarvis runs. Its version is managed by Jarvis (<see cref="CodexVersion.Pinned"/>).</summary>
+public sealed record CodexInstallationDto(string? InstalledVersion, string PinnedVersion, bool MatchesPinnedVersion,
+    bool UsingManagedInstall, string? Error, IReadOnlyList<CodexModelDto> Models);
 
 internal static class ModelSettingsEndpoints
 {
@@ -65,7 +65,7 @@ internal static class ModelSettingsEndpoints
                 {
                     if (normalized.ChatModel is not null && !catalog.SupportsModel(normalized.ChatModel))
                         return EndpointHelpers.Invalid("chatModel",
-                            $"The installed Codex CLI does not support '{normalized.ChatModel}'. Choose a listed model or update Codex.");
+                            $"The installed Codex CLI does not support '{normalized.ChatModel}'. Choose a listed model.");
                     var selectedModel = normalized.ChatModel is null
                         ? catalog.Models.FirstOrDefault(model => model.IsDefault)
                         : catalog.Models.FirstOrDefault(model => model.Model == normalized.ChatModel ||
@@ -128,24 +128,6 @@ internal static class ModelSettingsEndpoints
         models.MapGet("/codex", async (CodexInstallation codex, CancellationToken ct) =>
             Results.Ok(ToCodexDto(await codex.GetStatusAsync(ct))))
             .WithName("GetCodexInstallation");
-
-        models.MapPost("/codex/update", async (CodexInstallation codex, IAuditEventStore audit, ICurrentUser currentUser,
-            CancellationToken ct) =>
-        {
-            try
-            {
-                var status = await codex.UpdateAsync(ct);
-                await EndpointHelpers.TryAppendAuditAsync(audit, logger, currentUser.OwnerId, "settings",
-                    "codex.updated", "moderate", true, null,
-                    JsonSerializer.Serialize(new { version = status.InstalledVersion }), ct);
-                return Results.Ok(ToCodexDto(status));
-            }
-            catch (InvalidOperationException exception)
-            {
-                return EndpointHelpers.Invalid("codex", exception.Message);
-            }
-        }).WithName("UpdateCodex");
-
         // ChatGPT sign-in for the server's Codex CLI, so nobody needs a shell on the host. Starting is only possible
         // while Codex is signed out.
         models.MapGet("/codex/sign-in", async (CodexSignIn signIn, CancellationToken ct) =>
@@ -235,8 +217,8 @@ internal static class ModelSettingsEndpoints
     }
 
     private static CodexInstallationDto ToCodexDto(CodexInstallationStatus status) =>
-        new(status.InstalledVersion, status.LatestVersion, status.UpdateAvailable, status.CanUpdate,
-            status.UsingManagedInstall, status.UpdateBlockedReason, status.Error,
+        new(status.InstalledVersion, status.PinnedVersion, status.MatchesPinnedVersion, status.UsingManagedInstall,
+            status.Error,
             status.Models.Select(model => new CodexModelDto(model.Id, model.Model, model.DisplayName, model.Description,
                 model.IsDefault, model.Hidden, model.SupportsImages, model.InputModalities,
                 model.SupportedReasoningEfforts, model.DefaultReasoningEffort)).ToArray());
