@@ -180,6 +180,11 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 - Quick-entry fields (list items) keep the keyboard up after each add (`onEditingComplete: () {}` and refocus).
 - Removing something with a swipe offers Undo in the snackbar. Snackbars replace the current one (`..hideCurrentSnackBar()..showSnackBar(...)`) rather than queueing.
 - List screens refresh with `OrbRefresh`; keep the content on screen while the reload runs.
+- Copying to the clipboard always confirms: a snackbar ("Draft copied"), or for something shown once, the Copy button turns into "Copied" with a check.
+- Overflow menus (`PopupMenuButton`) use the Phosphor `dotsThree` icon and a tooltip naming what they act on ("Goal actions"), never the default "Show menu".
+- App bar titles are always `PageTitle`, so a long name shrinks rather than being cut.
+- `showJarvisConfirm` gives a medium haptic on a destructive confirm and a light one otherwise.
+- Counts use the singular for one ("1 file", "1 step done"); hide a chip whose count is zero.
 - Two-series charts never tell series apart by hue alone: the second series is a neutral tone, and success is the accent, so never pair `success` with `accent`.
 
 ## 8. Copy
@@ -188,7 +193,7 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 - Buttons say what happens: Reply, Set it up, Done, +10 min, Not now. Toasts confirm it: "Saved as a draft routine. Turn it on in Routines."
 - Reason lines are plain facts: "From your calendar", "Seen 4 of your last 5 Fridays".
 - No apologies and no exclamation marks in UI text. Use typographic quotes (“ ”) in UI strings.
-- Never show raw exception text; say what failed and what to do. Errors say what failed and what to do: "Could not save the brief time".
+- Never show raw exception text; say what failed and what to do. `ErrorState` already says "Jarvis couldn’t load this", so its message reads "Could not load your files." (`errorDetail` strips a repeated "Jarvis could not"). Errors say what failed and what to do: "Could not save the brief time".
 - Short hints that fit beside buttons: "You reply in ~18 min".
 
 ## 9. Accessibility

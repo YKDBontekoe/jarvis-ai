@@ -1131,7 +1131,15 @@ Future<bool> showJarvisConfirm(
           child: Text(cancelLabel),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
+          onPressed: () {
+            // A firmer tap for something that cannot be taken back.
+            if (destructive) {
+              HapticFeedback.mediumImpact();
+            } else {
+              HapticFeedback.lightImpact();
+            }
+            Navigator.pop(dialogContext, true);
+          },
           style: destructive
               ? FilledButton.styleFrom(
                   backgroundColor: JarvisColors.of(context).danger,
