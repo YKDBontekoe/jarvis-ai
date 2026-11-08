@@ -265,7 +265,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(4, 18, 4, 0),
                     child: Text(
-                      'Tip: tell Jarvis "I went for a run" or "ik heb gelezen" '
+                      'Tip: tell Jarvis “I went for a run” or “ik heb gelezen” '
                       'and it checks the habit off for you.',
                       style: TextStyle(
                         fontSize: 13,

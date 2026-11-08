@@ -1501,7 +1501,7 @@ class _AskSheetState extends State<_AskSheet> {
                 enabled: !_busy,
                 textInputAction: TextInputAction.send,
                 decoration: InputDecoration(
-                  hintText: 'Ask anything, for example "when is the party?"',
+                  hintText: 'Ask anything, for example “when is the party?”',
                   counterText: '',
                   suffixIcon: IconButton(
                     key: const Key('whatsapp-ask-submit'),

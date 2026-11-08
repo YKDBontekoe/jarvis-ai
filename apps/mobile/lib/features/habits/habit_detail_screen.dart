@@ -343,7 +343,7 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                 padding: const EdgeInsets.fromLTRB(4, 16, 4, 0),
                 child: Text(
                   'You can also tell Jarvis in chat, for example '
-                  '"${habit.name}: done".',
+                  '“${habit.name}: done”.',
                   style: TextStyle(fontSize: 13, color: colors.muted),
                 ),
               ),

@@ -9,6 +9,8 @@ abstract final class PhosphorIconsRegular {
   static const alarm = IconData(0xe006, fontFamily: 'PhosphorRegular');
   static const appWindow = IconData(0xe5da, fontFamily: 'PhosphorRegular');
   static const archive = IconData(0xe00c, fontFamily: 'PhosphorRegular');
+  static const broom = IconData(0xec54, fontFamily: 'PhosphorRegular');
+  static const squaresFour = IconData(0xe464, fontFamily: 'PhosphorRegular');
   static const arrowBendUpLeft = IconData(
     0xe024,
     fontFamily: 'PhosphorRegular',

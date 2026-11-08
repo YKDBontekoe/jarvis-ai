@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 
@@ -109,7 +111,7 @@ class _ListsScreenState extends State<ListsScreen> {
     final name = asJsonString(list['name']) ?? 'this list';
     final ok = await showJarvisConfirm(
       context,
-      title: 'Delete "$name"?',
+      title: 'Delete “$name”?',
       message: 'The list and its items are removed.',
       confirmLabel: 'Delete',
       destructive: true,
@@ -316,26 +318,43 @@ class _ListCard extends StatefulWidget {
 
 class _ListCardState extends State<_ListCard> {
   final _controller = TextEditingController();
+  final _focus = FocusNode();
 
   @override
   void dispose() {
     _controller.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
+  /// Adds the item and keeps the keyboard up, so a shopping list can be
+  /// typed in one go. An empty submit puts the keyboard away.
   void _submit() {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      _focus.unfocus();
+      return;
+    }
+    HapticFeedback.selectionClick();
     _controller.clear();
     widget.onAdd(text);
+    _focus.requestFocus();
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
     final name = asJsonString(widget.list['name']) ?? 'List';
-    final items = jsonMaps(widget.list['items']);
-    final ticked = items.where((i) => asJsonBool(i['done'])).length;
+    // Open items first, ticked ones sink to the bottom; each group keeps
+    // the order it was added in.
+    final all = jsonMaps(widget.list['items']);
+    final items = [
+      ...all.where((i) => !asJsonBool(i['done'])),
+      ...all.where((i) => asJsonBool(i['done'])),
+    ];
+    final ticked =
+        items.length - all.where((i) => !asJsonBool(i['done'])).length;
+    final open = items.length - ticked;
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
@@ -358,8 +377,17 @@ class _ListCardState extends State<_ListCard> {
                 ),
               ),
               Text(
-                '${items.length - ticked} open',
-                style: TextStyle(fontSize: 13, color: colors.inkSoft),
+                items.isNotEmpty && open == 0 ? 'All done' : '$open open',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: items.isNotEmpty && open == 0
+                      ? colors.accent
+                      : colors.inkSoft,
+                  fontWeight: items.isNotEmpty && open == 0
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
               IconButton(
                 tooltip: 'Delete $name',
@@ -381,26 +409,45 @@ class _ListCardState extends State<_ListCard> {
               background: Container(
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 16),
-                color: colors.danger.withValues(alpha: .12),
-                child: Icon(PhosphorIconsRegular.trash, color: colors.danger),
+                decoration: BoxDecoration(
+                  color: colors.dangerSoft,
+                  borderRadius: BorderRadius.circular(JarvisRadii.sm),
+                ),
+                child: Icon(
+                  PhosphorIconsRegular.trash,
+                  color: colors.danger,
+                  semanticLabel: 'Remove',
+                ),
               ),
               child: CheckboxListTile(
                 key: ValueKey(item['id']),
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
                 value: asJsonBool(item['done']),
-                onChanged: (value) => widget.onToggle(
-                  asJsonString(item['text']) ?? '',
-                  value ?? false,
-                ),
-                title: Text(
-                  asJsonString(item['text']) ?? '',
-                  style: asJsonBool(item['done'])
-                      ? TextStyle(
-                          decoration: TextDecoration.lineThrough,
-                          color: colors.muted,
-                        )
-                      : null,
+                onChanged: (value) {
+                  HapticFeedback.selectionClick();
+                  widget.onToggle(
+                    asJsonString(item['text']) ?? '',
+                    value ?? false,
+                  );
+                },
+                title: AnimatedDefaultTextStyle(
+                  duration: JarvisMotion.of(context, JarvisMotion.base),
+                  curve: JarvisMotion.standard,
+                  style: DefaultTextStyle.of(context).style.merge(
+                    TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 15,
+                      color: asJsonBool(item['done'])
+                          ? colors.muted
+                          : colors.ink,
+                      decoration: asJsonBool(item['done'])
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                      decorationColor: colors.muted,
+                    ),
+                  ),
+                  child: Text(asJsonString(item['text']) ?? ''),
                 ),
               ),
             ),
@@ -408,7 +455,10 @@ class _ListCardState extends State<_ListCard> {
             padding: const EdgeInsets.only(right: 8),
             child: TextField(
               controller: _controller,
+              focusNode: _focus,
               textInputAction: TextInputAction.done,
+              // Handled in _submit so adding an item keeps the keyboard up.
+              onEditingComplete: () {},
               textCapitalization: TextCapitalization.sentences,
               onSubmitted: (_) => _submit(),
               decoration: InputDecoration(
@@ -422,11 +472,16 @@ class _ListCardState extends State<_ListCard> {
             ),
           ),
           if (ticked > 0)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: widget.onClear,
-                child: Text('Clear $ticked ticked'),
+            Padding(
+              padding: const EdgeInsets.only(top: 10, bottom: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: PillAction(
+                  compact: true,
+                  icon: PhosphorIconsRegular.broom,
+                  label: 'Clear $ticked ticked',
+                  onPressed: widget.onClear,
+                ),
               ),
             ),
         ],

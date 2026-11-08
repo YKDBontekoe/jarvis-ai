@@ -328,7 +328,7 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
       if (_webhooks.isEmpty)
         Text(
           'A webhook lets another service (CI, a form, a smart button) start '
-          'an automation whose trigger is "a webhook is called".',
+          'an automation whose trigger is “a webhook is called”.',
           style: TextStyle(color: JarvisColors.of(context).inkSoft),
         ),
       for (final hook in _webhooks)

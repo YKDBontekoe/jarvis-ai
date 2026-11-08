@@ -27,7 +27,7 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
       (
         title: 'Widgets',
         subtitle: 'What the home screen widgets show',
-        icon: PhosphorIconsRegular.eyeSlash,
+        icon: PhosphorIconsRegular.squaresFour,
         destination: 'widget-privacy',
       ),
       (
