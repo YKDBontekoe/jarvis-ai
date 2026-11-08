@@ -178,111 +178,118 @@ class _TripScreenState extends State<TripScreen> {
           ? const SkeletonList()
           : _error != null
           ? ErrorState(message: _error!, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      FadeSlideIn(
-                        child: KeyedSubtree(
-                          key: const Key('trip-summary'),
-                          child: HeroCard(
-                            label:
-                                '${_countdown()} · ${asJsonString(_trip['start']) ?? ''} – ${asJsonString(_trip['end']) ?? ''}',
-                            title: asJsonString(_trip['destination']) ?? '',
-                            subtitle:
-                                'Chosen so far: $currency ${(budget['chosen'] as num? ?? 0).toStringAsFixed(2)}'
-                                '${total is num ? ' of $currency ${total.toStringAsFixed(2)}' : ''}. Nothing is booked.',
-                            footer: PillAction(
-                              key: const Key('trip-dates'),
-                              onDark: true,
-                              icon: PhosphorIconsRegular.calendarBlank,
-                              label: 'Change dates',
-                              onPressed: _busy
-                                  ? null
-                                  : () => unawaited(_changeDates()),
+          : OrbRefresh(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  ContentWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        FadeSlideIn(
+                          child: KeyedSubtree(
+                            key: const Key('trip-summary'),
+                            child: HeroCard(
+                              label:
+                                  '${_countdown()} · ${asJsonString(_trip['start']) ?? ''} – ${asJsonString(_trip['end']) ?? ''}',
+                              title: asJsonString(_trip['destination']) ?? '',
+                              subtitle:
+                                  'Chosen so far: $currency ${(budget['chosen'] as num? ?? 0).toStringAsFixed(2)}'
+                                  '${total is num ? ' of $currency ${total.toStringAsFixed(2)}' : ''}. Nothing is booked.',
+                              footer: PillAction(
+                                key: const Key('trip-dates'),
+                                onDark: true,
+                                icon: PhosphorIconsRegular.calendarBlank,
+                                label: 'Change dates',
+                                onPressed: _busy
+                                    ? null
+                                    : () => unawaited(_changeDates()),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      if (unknowns.isNotEmpty) ...[
-                        GroupLabel('Still unknown', count: unknowns.length),
-                        for (final (i, unknown) in unknowns.indexed)
-                          FeatureRow(
-                            key: Key('trip-unknown-$i'),
-                            index: i,
-                            icon: PhosphorIconsRegular.info,
-                            badgeColor: colors.warning,
-                            title: unknown,
-                          ),
-                      ],
-                      const GroupLabel('Options'),
-                      for (final (i, view) in options.indexed) _option(view, i),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: PillAction(
-                          key: const Key('trip-add-option'),
-                          icon: PhosphorIconsRegular.plus,
-                          label: 'Add an option',
-                          onPressed: _busy
-                              ? null
-                              : () => unawaited(_addOption()),
-                        ),
-                      ),
-                      const GroupLabel('Days'),
-                      for (final day in days) _day(day),
-                      if (checklist.isNotEmpty) ...[
-                        const GroupLabel('Checklist'),
-                        for (final (i, entry) in checklist.indexed)
-                          FeatureRow(
-                            key: Key('trip-check-${entry['id']}'),
-                            index: i,
-                            icon: entry['done'] == true
-                                ? PhosphorIconsRegular.checkCircle
-                                : PhosphorIconsRegular.circle,
-                            quiet: entry['done'] == true,
-                            caption: asJsonString(entry['group']),
-                            title: asJsonString(entry['text']) ?? '',
-                            subtitle: asJsonString(entry['note']),
-                            onTap: _busy
+                        if (unknowns.isNotEmpty) ...[
+                          GroupLabel('Still unknown', count: unknowns.length),
+                          for (final (i, unknown) in unknowns.indexed)
+                            FeatureRow(
+                              key: Key('trip-unknown-$i'),
+                              index: i,
+                              icon: PhosphorIconsRegular.info,
+                              badgeColor: colors.warning,
+                              title: unknown,
+                            ),
+                        ],
+                        const GroupLabel('Options'),
+                        for (final (i, view) in options.indexed)
+                          _option(view, i),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: PillAction(
+                            key: const Key('trip-add-option'),
+                            icon: PhosphorIconsRegular.plus,
+                            label: 'Add an option',
+                            onPressed: _busy
                                 ? null
-                                : () => unawaited(
-                                    _send(
-                                      () => widget.http.put<dynamic>(
-                                        '$_path/checklist/${entry['id']}',
-                                        data: {'done': entry['done'] != true},
+                                : () => unawaited(_addOption()),
+                          ),
+                        ),
+                        const GroupLabel('Days'),
+                        for (final day in days) _day(day),
+                        if (checklist.isNotEmpty) ...[
+                          const GroupLabel('Checklist'),
+                          for (final (i, entry) in checklist.indexed)
+                            FeatureRow(
+                              key: Key('trip-check-${entry['id']}'),
+                              index: i,
+                              icon: entry['done'] == true
+                                  ? PhosphorIconsRegular.checkCircle
+                                  : PhosphorIconsRegular.circle,
+                              quiet: entry['done'] == true,
+                              caption: asJsonString(entry['group']),
+                              title: asJsonString(entry['text']) ?? '',
+                              subtitle: asJsonString(entry['note']),
+                              onTap: _busy
+                                  ? null
+                                  : () => unawaited(
+                                      _send(
+                                        () => widget.http.put<dynamic>(
+                                          '$_path/checklist/${entry['id']}',
+                                          data: {'done': entry['done'] != true},
+                                        ),
                                       ),
                                     ),
-                                  ),
+                            ),
+                        ],
+                        if (holds.isNotEmpty) ...[
+                          const GroupLabel('Proposed holds'),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                            child: Text(
+                              'Ideas for your calendar and reminders. Nothing has been added.',
+                              key: const Key('trip-holds-note'),
+                              style: TextStyle(
+                                color: colors.muted,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
+                          for (final (i, hold) in holds.indexed)
+                            FeatureRow(
+                              key: Key('trip-hold-$i'),
+                              index: i,
+                              icon: PhosphorIconsRegular.alarm,
+                              caption: asJsonString(hold['why']),
+                              title: asJsonString(hold['title']) ?? '',
+                              subtitle:
+                                  '${asJsonString(hold['date']) ?? ''}${asJsonString(hold['at']) == null ? '' : ' · ${(asJsonString(hold['at']) ?? '').substring(0, 5)}'}',
+                            ),
+                        ],
                       ],
-                      if (holds.isNotEmpty) ...[
-                        const GroupLabel('Proposed holds'),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                          child: Text(
-                            'Ideas for your calendar and reminders. Nothing has been added.',
-                            key: const Key('trip-holds-note'),
-                            style: TextStyle(color: colors.muted, fontSize: 13),
-                          ),
-                        ),
-                        for (final (i, hold) in holds.indexed)
-                          FeatureRow(
-                            key: Key('trip-hold-$i'),
-                            index: i,
-                            icon: PhosphorIconsRegular.alarm,
-                            caption: asJsonString(hold['why']),
-                            title: asJsonString(hold['title']) ?? '',
-                            subtitle:
-                                '${asJsonString(hold['date']) ?? ''}${asJsonString(hold['at']) == null ? '' : ' · ${(asJsonString(hold['at']) ?? '').substring(0, 5)}'}',
-                          ),
-                      ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }

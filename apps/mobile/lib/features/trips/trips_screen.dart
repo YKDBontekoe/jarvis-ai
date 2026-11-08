@@ -114,52 +114,55 @@ class _TripsScreenState extends State<TripsScreen> {
         ? const SkeletonList()
         : _error != null
         ? ErrorState(message: _error!, onRetry: _load)
-        : ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-            children: [
-              ContentWidth(
-                child: _trips.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 24),
-                        child: EmptyState(
-                          icon: PhosphorIconsRegular.airplaneTilt,
-                          title: 'Plan a trip you can trust',
-                          message: 'Dates, options with dated and sourced prices, a day-by-day plan and what is still unknown. Nothing is booked.',
-                          action: PillAction(
-                            key: const Key('trip-start'),
-                            primary: true,
-                            icon: PhosphorIconsRegular.plus,
-                            label: 'Plan a trip',
-                            onPressed: _create,
-                          ),
-                        ),
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final (i, trip) in _trips.indexed)
-                            FeatureRow(
-                              key: Key('trip-${trip['id']}'),
-                              index: i,
-                              icon: PhosphorIconsRegular.airplaneTilt,
-                              caption:
-                                  '${asJsonString(trip['start']) ?? ''} – ${asJsonString(trip['end']) ?? ''}',
-                              title: asJsonString(trip['title']) ?? 'Trip',
-                              subtitle: asJsonString(trip['destination']),
-                              trailing: asJsonInt(trip['unknowns']) > 0
-                                  ? StatusPill(
-                                      label:
-                                          '${asJsonInt(trip['unknowns'])} unknown',
-                                      color: JarvisColors.of(context).warning,
-                                    )
-                                  : null,
-                              onTap: () =>
-                                  unawaited(_open(trip['id'] as String)),
+        : OrbRefresh(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              children: [
+                ContentWidth(
+                  child: _trips.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 24),
+                          child: EmptyState(
+                            icon: PhosphorIconsRegular.airplaneTilt,
+                            title: 'Plan a trip you can trust',
+                            message: 'Dates, options with dated and sourced prices, a day-by-day plan and what is still unknown. Nothing is booked.',
+                            action: PillAction(
+                              key: const Key('trip-start'),
+                              primary: true,
+                              icon: PhosphorIconsRegular.plus,
+                              label: 'Plan a trip',
+                              onPressed: _create,
                             ),
-                        ],
-                      ),
-              ),
-            ],
+                          ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final (i, trip) in _trips.indexed)
+                              FeatureRow(
+                                key: Key('trip-${trip['id']}'),
+                                index: i,
+                                icon: PhosphorIconsRegular.airplaneTilt,
+                                caption:
+                                    '${asJsonString(trip['start']) ?? ''} – ${asJsonString(trip['end']) ?? ''}',
+                                title: asJsonString(trip['title']) ?? 'Trip',
+                                subtitle: asJsonString(trip['destination']),
+                                trailing: asJsonInt(trip['unknowns']) > 0
+                                    ? StatusPill(
+                                        label:
+                                            '${asJsonInt(trip['unknowns'])} unknown',
+                                        color: JarvisColors.of(context).warning,
+                                      )
+                                    : null,
+                                onTap: () =>
+                                    unawaited(_open(trip['id'] as String)),
+                              ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
           ),
   );
 }

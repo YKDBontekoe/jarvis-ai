@@ -258,31 +258,34 @@ class _GoalScreenState extends State<GoalScreen>
           ? const SkeletonList()
           : _error != null
           ? ErrorState(message: _error!, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _hero(status),
-                      const SizedBox(height: 12),
-                      if (status != 'active')
-                        InlineNotice(
-                          key: const Key('goal-status-notice'),
-                          tone: NoticeTone.info,
-                          message: status == 'paused'
-                              ? 'Paused. Nothing is planned or suggested until you resume.'
-                              : 'This goal is $status.',
-                        ),
-                      ..._progress(colors),
-                      ..._planSection(colors, status),
-                      ..._linked(colors),
-                      ..._experiments(colors, status),
-                    ],
+          : OrbRefresh(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  ContentWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _hero(status),
+                        const SizedBox(height: 12),
+                        if (status != 'active')
+                          InlineNotice(
+                            key: const Key('goal-status-notice'),
+                            tone: NoticeTone.info,
+                            message: status == 'paused'
+                                ? 'Paused. Nothing is planned or suggested until you resume.'
+                                : 'This goal is $status.',
+                          ),
+                        ..._progress(colors),
+                        ..._planSection(colors, status),
+                        ..._linked(colors),
+                        ..._experiments(colors, status),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }
