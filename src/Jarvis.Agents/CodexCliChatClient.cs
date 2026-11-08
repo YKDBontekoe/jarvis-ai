@@ -18,7 +18,7 @@ namespace Jarvis.Agents;
 public sealed partial class CodexCliChatClient(CodexExecutable executable, string? model = null, string? visionModel = null,
     IReadOnlyDictionary<string, string>? modelClasses = null, bool enableWebSearch = true,
     int turnTimeoutSeconds = 300, CodexProcessLimiter? processLimiter = null, CodexAccess? access = null,
-    string? chatServiceTier = CodexCliChatClient.PriorityServiceTier) : IChatClient
+    string? chatServiceTier = CodexCliChatClient.PriorityServiceTier, bool conversationThreads = true) : IChatClient
 {
     private readonly CodexAccess _access = access ?? CodexAccess.Open;
 
@@ -36,6 +36,8 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         "jarvis.model.tokens.cached_input", "{token}", "Cached input tokens reported by Codex.");
     private static readonly Counter<long> ReasoningOutputTokens = Meter.CreateCounter<long>(
         "jarvis.model.tokens.reasoning_output", "{token}", "Reasoning output tokens reported by Codex.");
+    private static readonly Counter<long> ThreadCalls = Meter.CreateCounter<long>(
+        "jarvis.codex.thread.calls", "{call}", "Codex model calls by whether they continued a conversation's thread.");
     private static readonly Counter<long> WebSearchActions = Meter.CreateCounter<long>(
         "jarvis.codex.web_search.actions", "{action}", "Codex native web-search actions completed.");
     private const int MaxPromptLength = 768_000;
@@ -83,8 +85,8 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
     {
         ArgumentNullException.ThrowIfNull(messages);
         var tools = options?.Tools?.OfType<AIFunction>().ToArray() ?? [];
-        var prompt = BuildPrompt(messages, options, tools, enableWebSearch, _access.AllowShell);
-        return await RunCodexAsync(prompt, options?.ModelId ?? model,
+        var request = PlanRequest(messages, options, tools);
+        return await RunCodexAsync(request, options?.ModelId ?? model,
             GetReasoningEffort(options),
             CallableToolNames(tools, options), null, IsBackground(options),
             cancellationToken, IsInteractive(options));
@@ -95,13 +97,13 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
     {
         ArgumentNullException.ThrowIfNull(messages);
         var tools = options?.Tools?.OfType<AIFunction>().ToArray() ?? [];
-        var prompt = BuildPrompt(messages, options, tools, enableWebSearch, _access.AllowShell);
+        var request = PlanRequest(messages, options, tools);
         var updates = Channel.CreateUnbounded<ChatResponseUpdate>(new UnboundedChannelOptions
         {
             SingleReader = true,
             SingleWriter = true
         });
-        var runTask = RunCodexAsync(prompt, options?.ModelId ?? model,
+        var runTask = RunCodexAsync(request, options?.ModelId ?? model,
             GetReasoningEffort(options),
             CallableToolNames(tools, options), updates.Writer, IsBackground(options),
             cancellationToken, IsInteractive(options));
@@ -209,7 +211,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         return selector;
     }
 
-    private async Task<ChatResponse> RunCodexAsync(PromptPayload prompt, string? requestedModel,
+    private async Task<ChatResponse> RunCodexAsync(CodexRequest request, string? requestedModel,
         string? reasoningEffort, IReadOnlySet<string> toolNames,
         ChannelWriter<ChatResponseUpdate>? updates, bool background, CancellationToken cancellationToken,
         bool interactive = false)
@@ -223,9 +225,11 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
             timeout.CancelAfter(_turnTimeout);
             var runToken = timeout.Token;
             var executablePath = executable.Resolve();
+            var continuation = TryContinue(request, executablePath);
+            var prompt = continuation?.Prompt ?? request.Full;
             try
             {
-                server = await RentAsync(executablePath, runToken);
+                server = continuation?.Thread.Process ?? await RentAsync(executablePath, runToken);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -236,18 +240,28 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
             var scratch = server.Scratch;
             {
                 var rpc = server.Rpc;
-                var modality = prompt.Images.Count > 0 ? "image" : "text";
+                // The model follows the whole conversation's images, not only the part this call sends.
+                var modality = request.Full.Images.Count > 0 ? "image" : "text";
                 var hasVisionClass = _modelClasses.ContainsKey("vision");
-                var selectedModel = prompt.Images.Count > 0
+                var selectedModel = request.Full.Images.Count > 0
                     ? visionModel ?? (hasVisionClass ? "vision" : requestedModel)
                     : requestedModel;
                 var modelCatalog = await GetModelCatalogAsync(rpc, executablePath, runToken);
                 var resolvedModel = ResolveModel(modelCatalog, ResolveModelSelector(selectedModel), modality,
-                    allowCompatibleFallback: prompt.Images.Count > 0 && visionModel is null && !hasVisionClass);
+                    allowCompatibleFallback: request.Full.Images.Count > 0 && visionModel is null && !hasVisionClass);
+                if (continuation is not null && continuation.Thread.Model != resolvedModel)
+                {
+                    // A thread runs on one model; a different one starts over with the full conversation.
+                    continuation = null;
+                    prompt = request.Full;
+                }
                 var serviceTier = SelectServiceTier(chatServiceTier, interactive,
                     modelCatalog.FirstOrDefault(candidate => candidate.Model == resolvedModel)?.ServiceTiers ??
                     new HashSet<string>());
-                var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, runToken);
+                var threadId = continuation?.Thread.ThreadId ?? await rpc.StartThreadAsync(scratch, resolvedModel, runToken);
+                var sentChars = (continuation?.Thread.SentChars ?? 0) + prompt.Text.Length;
+                if (request.ConversationKey is not null)
+                    ThreadCalls.Add(1, new TagList { { "mode", continuation is null ? "new" : "continued" } });
                 var rawResponse = new StringBuilder();
                 StructuredTextStreamDecoder textDecoder = new();
                 string? agentMessageId = null;
@@ -288,6 +302,9 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                 GenAiTelemetry.TagChat(modelActivity, "openai", resolvedModel);
                 modelActivity?.SetTag("gen_ai.request.input_images", prompt.Images.Count);
                 modelActivity?.SetTag("gen_ai.request.service_tier", serviceTier ?? "default");
+                modelActivity?.SetTag("jarvis.codex.thread", request.ConversationKey is null ? "single"
+                    : continuation is null ? "new" : "continued");
+                modelActivity?.SetTag("jarvis.codex.prompt_chars", prompt.Text.Length);
                 var modelCallStarted = Stopwatch.GetTimestamp();
                 var modelOutcome = "failed";
                 CodexTokenUsage? usage = null;
@@ -349,7 +366,9 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                     rawResponse.Clear();
                     textDecoder = new StructuredTextStreamDecoder();
                     agentMessageId = null;
-                    var retryPrompt = prompt with { Text = prompt.Text + "\n\n" + RetryInstruction(exception) };
+                    // The thread already holds the request and the unusable reply, so only the correction is sent.
+                    var retryPrompt = new PromptPayload(RetryInstruction(exception) + "\n" + ClosingLine, []);
+                    sentChars += retryPrompt.Text.Length;
                     var retryStarted = Stopwatch.GetTimestamp();
                     var retryOutcome = "failed";
                     try
@@ -433,6 +452,14 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                         Contents = [new UsageContent(reportedUsage)]
                     });
                 reusable = !ranNativeWork;
+                if (reusable)
+                {
+                    // What Jarvis will store for this reply: the streamed text, or the call itself.
+                    var stored = assistant.Contents is [FunctionCallContent] || updates is null
+                        ? assistant
+                        : new ChatMessage(ChatRole.Assistant, textDecoder.Emitted);
+                    RememberThread(request, server, threadId, resolvedModel, stored, sentChars);
+                }
                 return new ChatResponse(assistant) { ModelId = resolvedModel, Usage = reportedUsage };
             }
         }
