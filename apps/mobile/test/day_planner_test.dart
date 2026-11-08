@@ -207,6 +207,14 @@ void main() {
     await tester.tap(find.byTooltip('Remove Call plumber'));
     await tester.pumpAndSettle();
     expect(http.sent('DELETE', '$_base/items/b'), hasLength(1));
+
+    // Undo adds it back with its length.
+    http.on('POST', '$_base/items', _item('c', 'Call plumber'));
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    final undo = http.sent('POST', '$_base/items').single.body as Map;
+    expect(undo['title'], 'Call plumber');
+    expect(undo['minutes'], isNotNull);
   });
 
   testWidgets('asks chat to connect a calendar or copy focus blocks to it', (

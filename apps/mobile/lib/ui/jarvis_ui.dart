@@ -567,7 +567,7 @@ class ErrorState extends StatelessWidget {
     icon: PhosphorIconsRegular.cloudSlash,
     tone: JarvisColors.of(context).warning,
     title: 'Jarvis couldn’t load this',
-    message: message,
+    message: errorDetail(message),
     hint: onRetry == null
         ? null
         : 'Check your connection, or try again in a moment.',
@@ -580,6 +580,13 @@ class ErrorState extends StatelessWidget {
           ),
   );
 }
+
+/// The line under "Jarvis couldn’t load this": drops a repeated "Jarvis could
+/// not" so every error page reads "Could not load your files." the same way.
+String errorDetail(String message) => message.replaceFirstMapped(
+  RegExp(r"^Jarvis (could not|couldn’t|couldn't) "),
+  (_) => 'Could not ',
+);
 
 /// Loading, empty, full-page error, or a list that keeps rows visible when a refresh fails.
 ///

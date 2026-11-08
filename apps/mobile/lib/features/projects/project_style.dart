@@ -44,7 +44,7 @@ String projectCountsLabel(Map<String, dynamic> project) {
     part('fileCount', 'file', 'files'),
     part('taskCount', 'task', 'tasks'),
   ].where((item) => item.isNotEmpty).toList();
-  return parts.isEmpty ? 'Empty' : parts.join(' · ');
+  return parts.isEmpty ? 'Nothing added yet' : parts.join(' · ');
 }
 
 /// A tinted rounded square with a folder in the project's color.

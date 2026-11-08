@@ -231,11 +231,44 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
         queryParameters: _zone,
       );
       await _load();
+      _offerUndoRemove(item);
     } catch (error) {
       _toast(_problem(error, 'Could not remove that to-do.'));
     } finally {
       if (mounted) setState(() => _busyItems.remove(id));
     }
+  }
+
+  /// "Removed “Pack”" with Undo, which adds the to-do back with its length.
+  void _offerUndoRemove(Map<String, dynamic> item) {
+    if (!mounted) return;
+    final title = asJsonString(item['title']) ?? '';
+    if (title.isEmpty) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Removed “$title”'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => unawaited(() async {
+              try {
+                await widget.http.post<dynamic>(
+                  '$_base/items',
+                  queryParameters: _zone,
+                  data: {
+                    'title': title,
+                    'minutes': asJsonInt(item['minutes'], 30),
+                  },
+                );
+                await _load();
+              } catch (error) {
+                _toast(_problem(error, 'Could not bring that to-do back.'));
+              }
+            }()),
+          ),
+        ),
+      );
   }
 
   Future<void> _pin(Map<String, dynamic> item) async {

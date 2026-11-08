@@ -143,4 +143,15 @@ void main() {
     expect(node.tooltip, isEmpty);
     handle.dispose();
   });
+
+  test('error pages do not repeat “Jarvis could not” under their heading', () {
+    expect(
+      errorDetail('Jarvis could not load your files.'),
+      'Could not load your files.',
+    );
+    expect(
+      errorDetail('Could not load your people.'),
+      'Could not load your people.',
+    );
+  });
 }
