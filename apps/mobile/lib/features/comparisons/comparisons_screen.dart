@@ -271,6 +271,7 @@ class _NewComparisonSheetState extends State<_NewComparisonSheet> {
             key: const Key('comparison-title-field'),
             controller: _title,
             maxLength: 120,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'What are you deciding?',

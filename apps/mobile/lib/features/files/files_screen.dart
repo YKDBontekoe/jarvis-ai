@@ -1001,6 +1001,7 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
       controller: _controller,
       autofocus: true,
       maxLength: 80,
+      buildCounter: quietCounter,
       textInputAction: TextInputAction.done,
       onChanged: (_) => setState(() {}),
       onSubmitted: (_) => _create(),

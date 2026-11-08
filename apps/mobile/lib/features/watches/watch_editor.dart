@@ -150,6 +150,7 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
                 controller: _title,
                 autofocus: true,
                 maxLength: 200,
+                buildCounter: quietCounter,
                 decoration: const InputDecoration(
                   labelText: 'What are we watching?',
                 ),
@@ -192,6 +193,7 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
                 TextFormField(
                   controller: _url,
                   maxLength: 2048,
+                  buildCounter: quietCounter,
                   keyboardType: TextInputType.url,
                   decoration: const InputDecoration(
                     labelText: 'JSON HTTPS URL',

@@ -154,6 +154,7 @@ class _WorkingStylesScreenState extends State<WorkingStylesScreen> {
                         key: const Key('styles-task'),
                         controller: _task,
                         maxLength: 500,
+                        buildCounter: quietCounter,
                         decoration: const InputDecoration(
                           labelText: 'What are you about to do?',
                           hintText: 'Rewrite an email, plan my week, study for an exam',

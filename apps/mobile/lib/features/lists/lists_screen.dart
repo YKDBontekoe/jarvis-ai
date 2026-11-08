@@ -269,6 +269,7 @@ class _AskTextDialogState extends State<_AskTextDialog> {
       controller: _controller,
       autofocus: true,
       maxLength: 60,
+      buildCounter: quietCounter,
       textCapitalization: TextCapitalization.sentences,
       decoration: InputDecoration(
         hintText: widget.hint,

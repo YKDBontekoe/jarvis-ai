@@ -154,6 +154,7 @@ class _ProjectEditorScreenState extends State<ProjectEditorScreen> {
                       controller: _name,
                       autofocus: !_editing,
                       maxLength: _maxName,
+                      buildCounter: quietCounter,
                       textCapitalization: TextCapitalization.sentences,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
@@ -168,6 +169,7 @@ class _ProjectEditorScreenState extends State<ProjectEditorScreen> {
                     TextFormField(
                       controller: _description,
                       maxLength: _maxDescription,
+                      buildCounter: quietCounter,
                       minLines: 1,
                       maxLines: 3,
                       textCapitalization: TextCapitalization.sentences,
@@ -195,6 +197,7 @@ class _ProjectEditorScreenState extends State<ProjectEditorScreen> {
                     TextFormField(
                       controller: _instructions,
                       maxLength: _maxInstructions,
+                      buildCounter: quietCounter,
                       minLines: 6,
                       maxLines: 16,
                       textCapitalization: TextCapitalization.sentences,

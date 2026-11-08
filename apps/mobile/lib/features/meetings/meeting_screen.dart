@@ -501,6 +501,7 @@ class _MeetingScreenState extends State<MeetingScreen>
                 minLines: 2,
                 maxLines: 6,
                 maxLength: 4000,
+                buildCounter: quietCounter,
                 onEditingComplete: () => unawaited(_saveNotes()),
                 decoration: const InputDecoration(
                   hintText: 'Notes to yourself',
@@ -531,6 +532,7 @@ class _MeetingScreenState extends State<MeetingScreen>
                 minLines: 3,
                 maxLines: 8,
                 maxLength: 8000,
+                buildCounter: quietCounter,
                 decoration: const InputDecoration(
                   hintText: 'We decided to… I’ll send… Rosa will…',
                 ),
@@ -806,6 +808,7 @@ class _AcceptSheetState extends State<_AcceptSheet> {
             key: const Key('accept-text'),
             controller: _text,
             maxLength: 300,
+            buildCounter: quietCounter,
             minLines: 1,
             maxLines: 4,
             decoration: InputDecoration(

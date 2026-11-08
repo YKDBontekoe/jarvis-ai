@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../schedule_format.dart';
+
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/feature_kit.dart';
@@ -585,6 +587,7 @@ class _ItemSheetState extends State<_ItemSheet> {
   Future<void> _pick(bool from) async {
     final picked = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: from ? _from : _to,
     );
     if (picked != null) setState(() => from ? _from = picked : _to = picked);
@@ -626,13 +629,13 @@ class _ItemSheetState extends State<_ItemSheet> {
               PillAction(
                 key: const Key('item-from'),
                 icon: PhosphorIconsRegular.clock,
-                label: 'From ${_from.format(context)}',
+                label: 'From ${timeOfDayLabel(context, _from)}',
                 onPressed: () => unawaited(_pick(true)),
               ),
               PillAction(
                 key: const Key('item-to'),
                 icon: PhosphorIconsRegular.clock,
-                label: 'To ${_to.format(context)}',
+                label: 'To ${timeOfDayLabel(context, _to)}',
                 onPressed: () => unawaited(_pick(false)),
               ),
             ],

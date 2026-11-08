@@ -86,6 +86,7 @@ class _NewTaskDialogState extends State<_NewTaskDialog> with SubmitState {
             controller: _title,
             autofocus: true,
             maxLength: 200,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'Task name'),
             validator: (value) => value == null || value.trim().isEmpty
                 ? 'Enter a task name.'
@@ -97,6 +98,7 @@ class _NewTaskDialogState extends State<_NewTaskDialog> with SubmitState {
             minLines: 2,
             maxLines: 5,
             maxLength: 32000,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'What should Jarvis do?',
               alignLabelWithHint: true,

@@ -324,6 +324,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
                 controller: _title,
                 autofocus: true,
                 maxLength: 300,
+                buildCounter: quietCounter,
                 decoration: const InputDecoration(labelText: 'Remind me about'),
                 validator: (value) => value == null || value.trim().isEmpty
                     ? 'Enter a reminder.'
@@ -433,6 +434,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
           key: const Key('place-name'),
           controller: _placeName,
           maxLength: 120,
+          buildCounter: quietCounter,
           textCapitalization: TextCapitalization.words,
           decoration: const InputDecoration(
             labelText: 'Place name',
@@ -618,7 +620,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
         ),
         leading: const Icon(PhosphorIconsRegular.calendarBlank),
         trailing: const Icon(PhosphorIconsRegular.caretDown),
-        title: Text(MaterialLocalizations.of(context).formatFullDate(_date)),
+        title: Text(friendlyDate(context, _date)),
         onTap: () async {
           final value = await showDatePicker(
             context: context,
@@ -642,10 +644,11 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
         ),
         leading: const Icon(PhosphorIconsRegular.clock),
         trailing: const Icon(PhosphorIconsRegular.caretDown),
-        title: Text(_time.format(context)),
+        title: Text(timeOfDayLabel(context, _time)),
         onTap: () async {
           final value = await showTimePicker(
             context: context,
+            builder: use24HourClock,
             initialTime: _time,
           );
           if (value != null && mounted) {

@@ -270,6 +270,7 @@ mixin _UiSurfaceCardFields on _UiSurfaceCardController {
     } else {
       final time = await showTimePicker(
         context: context,
+        builder: use24HourClock,
         initialTime: _parseTime(stored) ?? TimeOfDay.now(),
       );
       if (time != null) {
@@ -292,12 +293,7 @@ mixin _UiSurfaceCardFields on _UiSurfaceCardController {
       return date == null ? value : localizations.formatMediumDate(date);
     }
     final time = _parseTime(value);
-    return time == null
-        ? value
-        : localizations.formatTimeOfDay(
-            time,
-            alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
-          );
+    return time == null ? value : timeOfDayLabel(context, time);
   }
 
   Widget _textField(

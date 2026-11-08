@@ -162,6 +162,7 @@ class _DecisionEditorScreenState extends State<DecisionEditorScreen> {
                   key: const Key('decision-title'),
                   controller: _title,
                   maxLength: 200,
+                  buildCounter: quietCounter,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'What are you deciding?',
@@ -175,6 +176,7 @@ class _DecisionEditorScreenState extends State<DecisionEditorScreen> {
                   minLines: 1,
                   maxLines: 3,
                   maxLength: 500,
+                  buildCounter: quietCounter,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'What do you expect to happen?',
@@ -238,6 +240,7 @@ class _DecisionEditorScreenState extends State<DecisionEditorScreen> {
                   minLines: 2,
                   maxLines: 8,
                   maxLength: 2000,
+                  buildCounter: quietCounter,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Why? (optional)',

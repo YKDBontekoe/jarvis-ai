@@ -1964,3 +1964,36 @@ class HeroGlow extends StatelessWidget {
     );
   }
 }
+
+/// A character counter that stays out of the way: nothing while there is
+/// plenty of room, then "182/200" in the last fifth of the limit, in the
+/// warning colour once the limit is reached. Pass it as a text field's
+/// `buildCounter` so forms are not lined with "0/32000".
+Widget? quietCounter(
+  BuildContext context, {
+  required int currentLength,
+  required bool isFocused,
+  required int? maxLength,
+}) {
+  if (maxLength == null || maxLength <= 0) return null;
+  if (currentLength < maxLength * .8) return null;
+  final colors = JarvisColors.of(context);
+  final full = currentLength >= maxLength;
+  return Semantics(
+    liveRegion: full,
+    label: full
+        ? 'Character limit reached, $maxLength characters'
+        : '${maxLength - currentLength} characters left',
+    excludeSemantics: true,
+    child: Text(
+      '$currentLength/$maxLength',
+      style: TextStyle(
+        fontFamily: 'Geist',
+        fontSize: 12,
+        fontWeight: full ? FontWeight.w600 : FontWeight.w500,
+        color: full ? colors.warning : colors.muted,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    ),
+  );
+}

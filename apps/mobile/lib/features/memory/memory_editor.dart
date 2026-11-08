@@ -87,6 +87,7 @@ class _MemoryEditorDialogState extends State<_MemoryEditorDialog> {
               minLines: 2,
               maxLines: 5,
               maxLength: 8000,
+              buildCounter: quietCounter,
               decoration: const InputDecoration(
                 labelText: 'What should Jarvis remember?',
                 alignLabelWithHint: true,

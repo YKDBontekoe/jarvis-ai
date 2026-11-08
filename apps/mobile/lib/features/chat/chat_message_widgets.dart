@@ -522,6 +522,7 @@ Future<String?> showFeedbackNoteDialog(BuildContext context) async {
         autofocus: true,
         maxLines: 3,
         maxLength: 1000,
+        buildCounter: quietCounter,
         decoration: const InputDecoration(
           hintText: 'e.g. Shorter answers, use metric units, skip the intro',
         ),
@@ -699,7 +700,21 @@ class _TypingIndicatorState extends State<TypingIndicator>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
-  )..repeat();
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Under Reduce Motion the indicator holds still; the label and elapsed
+    // time still say Jarvis is working.
+    if (JarvisMotion.reduced(context)) {
+      _controller
+        ..stop()
+        ..value = .5;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
 
   @override
   void dispose() {

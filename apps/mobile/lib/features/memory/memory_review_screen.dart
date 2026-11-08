@@ -425,6 +425,7 @@ class _CorrectionSheetState extends State<_CorrectionSheet> {
               maxLines: 4,
               minLines: 2,
               maxLength: 2000,
+              buildCounter: quietCounter,
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(hintText: 'What is true now?'),
             ),

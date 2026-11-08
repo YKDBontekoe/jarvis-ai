@@ -249,6 +249,7 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
             key: const Key('goal-title-field'),
             controller: _title,
             maxLength: 200,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'What do you want?',
@@ -259,6 +260,7 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
             key: const Key('goal-why-field'),
             controller: _why,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'Why does it matter?'),
           ),
           TextField(

@@ -113,6 +113,7 @@ class _SnoozeSheet extends StatelessWidget {
     if (date == null || !context.mounted) return;
     final time = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: TimeOfDay(hour: (now.hour + 1) % 24, minute: 0),
     );
     if (time == null || !context.mounted) return;

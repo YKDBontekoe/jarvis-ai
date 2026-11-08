@@ -666,6 +666,7 @@ class _CheckInSheetState extends State<_CheckInSheet> {
             key: const Key('checkin-progress'),
             controller: _progress,
             maxLength: 300,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'What moved, even a little?',
@@ -675,6 +676,7 @@ class _CheckInSheetState extends State<_CheckInSheet> {
             key: const Key('checkin-friction'),
             controller: _friction,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'What got in the way? (optional)',
             ),
@@ -683,6 +685,7 @@ class _CheckInSheetState extends State<_CheckInSheet> {
             key: const Key('checkin-adjustment'),
             controller: _adjustment,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'What would you change? (optional)',
             ),
@@ -761,6 +764,7 @@ class _ExperimentSheetState extends State<_ExperimentSheet> {
             key: const Key('experiment-change'),
             controller: _change,
             maxLength: 200,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'What will you change?',
@@ -770,6 +774,7 @@ class _ExperimentSheetState extends State<_ExperimentSheet> {
             key: const Key('experiment-benefit'),
             controller: _benefit,
             maxLength: 200,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'What do you hope it does?',
@@ -848,6 +853,7 @@ class _PromptDialogState extends State<_PromptDialog> {
       controller: _controller,
       keyboardType: widget.numeric ? TextInputType.number : null,
       maxLength: widget.numeric ? null : 300,
+      buildCounter: quietCounter,
       decoration: InputDecoration(labelText: widget.label),
     ),
     actions: [

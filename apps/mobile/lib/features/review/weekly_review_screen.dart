@@ -156,6 +156,7 @@ class _WeeklyReviewScreenState extends State<WeeklyReviewScreen> {
   Future<void> _chooseTime() async {
     final selected = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: _timeOf(_settings),
     );
     if (selected != null && mounted) await _saveSettings(time: selected);
@@ -885,7 +886,7 @@ class _DeliverySettings extends StatelessWidget {
             ListTile(
               enabled: !saving,
               title: const Text('Time'),
-              subtitle: Text('Sunday at ${time.format(context)}'),
+              subtitle: Text('Sunday at ${timeOfDayLabel(context, time)}'),
               trailing: const Icon(PhosphorIconsRegular.clock),
               onTap: onChooseTime,
             ),

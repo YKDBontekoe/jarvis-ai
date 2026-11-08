@@ -349,6 +349,7 @@ class _NewMeetingSheetState extends State<_NewMeetingSheet> {
             key: const Key('meeting-title-field'),
             controller: _title,
             maxLength: 120,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(labelText: 'Meeting'),
           ),
@@ -364,6 +365,7 @@ class _NewMeetingSheetState extends State<_NewMeetingSheet> {
             key: const Key('meeting-purpose-field'),
             controller: _purpose,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'What is it for?'),
           ),
           Wrap(

@@ -44,6 +44,7 @@ class _TraitDialogState extends State<_TraitDialog> {
           autofocus: true,
           maxLines: 3,
           maxLength: 280,
+          buildCounter: quietCounter,
           decoration: const InputDecoration(
             hintText: 'e.g. Keep answers under five sentences.',
           ),

@@ -306,6 +306,7 @@ class _WorkspaceSheetState extends State<_WorkspaceSheet> {
             key: const Key('workspace-name'),
             controller: _name,
             maxLength: 60,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'Name',
               hintText: 'Weekly research',
@@ -355,6 +356,7 @@ class _WorkspaceSheetState extends State<_WorkspaceSheet> {
             key: const Key('workspace-instruction'),
             controller: _instruction,
             maxLength: 400,
+            buildCounter: quietCounter,
             maxLines: 2,
             decoration: const InputDecoration(
               labelText: 'First message (optional)',

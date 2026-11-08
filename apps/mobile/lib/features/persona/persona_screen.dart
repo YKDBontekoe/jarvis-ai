@@ -329,6 +329,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
           minLines: 3,
           maxLines: 8,
           maxLength: 4000,
+          buildCounter: quietCounter,
           decoration: const InputDecoration(
             labelText: 'Your instructions for Jarvis',
             hintText: 'Anything Jarvis should always keep in mind — your role, priorities, pet peeves…',

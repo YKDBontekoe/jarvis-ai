@@ -162,6 +162,7 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
           TextFormField(
             controller: _name,
             maxLength: 80,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'Name'),
             validator: (value) => value == null || value.trim().isEmpty
                 ? 'Enter a profile name.'
@@ -170,6 +171,7 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
           TextFormField(
             controller: _description,
             maxLength: 500,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'Description'),
           ),
           TextFormField(
@@ -177,6 +179,7 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
             minLines: 3,
             maxLines: 8,
             maxLength: 4000,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'Persona instructions',
               alignLabelWithHint: true,
@@ -187,11 +190,13 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
           TextFormField(
             controller: _preferredName,
             maxLength: 60,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'Preferred name'),
           ),
           TextFormField(
             controller: _replyLanguage,
             maxLength: 40,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'Reply language'),
           ),
           SwitchListTile(

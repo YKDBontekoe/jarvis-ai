@@ -34,6 +34,30 @@ String clockOf(BuildContext context, DateTime local) =>
       alwaysUse24HourFormat: true,
     );
 
+/// "14:30" for a picked time of day, on the same 24-hour clock as [clockOf].
+String timeOfDayLabel(BuildContext context, TimeOfDay time) =>
+    MaterialLocalizations.of(context)
+        .formatTimeOfDay(time, alwaysUse24HourFormat: true);
+
+/// Builder for `showTimePicker` so the dial and the typed entry use the
+/// 24-hour clock the rest of Jarvis shows.
+Widget use24HourClock(BuildContext context, Widget? child) => MediaQuery(
+  data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+  child: child ?? const SizedBox.shrink(),
+);
+
+/// "Tomorrow · Mon, Nov 9": a date to pick or confirm, short enough for one
+/// line, with the relative day when it is close.
+String friendlyDate(BuildContext context, DateTime date, {DateTime? now}) {
+  final medium = MaterialLocalizations.of(context).formatMediumDate(date);
+  final days = _day(date).difference(_day(now ?? DateTime.now())).inDays;
+  return switch (days) {
+    0 => 'Today · $medium',
+    1 => 'Tomorrow · $medium',
+    _ => medium,
+  };
+}
+
 /// "Today 14:30", "Tomorrow 08:00", "Wed 14:30" within a week, otherwise the
 /// medium date with the time. [inSentence] lowercases today, tomorrow and
 /// yesterday for use after other words ("Reminded you yesterday 20:00").

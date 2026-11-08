@@ -396,6 +396,7 @@ class _AcceptSheetState extends State<_AcceptSheet> {
               controller: _note,
               autofocus: true,
               maxLength: 200,
+              buildCounter: quietCounter,
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(labelText: 'The next step'),
             ),

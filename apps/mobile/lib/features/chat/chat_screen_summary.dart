@@ -71,6 +71,7 @@ mixin _ChatScreenSummary on _ChatScreenController {
     if (date == null || !mounted) return false;
     final time = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: const TimeOfDay(hour: 9, minute: 0),
       helpText: 'Remind me at',
     );

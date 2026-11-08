@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../schedule_format.dart';
+
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -226,12 +228,14 @@ class _ModesScreenState extends State<ModesScreen> {
 
     final start = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: parse(state.sleepStart),
       helpText: 'Sleep mode starts',
     );
     if (start == null || !mounted) return;
     final end = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: parse(state.sleepEnd),
       helpText: 'Sleep mode ends',
     );

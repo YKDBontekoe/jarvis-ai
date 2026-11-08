@@ -918,6 +918,7 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
                 controller: _name,
                 autofocus: true,
                 maxLength: 120,
+                buildCounter: quietCounter,
                 decoration: const InputDecoration(labelText: 'Name'),
                 validator: (value) => value == null || value.trim().isEmpty
                     ? 'Give it a name.'
@@ -954,10 +955,11 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
                 ),
                 leading: const Icon(PhosphorIconsRegular.clock),
                 trailing: const Icon(PhosphorIconsRegular.caretDown),
-                title: Text(_time.format(context)),
+                title: Text(timeOfDayLabel(context, _time)),
                 onTap: () async {
                   final value = await showTimePicker(
                     context: context,
+                    builder: use24HourClock,
                     initialTime: _time,
                   );
                   if (value != null && mounted) setState(() => _time = value);
@@ -979,6 +981,7 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
                 key: const Key('automation-title'),
                 controller: _title,
                 maxLength: 120,
+                buildCounter: quietCounter,
                 decoration: const InputDecoration(
                   labelText: 'Title',
                   hintText: 'Defaults to the name',
@@ -988,6 +991,7 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
                 key: const Key('automation-body'),
                 controller: _body,
                 maxLength: 500,
+                buildCounter: quietCounter,
                 minLines: 1,
                 maxLines: 3,
                 decoration: const InputDecoration(labelText: 'Message'),

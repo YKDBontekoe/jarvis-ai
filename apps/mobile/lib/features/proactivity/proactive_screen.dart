@@ -10,7 +10,8 @@ import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../shell/utility_pages.dart';
-import '../../schedule_format.dart' show clockOf, deviceTimeZoneLookup;
+import '../../schedule_format.dart'
+    show clockOf, deviceTimeZoneLookup, use24HourClock;
 
 class ProactiveScreen extends StatefulWidget {
   const ProactiveScreen({
@@ -544,12 +545,14 @@ class _MemoryContextsDialogState extends State<_MemoryContextsDialog> {
             TextField(
               controller: _first,
               maxLength: 200,
+              buildCounter: quietCounter,
               decoration: InputDecoration(labelText: s.proactiveFirstContext),
             ),
             Text(widget.second),
             TextField(
               controller: _second,
               maxLength: 200,
+              buildCounter: quietCounter,
               decoration: InputDecoration(labelText: s.proactiveSecondContext),
             ),
           ],
@@ -717,6 +720,7 @@ class _CaseEditorState extends State<_CaseEditor> {
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: current == null
           ? const TimeOfDay(hour: 17, minute: 0)
           : TimeOfDay.fromDateTime(current),
@@ -827,6 +831,7 @@ class _CaseEditorState extends State<_CaseEditor> {
                   TextFormField(
                     controller: _title,
                     maxLength: 200,
+                    buildCounter: quietCounter,
                     decoration: InputDecoration(labelText: s.proactiveName),
                     validator: (v) => v == null || v.trim().isEmpty
                         ? s.proactiveRequired
@@ -838,6 +843,7 @@ class _CaseEditorState extends State<_CaseEditor> {
                     minLines: 3,
                     maxLines: 6,
                     maxLength: 2000,
+                    buildCounter: quietCounter,
                     decoration: InputDecoration(
                       labelText: s.proactiveObjective,
                     ),
@@ -883,6 +889,7 @@ class _CaseEditorState extends State<_CaseEditor> {
                   TextFormField(
                     controller: _stop,
                     maxLength: 1000,
+                    buildCounter: quietCounter,
                     decoration: InputDecoration(labelText: s.proactiveStopWhen),
                   ),
                   TextFormField(
@@ -923,6 +930,7 @@ class _CaseEditorState extends State<_CaseEditor> {
                     minLines: 2,
                     maxLines: 6,
                     maxLength: 4000,
+                    buildCounter: quietCounter,
                     decoration: InputDecoration(
                       labelText: s.proactiveCaseNotes,
                     ),
@@ -1195,6 +1203,7 @@ class _AssumptionEditorState extends State<_AssumptionEditor> {
                 TextFormField(
                   controller: _statement,
                   maxLength: 500,
+                  buildCounter: quietCounter,
                   decoration: InputDecoration(
                     labelText: widget.researchMode
                         ? s.proactiveClaimStatement
@@ -1356,6 +1365,7 @@ class _StepEditorState extends State<_StepEditor> {
                 TextFormField(
                   controller: _title,
                   maxLength: 300,
+                  buildCounter: quietCounter,
                   decoration: InputDecoration(labelText: s.proactiveName),
                   validator: (v) => v == null || v.trim().isEmpty
                       ? s.proactiveRequired
@@ -1376,6 +1386,7 @@ class _StepEditorState extends State<_StepEditor> {
                 TextFormField(
                   controller: _condition,
                   maxLength: 500,
+                  buildCounter: quietCounter,
                   decoration: InputDecoration(labelText: s.proactiveCompletion),
                 ),
                 DropdownButtonFormField<String>(
