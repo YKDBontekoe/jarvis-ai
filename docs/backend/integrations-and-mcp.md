@@ -144,6 +144,8 @@ as before (tests).
 | **Policy** | `IOwnerMcpPolicyStore` — enable/disable, allowlists |
 | **Runtime** | `McpToolHost` — per agent run connections, credential injection, redaction |
 
+`McpToolHost.InitializeAsync` runs before every chat turn's first model call. It resolves credentials one server at a time (the scoped database context allows one operation at a time), then starts every server and lists its tools **in parallel**, then registers tools and statuses in configured order. A turn therefore waits for the slowest server, not the sum of all of them; each server is still bounded by its `ConnectionTimeoutSeconds` (30 s for owner servers), so a hanging server can delay a turn by up to that long.
+
 Integration tools that are not host-auto-approved still ask by default, except that a tool whose server declares an explicit `readOnlyHint` (and no `destructiveHint`) runs without a card while the owner's `autoApproveMcpReadHints` autonomy switch is on (default). Treat that as the server's own claim: add only servers you trust, or switch it off to have every integration tool ask.
 
 Transports: **stdio** and **streamableHttp**. Allowlists are explicit tool names (or `*` up to 80 tools). Default = approval required; `AutoApprovedTools` for unattended tools only.
