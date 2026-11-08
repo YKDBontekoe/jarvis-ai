@@ -678,7 +678,12 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
               _time.minute,
             );
             final instant = instantInZone(picked, zone) ?? picked.toUtc();
-            final described = describeScheduledInstant(context, instant, zone);
+            final described = describeScheduledInstant(
+              context,
+              instant,
+              zone,
+              inSentence: true,
+            );
             when = 'Reminds you ${described.primary}';
             phone = described.other;
           }

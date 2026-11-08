@@ -173,6 +173,7 @@ String? zoneEquivalentLine(
   DateTime instant,
   String? zoneId, {
   DateTime? now,
+  bool inSentence = false,
 }) {
   final there = wallClockInZone(instant, zoneId);
   if (there == null || zoneId == null) return null;
@@ -185,20 +186,39 @@ String? zoneEquivalentLine(
       there.minute == here.minute;
   if (same) return null;
   final nowThere = wallClockInZone(now ?? DateTime.now(), zoneId);
-  return '${friendlyWhen(context, there, now: nowThere)} in ${zoneCity(zoneId)}';
+  return '${friendlyWhen(context, there, now: nowThere, inSentence: inSentence)} '
+      'in ${zoneCity(zoneId)}';
 }
 
 /// One scheduled [instant] described on both clocks when they differ: the
 /// reminder's own zone first, then the phone. When they read the same (or the
 /// zone is unknown) there is only the phone's reading and [other] is null.
+/// [inSentence] lowercases the day of [primary] for use after other words.
 ({String primary, String? other}) describeScheduledInstant(
   BuildContext context,
   DateTime instant,
   String? zoneId, {
   DateTime? now,
+  bool inSentence = false,
 }) {
-  final zoneLine = zoneEquivalentLine(context, instant, zoneId, now: now);
+  final zoneLine = zoneEquivalentLine(
+    context,
+    instant,
+    zoneId,
+    now: now,
+    inSentence: inSentence,
+  );
+  if (zoneLine == null) {
+    return (
+      primary: friendlyWhen(
+        context,
+        instant.toLocal(),
+        now: now,
+        inSentence: inSentence,
+      ),
+      other: null,
+    );
+  }
   final phone = friendlyWhen(context, instant.toLocal(), now: now);
-  if (zoneLine == null) return (primary: phone, other: null);
   return (primary: zoneLine, other: '$phone on your phone');
 }
