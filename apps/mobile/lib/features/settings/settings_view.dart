@@ -489,18 +489,12 @@ class _SettingsViewState extends State<SettingsView> {
             size: 18,
             color: colors.muted,
           ),
-          suffixIcon: _query.text.isEmpty
-              ? null
-              : IconButton(
-                  key: const Key('settings-clear-search'),
-                  tooltip: 'Clear settings search',
-                  onPressed: () => setState(_query.clear),
-                  icon: Icon(
-                    PhosphorIconsRegular.x,
-                    size: 16,
-                    color: colors.inkSoft,
-                  ),
-                ),
+          suffixIcon: SearchClearButton(
+            controller: _query,
+            buttonKey: const Key('settings-clear-search'),
+            tooltip: 'Clear settings search',
+            onCleared: () => setState(() {}),
+          ),
         ),
       ),
     ),

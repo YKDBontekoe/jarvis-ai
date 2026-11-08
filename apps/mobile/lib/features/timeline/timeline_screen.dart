@@ -194,16 +194,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
         decoration: InputDecoration(
           hintText: 'Search your timeline',
           prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-          suffixIcon: _search.text.isEmpty
-              ? null
-              : IconButton(
-                  tooltip: 'Clear',
-                  icon: const Icon(PhosphorIconsRegular.x),
-                  onPressed: () {
-                    _search.clear();
-                    unawaited(_load());
-                  },
-                ),
+          suffixIcon: SearchClearButton(
+            controller: _search,
+            onCleared: () => unawaited(_load()),
+          ),
         ),
       ),
       const SizedBox(height: 10),

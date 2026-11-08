@@ -760,14 +760,12 @@ class _FilesScreenState extends State<FilesScreen> {
                 size: 18,
                 color: colors.muted,
               ),
-              suffixIcon: _search.text.isEmpty
-                  ? null
-                  : IconButton(
-                      key: const Key('files-search-clear'),
-                      tooltip: 'Clear search',
-                      onPressed: () => setState(_search.clear),
-                      icon: const Icon(PhosphorIconsRegular.x, size: 16),
-                    ),
+              suffixIcon: SearchClearButton(
+                controller: _search,
+                buttonKey: const Key('files-search-clear'),
+                tooltip: 'Clear search',
+                onCleared: () => setState(() {}),
+              ),
             ),
           ),
           SingleChildScrollView(

@@ -198,18 +198,12 @@ class _EverythingScreenState extends State<EverythingScreen> {
                       size: 18,
                       color: colors.muted,
                     ),
-                    suffixIcon: _query.text.isEmpty
-                        ? null
-                        : IconButton(
-                            key: const Key('everything-clear-search'),
-                            tooltip: 'Clear feature search',
-                            onPressed: () => setState(_query.clear),
-                            icon: Icon(
-                              PhosphorIconsRegular.x,
-                              size: 16,
-                              color: colors.inkSoft,
-                            ),
-                          ),
+                    suffixIcon: SearchClearButton(
+                      controller: _query,
+                      buttonKey: const Key('everything-clear-search'),
+                      tooltip: 'Clear feature search',
+                      onCleared: () => setState(() {}),
+                    ),
                     filled: true,
                     fillColor: colors.surfaceMuted,
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),

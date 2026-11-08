@@ -338,13 +338,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
                   ),
                 ),
                 prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-                suffixIcon: IconButton(
-                  tooltip: 'Clear search',
-                  onPressed: () {
-                    _query.clear();
-                    _load();
-                  },
-                  icon: const Icon(PhosphorIconsRegular.x, size: 20),
+                suffixIcon: SearchClearButton(
+                  controller: _query,
+                  onCleared: () => _load(),
                 ),
               ),
             ),

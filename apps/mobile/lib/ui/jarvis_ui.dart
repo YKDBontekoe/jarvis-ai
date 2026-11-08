@@ -2010,11 +2010,15 @@ class SearchClearButton extends StatelessWidget {
   const SearchClearButton({
     required this.controller,
     required this.onCleared,
+    this.tooltip = 'Clear search',
+    this.buttonKey = const ValueKey('search-clear'),
     super.key,
   });
 
   final TextEditingController controller;
   final VoidCallback onCleared;
+  final String tooltip;
+  final Key buttonKey;
 
   @override
   Widget build(BuildContext context) =>
@@ -2027,8 +2031,8 @@ class SearchClearButton extends StatelessWidget {
           child: value.text.isEmpty
               ? const SizedBox.shrink()
               : IconButton(
-                  key: const ValueKey('search-clear'),
-                  tooltip: 'Clear search',
+                  key: buttonKey,
+                  tooltip: tooltip,
                   onPressed: () {
                     HapticFeedback.selectionClick();
                     controller.clear();

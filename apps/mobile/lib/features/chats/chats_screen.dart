@@ -273,18 +273,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
                         size: 18,
                         color: colors.muted,
                       ),
-                      suffixIcon: _query.text.isEmpty
-                          ? null
-                          : IconButton(
-                              key: const Key('chats-clear-search'),
-                              tooltip: 'Clear chat search',
-                              onPressed: () => setState(_query.clear),
-                              icon: Icon(
-                                PhosphorIconsRegular.x,
-                                size: 16,
-                                color: colors.inkSoft,
-                              ),
-                            ),
+                      suffixIcon: SearchClearButton(
+                        controller: _query,
+                        buttonKey: const Key('chats-clear-search'),
+                        tooltip: 'Clear chat search',
+                        onCleared: () => setState(() {}),
+                      ),
                       filled: true,
                       fillColor: colors.surfaceMuted,
                       contentPadding: const EdgeInsets.symmetric(vertical: 13),
