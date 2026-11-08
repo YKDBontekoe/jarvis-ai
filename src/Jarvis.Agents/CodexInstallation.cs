@@ -32,10 +32,7 @@ public sealed record CodexRealtimeVoices(IReadOnlyList<CodexRealtimeVoice> Voice
 
 public sealed record CodexInstallationStatus(
     string? InstalledVersion,
-    string? LatestVersion,
-    bool UpdateAvailable,
-    bool CanUpdate,
-    string? UpdateBlockedReason,
+    string PinnedVersion,
     bool UsingManagedInstall,
     string? Error,
     IReadOnlyList<CodexSupportedModel> Models,
@@ -44,18 +41,29 @@ public sealed record CodexInstallationStatus(
 {
     public bool SupportsModel(string modelId) =>
         Models.Any(model => model.Model == modelId || model.Id == modelId);
+
+    /// <summary>True when the running CLI is the version Jarvis is built and tested against.</summary>
+    public bool MatchesPinnedVersion => InstalledVersion == PinnedVersion;
 }
 
 /// <summary>
-/// Reads the model catalog from the installed Codex CLI and installs a newer official release into the managed directory.
+/// The Codex CLI release Jarvis is built and tested against. Jarvis relies on its app-server protocol (service tiers,
+/// thread continuation), so the version is managed here, not chosen by the owner. infra/compose/Dockerfile installs
+/// the same version, and a unit test keeps the two in step. Change both together, after checking the protocol.
+/// </summary>
+public static class CodexVersion
+{
+    public const string Pinned = "0.167.0";
+}
+
+/// <summary>
+/// Reads the model catalog from the installed Codex CLI and keeps the CLI at <see cref="CodexVersion.Pinned"/>.
 /// </summary>
 public sealed partial class CodexInstallation(
-    IHttpClientFactory httpClientFactory,
     CodexExecutable executable,
     CodexProcessLimiter processLimiter,
     ILogger<CodexInstallation> logger)
 {
-    private static readonly Uri LatestPackageUri = new("https://registry.npmjs.org/@openai/codex/latest");
     private static readonly TimeSpan CatalogCacheLifetime = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan ErrorCacheLifetime = TimeSpan.FromSeconds(15);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -77,30 +85,45 @@ public sealed partial class CodexInstallation(
         }
     }
 
-    public async Task<CodexInstallationStatus> UpdateAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Makes the CLI Jarvis runs the pinned release. An install under the managed directory with another version (one
+    /// an earlier Jarvis let the owner choose) is removed; when the stock executable is another version too, the pinned
+    /// release is installed there. A custom executable (a wrapper or test fixture) is left alone. The API and the
+    /// worker share the managed directory, so a lock file keeps them from installing at the same time.
+    /// </summary>
+    public async Task<string> EnsurePinnedAsync(CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            var blocked = UpdateBlockedReason();
-            if (blocked is not null) throw new InvalidOperationException(blocked);
-            var latest = await GetLatestVersionAsync(cancellationToken);
-            if (latest is null)
-                throw new InvalidOperationException("The npm registry did not report a stable Codex CLI release.");
-
-            var installed = await WithProcessSlot(() => ReadInstalledVersionAsync(executable.Resolve(), cancellationToken), cancellationToken);
-            if (!IsNewerRelease(latest, installed))
+            if (!executable.UsesStockCli)
+                return "custom Codex executable; version not managed";
+            Directory.CreateDirectory(Path.GetDirectoryName(executable.ManagedDirectory)!);
+            await using var installLock = await AcquireInstallLockAsync(cancellationToken);
+            if (executable.FindManagedExecutable() is { } managed)
             {
-                _cached = null;
-                return Cache(await BuildStatusAsync(cancellationToken));
+                var managedVersion = await TryReadVersionAsync(managed, cancellationToken);
+                if (managedVersion == CodexVersion.Pinned) return "managed install is " + CodexVersion.Pinned;
+                logger.LogInformation("Removing the managed Codex CLI {Version}; Jarvis runs {Pinned}.",
+                    managedVersion ?? "of unknown version", CodexVersion.Pinned);
+                DeleteDirectory(executable.ManagedDirectory);
+                CodexCliChatClient.RetireProcesses();
             }
 
-            await InstallAsync(latest, cancellationToken);
+            var stockVersion = await TryReadVersionAsync(executable.ConfiguredPath, cancellationToken);
+            if (stockVersion == CodexVersion.Pinned) return "installed CLI is " + CodexVersion.Pinned;
+            if (executable.ResolveNpm() is null || !executable.CanWriteManagedDirectory())
+            {
+                logger.LogWarning("The Codex CLI is {Version}, not the {Pinned} Jarvis runs, and Jarvis cannot install it here (needs npm and a writable CODEX_HOME).",
+                    stockVersion ?? "missing", CodexVersion.Pinned);
+                return "cannot install " + CodexVersion.Pinned;
+            }
+            await InstallAsync(CodexVersion.Pinned, cancellationToken);
+            CodexCliChatClient.RetireProcesses();
             _cached = null;
-            var updated = Cache(await BuildStatusAsync(cancellationToken));
-            logger.LogInformation("Updated the Codex CLI from {InstalledVersion} to {LatestVersion}.",
-                installed, updated.InstalledVersion);
-            return updated;
+            logger.LogInformation("Installed the Codex CLI {Pinned} (was {Version}).", CodexVersion.Pinned,
+                stockVersion ?? "missing");
+            return "installed " + CodexVersion.Pinned;
         }
         finally
         {
@@ -108,15 +131,42 @@ public sealed partial class CodexInstallation(
         }
     }
 
+    private async Task<string?> TryReadVersionAsync(string path, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await WithProcessSlot(() => ReadInstalledVersionAsync(path, cancellationToken), cancellationToken);
+        }
+        catch (Exception exception) when (IsProbeFailure(exception, cancellationToken))
+        {
+            return null;
+        }
+    }
+
+    private async Task<FileStream> AcquireInstallLockAsync(CancellationToken cancellationToken)
+    {
+        var path = executable.ManagedDirectory.TrimEnd(Path.DirectorySeparatorChar) + ".lock";
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1,
+                    FileOptions.DeleteOnClose);
+            }
+            catch (IOException) when (attempt < 360)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+            }
+        }
+    }
+
+    private static void DeleteDirectory(string path)
+    {
+        if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+    }
+
     internal static bool IsStableRelease(string? version) =>
         version is not null && StableVersionPattern().IsMatch(version);
-
-    internal static bool IsNewerRelease(string? latest, string? installed)
-    {
-        if (!TryParseRelease(latest, out var latestVersion)) return false;
-        if (!TryParseRelease(installed, out var installedVersion)) return true;
-        return latestVersion > installedVersion;
-    }
 
     internal static string? ReadVersion(string output)
     {
@@ -251,87 +301,72 @@ public sealed partial class CodexInstallation(
             processLimiter.Release();
         }
 
-        var latest = await GetLatestVersionAsync(cancellationToken);
-        var blocked = UpdateBlockedReason();
-        return new CodexInstallationStatus(installed, latest,
-            blocked is null && IsNewerRelease(latest, installed),
-            blocked is null, blocked, executable.IsManagedInstallActive, error, models, voices, voiceError);
+        return new CodexInstallationStatus(installed, CodexVersion.Pinned, executable.IsManagedInstallActive, error,
+            models, voices, voiceError);
     }
 
-    private string? UpdateBlockedReason()
-    {
-        if (!executable.UsesStockCli)
-            return "This server uses a custom Codex executable, so Settings cannot replace it.";
-        if (executable.ResolveNpm() is null)
-            return "npm is not available on this server, so Codex cannot be updated from Settings.";
-        if (!executable.CanWriteManagedDirectory())
-            return "Codex updates need a writable directory under CODEX_HOME.";
-        return null;
-    }
-
-    private async Task<string?> GetLatestVersionAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            var client = httpClientFactory.CreateClient("npm-registry");
-            using var response = await client.GetAsync(LatestPackageUri, cancellationToken);
-            if (!response.IsSuccessStatusCode) return null;
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            var version = document.RootElement.TryGetProperty("version", out var value) ? value.GetString() : null;
-            return IsStableRelease(version) ? version : null;
-        }
-        catch (Exception exception) when (IsProbeFailure(exception, cancellationToken) || exception is JsonException)
-        {
-            logger.LogWarning(exception, "Could not read the latest Codex CLI version from the npm registry.");
-            return null;
-        }
-    }
-
+    /// <summary>
+    /// Installs <paramref name="version"/> beside the managed directory and moves it into place only once complete,
+    /// so a model call never resolves a half-installed CLI.
+    /// </summary>
     private async Task InstallAsync(string version, CancellationToken cancellationToken)
     {
         if (!IsStableRelease(version))
             throw new InvalidOperationException("Refusing to install an unexpected Codex version.");
         var npm = executable.ResolveNpm()
-            ?? throw new InvalidOperationException("npm is not available on this server, so Codex cannot be updated from Settings.");
-        Directory.CreateDirectory(executable.ManagedDirectory);
-        var start = CreateProcess(npm, executable.ManagedDirectory);
-        start.Environment["npm_config_prefix"] = executable.ManagedDirectory;
-        start.Environment["npm_config_cache"] = Path.Combine(Path.GetTempPath(), "jarvis-npm-cache");
-        start.Environment["npm_config_update_notifier"] = "false";
-        start.Environment["npm_config_fund"] = "false";
-        start.Environment["npm_config_audit"] = "false";
-        foreach (var argument in new[]
-        {
-            "install", "--global", "--prefix", executable.ManagedDirectory,
-            "--no-fund", "--no-audit", "--no-update-notifier", "@openai/codex@" + version
-        })
-            start.ArgumentList.Add(argument);
-
-        using var process = new Process { StartInfo = start };
-        if (!process.Start()) throw new InvalidOperationException("Could not start npm.");
-        process.StandardInput.Close();
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromMinutes(3));
-        using var kill = timeout.Token.Register(() => Kill(process));
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        var stderrTask = process.StandardError.ReadToEndAsync(timeout.Token);
+            ?? throw new InvalidOperationException("npm is not available on this server, so Codex cannot be installed.");
+        var staging = executable.ManagedDirectory.TrimEnd(Path.DirectorySeparatorChar) + ".installing";
+        DeleteDirectory(staging);
+        Directory.CreateDirectory(staging);
         try
         {
-            await process.WaitForExitAsync(timeout.Token);
+            var start = CreateProcess(npm, staging);
+            start.Environment["npm_config_prefix"] = staging;
+            start.Environment["npm_config_cache"] = Path.Combine(Path.GetTempPath(), "jarvis-npm-cache");
+            start.Environment["npm_config_update_notifier"] = "false";
+            start.Environment["npm_config_fund"] = "false";
+            start.Environment["npm_config_audit"] = "false";
+            foreach (var argument in new[]
+            {
+                "install", "--global", "--prefix", staging,
+                "--no-fund", "--no-audit", "--no-update-notifier", "@openai/codex@" + version
+            })
+                start.ArgumentList.Add(argument);
+
+            using var process = new Process { StartInfo = start };
+            if (!process.Start()) throw new InvalidOperationException("Could not start npm.");
+            process.StandardInput.Close();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromMinutes(5));
+            using var kill = timeout.Token.Register(() => Kill(process));
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(timeout.Token);
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new InvalidOperationException("The Codex install timed out.");
+            }
+            if (process.ExitCode != 0)
+            {
+                var stderr = await SafeRead(stderrTask);
+                var stdout = await SafeRead(stdoutTask);
+                throw new InvalidOperationException("Codex install failed: " + Limit(string.IsNullOrWhiteSpace(stderr) ? stdout : stderr));
+            }
+            if (CodexExecutable.FindExecutableIn(staging) is not { } installed ||
+                await TryReadVersionAsync(installed, cancellationToken) != version)
+                throw new InvalidOperationException($"The Codex install did not produce a {version} CLI binary.");
+            DeleteDirectory(executable.ManagedDirectory);
+            Directory.Move(staging, executable.ManagedDirectory);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        finally
         {
-            throw new InvalidOperationException("The Codex update timed out.");
+            try { DeleteDirectory(staging); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
         }
-        if (process.ExitCode != 0)
-        {
-            var stderr = await SafeRead(stderrTask);
-            var stdout = await SafeRead(stdoutTask);
-            throw new InvalidOperationException("Codex update failed: " + Limit(string.IsNullOrWhiteSpace(stderr) ? stdout : stderr));
-        }
-        if (executable.FindManagedExecutable() is null)
-            throw new InvalidOperationException("Codex update finished without installing a CLI binary.");
     }
 
     private async Task<T> WithProcessSlot<T>(Func<Task<T>> action, CancellationToken cancellationToken)
@@ -464,14 +499,6 @@ public sealed partial class CodexInstallation(
         catch (Win32Exception) { }
     }
 
-    private static bool TryParseRelease(string? text, out Version version)
-    {
-        version = new Version(0, 0);
-        if (!IsStableRelease(text)) return false;
-        var parts = text!.Split('.');
-        version = new Version(int.Parse(parts[0]), int.Parse(parts[1]), int.Parse(parts[2]));
-        return true;
-    }
 
     private static string? ReadString(JsonElement item, string name) =>
         item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;

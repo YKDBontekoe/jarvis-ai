@@ -19,6 +19,7 @@ class ChatComposer extends StatefulWidget {
     this.onRemovePhoto,
     this.onPhoto,
     this.onImages,
+    this.onEngaged,
     super.key,
   });
 
@@ -50,6 +51,10 @@ class ChatComposer extends StatefulWidget {
   /// Photos pasted, dropped, or inserted from the keyboard.
   final ValueChanged<List<IncomingPhoto>>? onImages;
 
+  /// Called when the owner looks ready to write: the field gains focus, or its
+  /// text goes from empty to non-empty. Used to warm the server up.
+  final VoidCallback? onEngaged;
+
   @override
   State<ChatComposer> createState() => _ChatComposerState();
 }
@@ -60,7 +65,9 @@ class _ChatComposerState extends State<ChatComposer> {
   final _parentTick = ValueNotifier<int>(0);
 
   late final FocusNode _focus = FocusNode(onKeyEvent: _onKey)
-    ..addListener(_changed);
+    ..addListener(_changed)
+    ..addListener(_focusChanged);
+  bool _wasEmpty = true;
   late final _paste = ImagePasteListener(
     shouldHandlePaste: () => _canAcceptImages && !_anotherTextFieldHasFocus(),
     shouldHandleDrop: () => _canAcceptImages,
@@ -91,7 +98,16 @@ class _ChatComposerState extends State<ChatComposer> {
 
   void _requestFocus() => _focus.requestFocus();
 
-  void _changed() => setState(() {});
+  void _changed() {
+    final empty = widget.controller.text.isEmpty;
+    if (_wasEmpty && !empty) widget.onEngaged?.call();
+    _wasEmpty = empty;
+    setState(() {});
+  }
+
+  void _focusChanged() {
+    if (_focus.hasFocus) widget.onEngaged?.call();
+  }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is KeyDownEvent &&

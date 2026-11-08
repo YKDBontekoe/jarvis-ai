@@ -48,6 +48,13 @@ const send = message => process.stdout.write(JSON.stringify(message) + '\n');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const input = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
 let queue = Promise.resolve();
+// Like Codex, a thread keeps its conversation: Jarvis sends a thread's first prompt in full and later calls only what
+// is new, so each turn is planned from the whole thread (its first prompt, later messages and the fixture's replies).
+const threads = new Map();
+let threadCount = 0;
+const CLOSING = '\nReturn only the JSON object required by the output schema.';
+const CONTINUES = 'Conversation continues with the messages since your last response.\n';
+const REPLACES = 'Context blocks in these messages are current and replace the earlier ones.\n';
 
 input.on('line', line => {
   let request;
@@ -72,8 +79,11 @@ async function handle(request) {
       return send({ id: request.id, result: { voices: {
         v1: ['juniper', 'cove', 'spruce'], v2: ['marin'], defaultV1: 'cove', defaultV2: 'marin',
       } } });
-    case 'thread/start':
-      return send({ id: request.id, result: { thread: { id: 'thread-fixture' } } });
+    case 'thread/start': {
+      const id = `thread-fixture-${++threadCount}`;
+      threads.set(id, '');
+      return send({ id: request.id, result: { thread: { id } } });
+    }
     case 'turn/start':
       send({ id: request.id, result: { turn: { id: 'turn-fixture', status: 'inProgress' } } });
       return runTurn(request.params);
@@ -83,7 +93,13 @@ async function handle(request) {
 }
 
 async function runTurn(params) {
-  const prompt = params.input.find(item => item.type === 'text')?.text ?? '';
+  const input = params.input.find(item => item.type === 'text')?.text ?? '';
+  let body = input.trimEnd();
+  if (body.endsWith(CLOSING.trim())) body = body.slice(0, body.length - CLOSING.trim().length).trimEnd();
+  if (body.startsWith(CONTINUES)) body = body.slice(CONTINUES.length);
+  if (body.startsWith(REPLACES)) body = body.slice(REPLACES.length);
+  const history = (threads.get(params.threadId) ?? '') + (threads.get(params.threadId) ? '\n' : '') + body;
+  const prompt = history + '\n' + CLOSING + '\n';
   // Images arrive as real image inputs next to the text. "How many images do you see?" answers with the count, which
   // lets a test prove that photos and image sources reach the model as pixels and not as extracted text.
   const images = params.input.filter(item => item.type === 'image');
@@ -92,6 +108,10 @@ async function runTurn(params) {
   const output = JSON.stringify(asked
     ? text(`I see ${images.length} image(s): ${images.map(image => (image.url?.match(/^data:([^;]+);/)?.[1] ?? 'unknown')).join(', ')}.`)
     : plan(prompt));
+  const reply = JSON.parse(output);
+  threads.set(params.threadId, history + '\n\n[assistant]\n' + (reply.type === 'tool_call'
+    ? `Jarvis tool request: ${reply.name} ${reply.argumentsJson}`
+    : reply.text) + '\n');
   for (let index = 0; index < output.length;) {
     let end = Math.min(output.length, index + 3 + Math.floor(Math.random() * 6));
     // Never cut an emoji in half: a lone surrogate is not valid text, and the real app server never sends one.

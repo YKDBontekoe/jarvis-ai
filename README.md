@@ -260,7 +260,7 @@ Important settings are in `src/Jarvis.Api/appsettings.json` and may be overridde
 
 - `ConnectionStrings__jarvis`: PostgreSQL connection string supplied automatically by Aspire.
 - `Codex__ExecutablePath`: Codex CLI executable (default `codex`). Settings updates apply only when this is the stock `codex` executable; a custom path, such as the end-to-end fixture, is left unchanged.
-- `Codex__ManagedInstallDirectory`: directory for Settings-driven Codex CLI updates (default `$CODEX_HOME/cli`, or `~/.codex/cli` when `CODEX_HOME` is unset). The image-pinned CLI remains the fallback until an update is installed.
+- `Codex__ManagedInstallDirectory`: where Jarvis installs its pinned Codex CLI release when the stock `codex` is a different version (default `$CODEX_HOME/cli`, or `~/.codex/cli` when `CODEX_HOME` is unset). The version is managed by Jarvis, not chosen in Settings; the image already ships the pinned release, so in production this directory normally stays empty.
 - `Codex__NpmExecutablePath`: npm used to install those updates (default `npm`).
 - `Codex__EnableWebSearch`: enable Codex CLI's hosted live web search for chat turns (default `true`); set to `false` to disable search while keeping the other Codex restrictions. This CLI feature is experimental and depends on the installed Codex version.
 - `Codex__Model`: optional model identifier passed to each Codex CLI app-server thread; by default, Jarvis selects the default available model reported by the signed-in Codex account.

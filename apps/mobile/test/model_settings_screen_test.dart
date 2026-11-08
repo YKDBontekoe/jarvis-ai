@@ -20,17 +20,14 @@ Map<String, Object?> _settings({
 };
 
 Map<String, Object?> _codex({
-  String installed = '0.145.0',
-  String latest = '0.145.0',
-  bool updateAvailable = false,
+  String installed = '0.167.0',
+  String pinned = '0.167.0',
   List<Map<String, Object?>> models = const [],
 }) => {
   'installedVersion': installed,
-  'latestVersion': latest,
-  'updateAvailable': updateAvailable,
-  'canUpdate': true,
+  'pinnedVersion': pinned,
+  'matchesPinnedVersion': installed == pinned,
   'usingManagedInstall': false,
-  'updateBlockedReason': null,
   'error': null,
   'models': models,
 };
@@ -291,7 +288,10 @@ void main() {
       );
       await show(tester);
 
-      expect(find.textContaining('Installed 0.145.0'), findsOneWidget);
+      expect(
+        find.textContaining('Jarvis keeps Codex at 0.167.0'),
+        findsOneWidget,
+      );
       await tester.ensureVisible(find.byKey(const Key('browse-codex-models')));
       await tester.tap(find.byKey(const Key('browse-codex-models')));
       await tester.pumpAndSettle();
@@ -308,32 +308,38 @@ void main() {
     },
   );
 
-  testWidgets('updates Codex when a newer release is published', (
+  testWidgets(
+    'shows the Codex version as managed by Jarvis, with nothing to update',
+    (tester) async {
+      http.on('GET', '/api/v1/settings/models', _settings());
+      http.on('GET', '/api/v1/settings/models/codex', _codex());
+      await show(tester);
+
+      expect(find.text('Managed by Jarvis'), findsOneWidget);
+      expect(
+        find.textContaining('Jarvis keeps Codex at 0.167.0'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('update-codex')), findsNothing);
+      expect(find.textContaining('Update to'), findsNothing);
+    },
+  );
+
+  testWidgets('says Jarvis switches to its Codex version when another runs', (
     tester,
   ) async {
     http.on('GET', '/api/v1/settings/models', _settings());
     http.on(
       'GET',
       '/api/v1/settings/models/codex',
-      _codex(latest: '0.157.0', updateAvailable: true),
-    );
-    http.on(
-      'POST',
-      '/api/v1/settings/models/codex/update',
-      _codex(installed: '0.157.0', latest: '0.157.0'),
+      _codex(installed: '0.145.0'),
     );
     await show(tester);
 
-    await tester.ensureVisible(find.byKey(const Key('update-codex')));
-    await tester.tap(find.byKey(const Key('update-codex')));
-    await tester.pumpAndSettle();
-
-    expect(
-      http.sent('POST', '/api/v1/settings/models/codex/update'),
-      hasLength(1),
-    );
-    expect(find.textContaining('Codex 0.157.0 is installed'), findsOneWidget);
-    expect(find.text('Up to date'), findsOneWidget);
+    expect(find.text('Being updated'), findsOneWidget);
+    expect(find.textContaining('Installed 0.145.0'), findsOneWidget);
+    expect(find.textContaining('switches to 0.167.0'), findsOneWidget);
+    expect(find.byKey(const Key('update-codex')), findsNothing);
   });
 
   testWidgets('a non-object Codex payload does not crash model settings', (

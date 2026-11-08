@@ -41,6 +41,12 @@ internal static class ConversationEndpoints
             }
         }).WithName("CreateConversation");
 
+        // The app calls this when the owner opens a chat or starts typing, so the reply that follows does not wait
+        // for a Codex process or MCP servers to start. Nothing about the owner's data changes.
+        api.MapPost("/conversations/prewarm", (TurnPrewarmer prewarmer, ICurrentUser currentUser) =>
+            Results.Accepted(value: new { started = prewarmer.Request(currentUser.OwnerId) }))
+            .WithName("PrewarmTurn");
+
         api.MapGet("/conversations", async (IConversationStore store, IConversationPreviews previews,
             IAssistantProfileService profiles, RemoteQueryHost queries, ICurrentUser currentUser,
             CancellationToken ct) =>

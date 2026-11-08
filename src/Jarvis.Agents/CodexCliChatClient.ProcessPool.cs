@@ -12,10 +12,11 @@ namespace Jarvis.Agents;
 public sealed partial class CodexCliChatClient
 {
     /// <summary>A process is replaced after this many model calls so per-thread state cannot pile up.</summary>
-    internal const int MaxProcessUses = 25;
+    internal const int MaxProcessUses = 200;
     private static readonly TimeSpan IdleProcessLifetime = TimeSpan.FromMinutes(10);
     private readonly object _poolSync = new();
-    private readonly Stack<AppServerProcess> _idle = new();
+    // Most recently returned last, so a fresh call takes the warmest process.
+    private readonly List<AppServerProcess> _idle = [];
     private Task? _warming;
     private Timer? _idleSweep;
     private bool _disposed;
@@ -68,7 +69,15 @@ public sealed partial class CodexCliChatClient
             Task? warming;
             lock (_poolSync)
             {
-                if (_idle.Count > 0) candidate = _idle.Pop();
+                if (_idle.Count > 0)
+                {
+                    // Leave a process that holds a conversation's thread for that conversation's next turn: memory
+                    // extraction and other background calls run right after a reply and would otherwise take it.
+                    var index = _idle.FindLastIndex(process => !HoldsThreadLocked(process));
+                    if (index < 0) index = _idle.Count - 1;
+                    candidate = _idle[index];
+                    _idle.RemoveAt(index);
+                }
                 warming = _warming;
             }
             if (candidate is not null)
@@ -91,8 +100,9 @@ public sealed partial class CodexCliChatClient
         }
     }
 
-    private void Return(AppServerProcess process)
+    private void Return(AppServerProcess? process)
     {
+        if (process is null) return;
         process.Uses++;
         if (process.Uses >= MaxProcessUses || !process.IsAlive || !process.TryClearScratch())
         {
@@ -100,16 +110,28 @@ public sealed partial class CodexCliChatClient
             return;
         }
         process.IdleSince = DateTimeOffset.UtcNow;
+        AppServerProcess? evicted = null;
         lock (_poolSync)
         {
+            if (!_disposed && _idle.Count >= MaxIdleProcesses && HoldsThreadLocked(process))
+            {
+                // A full pool gives up a process without a conversation thread before one with.
+                var spare = _idle.FindIndex(idle => !HoldsThreadLocked(idle));
+                if (spare >= 0)
+                {
+                    evicted = _idle[spare];
+                    _idle.RemoveAt(spare);
+                }
+            }
             if (!_disposed && _idle.Count < MaxIdleProcesses)
             {
-                _idle.Push(process);
+                _idle.Add(process);
                 _idleSweep ??= new Timer(_ => SweepIdle(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-                return;
+                process = null;
             }
         }
-        process.Dispose();
+        evicted?.Dispose();
+        process?.Dispose();
     }
 
     private void SweepIdle()
@@ -117,12 +139,12 @@ public sealed partial class CodexCliChatClient
         List<AppServerProcess> expired = [];
         lock (_poolSync)
         {
-            var keep = _idle.Reverse()
+            var keep = _idle
                 .Where(process => process.CanServe(process.ExecutablePath, DateTimeOffset.UtcNow, IdleProcessLifetime))
                 .ToArray();
             expired.AddRange(_idle.Except(keep));
             _idle.Clear();
-            foreach (var process in keep) _idle.Push(process);
+            _idle.AddRange(keep);
         }
         foreach (var process in expired) process.Dispose();
     }

@@ -167,6 +167,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
             ProfileScope.OverlayModels(ownerModels, snapshot));
         // Someone is waiting on an interactive reply; background task runs keep the standard service tier.
         if (task is null) chatClient = CodexCliChatClient.MarkInteractive(chatClient);
+        // Codex keeps one thread per conversation, so later calls send only what is new.
+        chatClient = CodexCliChatClient.ForConversation(chatClient, conversationId);
         return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools,
             new AgentBuildContext(ownerId, task?.Id, conversationId, snapshot));
     }

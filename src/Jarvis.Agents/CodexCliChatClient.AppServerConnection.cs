@@ -239,6 +239,9 @@ public sealed partial class CodexCliChatClient
         private bool _separate;
         private bool _isText;
 
+        /// <summary>All text streamed so far, across the turn's messages: what Jarvis stores for the reply.</summary>
+        public string Emitted => _emitted;
+
         /// <summary>
         /// Starts decoding the next agent message of the same turn. Text already streamed stays shown: a
         /// message that repeats or extends it only streams what is new, and a different message follows it

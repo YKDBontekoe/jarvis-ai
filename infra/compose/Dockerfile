@@ -2,7 +2,8 @@
 ARG PROJECT_PATH
 
 FROM node:24-slim AS codex-cli
-RUN npm install --global @openai/codex@0.145.0
+# Keep in step with CodexVersion.Pinned (src/Jarvis.Agents/CodexInstallation.cs); a unit test checks it.
+RUN npm install --global @openai/codex@0.167.0
 
 # uv provides uvx, which runs PyPI MCP connectors installed from the app catalog.
 FROM ghcr.io/astral-sh/uv:0.13.1 AS uv

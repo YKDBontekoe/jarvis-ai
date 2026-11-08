@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/api/api_config.dart';
 import 'package:jarvis_mobile/features/chat/chat_entries.dart';
 import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
+import 'package:jarvis_mobile/features/settings/model_settings_screen.dart';
 import 'package:jarvis_mobile/features/home/jarvis_home.dart'
     show debugHomeClock;
 import 'package:jarvis_mobile/theme.dart';
@@ -497,6 +499,61 @@ void main() {
       }
       await capture(tester, '21-components-${dark ? 'dark' : 'light'}');
     });
+  }
+
+  // Settings → Models: the Codex CLI version is managed by Jarvis, so the card shows it with no update action.
+  for (final (state, installed) in [
+    ('managed', '0.167.0'),
+    ('switching', '0.145.0'),
+  ]) {
+    for (final dark in [false, true]) {
+      screenshotTest('model settings codex $state ${dark ? 'dark' : 'light'}', (
+        tester,
+      ) async {
+        usePhone(tester);
+        final routes = ScreenshotHttp({
+          'GET /api/v1/settings/models': {
+            'provider': 'codex',
+            'chatModel': 'gpt-6.1-terra',
+            'fastModel': null,
+            'reasoningEffort': null,
+            'embeddingModel': null,
+            'openRouterKeyConfigured': false,
+            'providers': ['codex', 'openrouter'],
+          },
+          'GET /api/v1/settings/models/codex': {
+            'installedVersion': installed,
+            'pinnedVersion': '0.167.0',
+            'matchesPinnedVersion': installed == '0.167.0',
+            'usingManagedInstall': false,
+            'error': null,
+            'models': const <Object>[],
+          },
+        });
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: screenshotKey,
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: buildJarvisTheme(
+                brightness: dark ? Brightness.dark : Brightness.light,
+              ),
+              home: ModelSettingsScreen(
+                http: Dio(BaseOptions(baseUrl: 'http://fixture'))
+                  ..httpClientAdapter = routes,
+              ),
+            ),
+          ),
+        );
+        for (var i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        await capture(
+          tester,
+          '34-model-settings-codex-$state-${dark ? 'dark' : 'light'}',
+        );
+      });
+    }
   }
 
   screenshotTest('empty state', (tester) async {

@@ -37,12 +37,9 @@ abstract class _ModelSettingsController extends State<ModelSettingsScreen> {
   bool _saving = false;
   bool _testing = false;
   bool _codexLoading = true;
-  bool _updating = false;
-  bool _updateAvailable = false;
-  bool _canUpdate = false;
   String? _installedVersion;
-  String? _latestVersion;
-  String? _updateBlocked;
+  String? _pinnedVersion;
+  bool _matchesPinned = false;
   String? _codexError;
   List<Map<String, dynamic>> _codexModels = const [];
   String? _error;
@@ -51,7 +48,6 @@ abstract class _ModelSettingsController extends State<ModelSettingsScreen> {
   Map<String, dynamic>? _embeddingStatus;
   int _requestRevision = 0;
 
-  Future<void> _updateCodex();
   Future<void> _saveKey();
   Future<void> _removeKey();
   Future<void> _pickCodex(TextEditingController controller);
@@ -126,10 +122,8 @@ class _ModelSettingsScreenState extends _ModelSettingsController
 
   void _applyCodex(Map<String, dynamic> data) {
     _installedVersion = asJsonString(data['installedVersion']);
-    _latestVersion = asJsonString(data['latestVersion']);
-    _updateAvailable = asJsonBool(data['updateAvailable']);
-    _canUpdate = asJsonBool(data['canUpdate']);
-    _updateBlocked = asJsonString(data['updateBlockedReason']);
+    _pinnedVersion = asJsonString(data['pinnedVersion']);
+    _matchesPinned = asJsonBool(data['matchesPinnedVersion']);
     _codexError = asJsonString(data['error']);
     _codexModels = jsonMaps(data['models']);
   }
@@ -221,39 +215,6 @@ class _ModelSettingsScreenState extends _ModelSettingsController
     } catch (_) {
       if (!mounted || revision != _requestRevision) return;
       setState(() => _openRouterReasoningEfforts = const []);
-    }
-  }
-
-  @override
-  Future<void> _updateCodex() async {
-    setState(() {
-      _updating = true;
-      _error = null;
-      _notice = null;
-    });
-    try {
-      final response = await widget.http.post<dynamic>(
-        '/api/v1/settings/models/codex/update',
-      );
-      if (!mounted) return;
-      final data = jsonObject(response.data) ?? const {};
-      setState(() {
-        _applyCodex(data);
-        _notice =
-            'Codex ${asJsonString(data['installedVersion']) ?? 'CLI'} is installed. New replies use it right away.';
-      });
-    } on DioException catch (error) {
-      if (!mounted) return;
-      setState(
-        () => _error =
-            firstProblemMessage(error.response?.data) ??
-            'Jarvis could not update Codex.',
-      );
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _error = 'Jarvis could not update Codex.');
-    } finally {
-      if (mounted) setState(() => _updating = false);
     }
   }
 

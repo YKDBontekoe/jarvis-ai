@@ -31,10 +31,21 @@ mixin _ModelSettingsCards on _ModelSettingsController {
 
   Widget _codexCard() {
     final installed = _installedVersion;
-    final latest = _latestVersion;
-    final installedText = installed == null
-        ? 'Installed version unknown.'
-        : 'Installed $installed.';
+    final pinned = _pinnedVersion;
+    final colors = JarvisColors.of(context);
+    // Jarvis owns the Codex version: it relies on that release's protocol, so there is nothing to choose here.
+    final String detail;
+    if (pinned == null) {
+      detail = installed == null
+          ? 'Installed version unknown.'
+          : 'Installed $installed.';
+    } else if (_matchesPinned) {
+      detail = 'Jarvis keeps Codex at $pinned, the version it is tested with.';
+    } else {
+      detail =
+          'Installed ${installed ?? 'version unknown'}. '
+          'Jarvis switches to $pinned, the version it is tested with, when the server starts.';
+    }
     return SurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -49,69 +60,19 @@ mixin _ModelSettingsCards on _ModelSettingsController {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
-              if (!_codexLoading)
+              if (!_codexLoading && pinned != null)
                 StatusPill(
-                  label: _updateAvailable
-                      ? 'Update available'
-                      : _canUpdate && latest != null
-                      ? 'Up to date'
-                      : 'Installed',
-                  color: _updateAvailable
-                      ? JarvisColors.of(context).warning
-                      : _canUpdate && latest != null
-                      ? JarvisColors.of(context).success
-                      : JarvisColors.of(context).muted,
+                  label: _matchesPinned ? 'Managed by Jarvis' : 'Being updated',
+                  color: _matchesPinned ? colors.success : colors.warning,
                 ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            latest == null
-                ? installedText
-                : '$installedText Latest release is $latest.',
-            style: TextStyle(
-              color: JarvisColors.of(context).inkSoft,
-              height: 1.4,
-            ),
-          ),
+          Text(detail, style: TextStyle(color: colors.inkSoft, height: 1.4)),
           if (_codexLoading)
             const Padding(
               padding: EdgeInsets.only(top: 12),
               child: LinearProgressIndicator(),
-            ),
-          if (_updateAvailable)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
-                  key: const Key('update-codex'),
-                  onPressed: _updating || _saving
-                      ? null
-                      : () => unawaited(_updateCodex()),
-                  icon: _updating
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(
-                          PhosphorIconsRegular.arrowsClockwise,
-                          size: 18,
-                        ),
-                  label: Text('Update to $latest'),
-                ),
-              ),
-            ),
-          if (_updateBlocked != null && !_canUpdate)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                _updateBlocked!,
-                style: TextStyle(
-                  color: JarvisColors.of(context).inkSoft,
-                  height: 1.4,
-                ),
-              ),
             ),
           if (_codexError != null)
             InlineNotice(

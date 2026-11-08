@@ -21,7 +21,8 @@ setting is built into the client; no additional storage secrets or environment v
 | Key | Purpose |
 |-----|---------|
 | `Codex__ExecutablePath` | CLI binary (default `codex`) |
-| `Codex__ManagedInstallDirectory` | Settings-driven CLI updates |
+| `Codex__ManagedInstallDirectory` | Where Jarvis installs its pinned Codex CLI (`CodexVersion.Pinned`) when the stock `codex` is another version. The version is not an owner setting |
+| `Codex__ConversationThreads` | Default `true`. One Codex thread per conversation; later model calls send only new messages. `false` sends the full prompt on a fresh thread every call |
 | `Codex__EnableWebSearch` | Codex hosted live web search for chat turns |
 | `Codex__Access__Sandbox` | `workspace-write` (default), `read-only` or `danger-full-access`. Applies to Codex's own shell and file tools, never to Jarvis functions |
 | `Codex__Access__AllowShell` | Offer Codex's shell tool (default `true`). Commands run in the sandbox without an approval card |
