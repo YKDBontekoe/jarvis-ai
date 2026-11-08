@@ -20,14 +20,16 @@ public sealed class ChannelCommandHandlerTests
     }
 
     private static ChannelCommandHandler Create(IListService? lists = null, IExpenseService? expenses = null,
-        Jarvis.Application.Journal.IJournalService? journal = null, Jarvis.Application.Audit.IAuditEventStore? audit = null) => new(
+        Jarvis.Application.Journal.IJournalService? journal = null, Jarvis.Application.Audit.IAuditEventStore? audit = null, INotificationRepository? notifications = null,
+        IReminderService? reminders = null) => new(
         lists ?? new ListService(new InMemorySettingsStore()),
-        Fake<IReminderService>.Create(),
+        reminders ?? Fake<IReminderService>.Create(),
         Fake<IOwnerPreferenceService>.Create(("GetAsync", _ => new PreferencesView("Europe/Amsterdam", "chosen", true, "now", null))),
         Fake<IHabitService>.Create(),
         expenses ?? Fake<IExpenseService>.Create(),
         Fake<IDayPlannerService>.Create(),
         journal ?? Fake<Jarvis.Application.Journal.IJournalService>.Create(),
+        notifications ?? Fake<INotificationRepository>.Create(),
         audit ?? Fake<Jarvis.Application.Audit.IAuditEventStore>.Create(),
         new FixedTime(new DateTimeOffset(2026, 11, 7, 20, 30, 0, TimeSpan.Zero)));
 
@@ -104,5 +106,35 @@ public sealed class ChannelCommandHandlerTests
         Assert.Contains(entryId.ToString(), logged, StringComparison.Ordinal);
         Assert.DoesNotContain("canal", logged, StringComparison.Ordinal);
         Assert.Equal(QuickCommands.JournalUsage, await handler.TryHandleAsync(Owner, "/journal", default));
+    }
+
+    [Fact]
+    public async Task Snooze_moves_the_newest_reminder_that_went_off_and_ignores_old_or_missing_ones()
+    {
+        var reminderId = Guid.NewGuid();
+        var at = new DateTimeOffset(2026, 11, 7, 20, 0, 0, TimeSpan.Zero); // 30 minutes before the handler's clock
+        Guid? snoozed = null;
+        DateTimeOffset? newDue = null;
+        var reminders = Fake<IReminderService>.Create(("SnoozeAsync", args =>
+        {
+            snoozed = (Guid)args[0]!;
+            newDue = (DateTimeOffset)args[2]!;
+            return new ReminderRecord(reminderId, Owner, "Call mum", newDue.Value, "wf", "pending", at, null);
+        }));
+        List<NotificationRecord> list = [
+            new(Guid.NewGuid(), "reminder.due", "Old", "", Guid.NewGuid(), at.AddHours(-3), null),
+            new(Guid.NewGuid(), "reminder.due", "Call mum", "", reminderId, at, null),
+            new(Guid.NewGuid(), "task.done", "Task", "", Guid.NewGuid(), at.AddMinutes(10), null),
+        ];
+        var notifications = Fake<INotificationRepository>.Create(("ListNotificationsAsync", _ => (IReadOnlyList<NotificationRecord>)list));
+        var handler = Create(reminders: reminders, notifications: notifications);
+
+        var reply = await handler.TryHandleAsync(Owner, "/snooze 15m", default);
+
+        Assert.Contains("Snoozed until", reply, StringComparison.Ordinal);
+        Assert.Equal(reminderId, snoozed);
+        Assert.Equal(new DateTimeOffset(2026, 11, 7, 20, 45, 0, TimeSpan.Zero), newDue);
+        list.Clear();
+        Assert.StartsWith("No reminder went off", await handler.TryHandleAsync(Owner, "/snooze", default), StringComparison.Ordinal);
     }
 }

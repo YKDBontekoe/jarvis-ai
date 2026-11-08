@@ -227,6 +227,8 @@ await check('reminder commands work from WhatsApp without the model', async () =
   assert.equal(series.recurrence, 'biweekly');
   assert.equal(series.weekdays, 16);
   await call(`/reminders/${series.id}`, { method: 'DELETE' });
+  const snooze = await say('/snooze 5m', `wamid.snz-${tag}`, /Snoozed|No reminder went off/);
+  assert.ok(snooze.text);
   const listed = await say('/reminders', `wamid.rems-${tag}`, new RegExp(`call mum ${tag}`));
   assert.ok(listed.text);
   const usage = await say('/remind soon', `wamid.remx-${tag}`, /\/remind in 30m/);
@@ -359,6 +361,17 @@ await check('notifications are forwarded to connected channels', async () => {
   const signalAlert = await waitForReply('signal', message => /Take the bread out/.test(message.text), 45000);
   assert.match(signalAlert.text, /🔔/);
   await waitForReply('whatsapp', message => /Take the bread out/.test(message.text), 20000);
+});
+
+await check('/snooze brings back the reminder that just went off', async () => {
+  await fetch(`${fake}/_test/sent`, { method: 'DELETE' });
+  await postWebhook(whatsapp.webhookUrl, webhookPayload(owner, '/snooze 20m', 'wamid.snooze-real'));
+  const reply = await waitForReply('whatsapp', message => /Snoozed until/.test(message.text));
+  assert.match(reply.text, /Take the bread out/);
+  const moved = (await call('/reminders')).body.find(item => item.title === 'Take the bread out' && item.status === 'pending');
+  assert.ok(moved, 'the reminder is pending again');
+  const ahead = new Date(moved.dueAt).getTime() - Date.now();
+  assert.ok(ahead > 15 * 60_000 && ahead < 25 * 60_000, `due in about 20 minutes, got ${ahead / 60000}`);
 });
 
 await check('channel activity log shows both directions', async () => {

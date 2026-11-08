@@ -115,4 +115,20 @@ public sealed class ReminderCommandTests
         Assert.Equal(new TimeOnly(9, 0), request.LocalTime);
         Assert.Equal(Amsterdam.Id, request.TimeZoneId);
     }
+
+    [Theory]
+    [InlineData("/snooze", 10)]
+    [InlineData("/snooze 15m", 15)]
+    [InlineData("/SNOOZE 2 hours", 120)]
+    [InlineData("/snooze 1d", 1440)]
+    public void Snooze_reads_a_delay_and_defaults_to_ten_minutes(string text, int minutes) =>
+        Assert.Equal(TimeSpan.FromMinutes(minutes), Assert.IsType<ReminderCommand.Snooze>(ReminderCommands.Parse(text)).Delay);
+
+    [Theory]
+    [InlineData("/snooze soon")]
+    [InlineData("/snooze 0m")]
+    [InlineData("/snooze 2d")]
+    [InlineData("/snooze 15m please")]
+    public void An_unreadable_snooze_explains_the_format(string text) =>
+        Assert.Equal(ReminderCommands.UsageText, Assert.IsType<ReminderCommand.Usage>(ReminderCommands.Parse(text)).Message);
 }

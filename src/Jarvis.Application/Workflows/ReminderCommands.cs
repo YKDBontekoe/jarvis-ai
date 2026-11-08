@@ -16,6 +16,9 @@ public abstract record ReminderCommand
     /// <summary>A repeating reminder: every day, every weekday, or on one weekday every week or every other week.</summary>
     public sealed record Every(string Recurrence, int Weekdays, TimeOnly Time, string Title) : ReminderCommand;
 
+    /// <summary>Brings the reminder that just went off back after a delay.</summary>
+    public sealed record Snooze(TimeSpan Delay) : ReminderCommand;
+
     public sealed record List : ReminderCommand;
 
     public sealed record Usage(string Message) : ReminderCommand;
@@ -30,7 +33,7 @@ public static partial class ReminderCommands
     public const string UsageText =
         "Reminders: /remind in 30m call mum, /remind at 18:30 pick up the kids, /remind tomorrow 9:00 dentist, " +
         "/remind every monday 9:00 bins, /remind every other friday 17:00 report, /remind every day 8:00 pills, " +
-        "/reminders shows what is coming. Use m, h or d after the number.";
+        "/snooze 15m brings the one that just went off back, /reminders shows what is coming. Use m, h or d after the number.";
 
     public const int MaxTitleLength = 200;
     public static readonly TimeSpan MaxDelay = TimeSpan.FromDays(366);
@@ -44,6 +47,20 @@ public static partial class ReminderCommands
         var command = (space < 0 ? trimmed : trimmed[..space]).ToLowerInvariant();
         var rest = space < 0 ? "" : trimmed[(space + 1)..].Trim();
         if (command == "/reminders") return new ReminderCommand.List();
+        if (command == "/snooze")
+        {
+            if (rest.Length == 0) return new ReminderCommand.Snooze(TimeSpan.FromMinutes(10));
+            var delay = SnoozePattern().Match(rest);
+            if (!delay.Success) return new ReminderCommand.Usage(UsageText);
+            var amount = int.Parse(delay.Groups["n"].Value, CultureInfo.InvariantCulture);
+            var span = delay.Groups["u"].Value.ToLowerInvariant() switch
+            {
+                "m" or "min" or "mins" or "minute" or "minutes" => TimeSpan.FromMinutes(amount),
+                "h" or "hr" or "hrs" or "hour" or "hours" => TimeSpan.FromHours(amount),
+                _ => TimeSpan.FromDays(amount),
+            };
+            return amount <= 0 || span > TimeSpan.FromDays(1) ? new ReminderCommand.Usage(UsageText) : new ReminderCommand.Snooze(span);
+        }
         if (command != "/remind") return null;
 
         if (EveryPattern().Match(rest) is { Success: true } every)
@@ -169,6 +186,9 @@ public static partial class ReminderCommands
             return null;
         return new TimeOnly(h, m);
     }
+
+    [GeneratedRegex(@"^(?<n>\d{1,4})\s*(?<u>minutes?|mins?|m|hours?|hrs?|h|days?|d)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SnoozePattern();
 
     [GeneratedRegex(@"^every\s+(?<o>other\s+)?(?<w>[a-z]+)\s+(?:(?:at\s+)?(?<h>\d{1,2})(?:[:.](?<m>\d{2}))?\s+)?(?<t>.+)$",
         RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant)]

@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 108 improvements in this ledger.**
+**Count so far: 109 improvements in this ledger.**
 
 ## Images go to the model as images
 
@@ -145,6 +145,7 @@ Seen but left alone: Home lists the five oldest-due promises, so with five or mo
 106. The app's look-ahead lists "Kept for this day" read-only and explains when the day's to-dos join the plan; widget-tested.
 107. A plan preview for a later day (`GET /planner/day/plan-preview?date=`): the to-dos kept for that day placed into its free time around its calendar events, saved nowhere; checked on the running API and in unit tests (an event is respected, an 8-hour to-do is reported as not fitting, today and out-of-range days are refused).
 108. The assistant answers "how would Friday look?" with `PreviewDayPlan`, labelled as a proposal; on the real model it gave a tentative preview, said nothing was saved and noted that the calendar could not be read.
+109. `/snooze 15m` (default 10 minutes, up to a day) on WhatsApp or Signal brings back the reminder that just went off, by finding the newest reminder notification from the last day; checked end to end in `channels_flow.mjs` (26 checks): a real reminder fires, `/snooze 20m` moves it, and the stored reminder is pending again about 20 minutes ahead.
 
 ## Real-model evidence
 

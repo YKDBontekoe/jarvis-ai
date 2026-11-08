@@ -24,6 +24,7 @@ public sealed class ChannelCommandHandler(
     IExpenseService expenses,
     IDayPlannerService planner,
     IJournalService journal,
+    INotificationRepository notifications,
     IAuditEventStore audit,
     TimeProvider? timeProvider = null)
 {
@@ -128,6 +129,17 @@ public sealed class ChannelCommandHandler(
         {
             case ReminderCommand.Usage usage:
                 return usage.Message;
+            case ReminderCommand.Snooze snooze:
+                // "The one that just went off" is the owner's newest reminder notification that still points at a reminder.
+                var recent = (await notifications.ListNotificationsAsync(ownerId, cancellationToken))
+                    .Where(item => item.Type == "reminder.due" && item.SourceId is not null)
+                    .OrderByDescending(item => item.CreatedAt).FirstOrDefault();
+                if (recent is null || now - recent.CreatedAt > TimeSpan.FromHours(24))
+                    return "No reminder went off in the last day, so there is nothing to snooze.";
+                var snoozed = await reminders.SnoozeAsync(recent.SourceId!.Value, ownerId, now + snooze.Delay, cancellationToken);
+                return snoozed is null
+                    ? "That reminder can no longer be snoozed."
+                    : $"😴 Snoozed until {TimeZoneInfo.ConvertTime(snoozed.DueAt, zone):ddd d MMM HH:mm}: {snoozed.Title}";
             case ReminderCommand.List:
                 var pending = (await reminders.ListAsync(ownerId, cancellationToken))
                     .Where(item => item.Status == "pending" && item.Place is null).OrderBy(item => item.DueAt).Take(8).ToList();
