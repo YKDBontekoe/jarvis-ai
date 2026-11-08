@@ -170,6 +170,31 @@ class _ListsScreenState extends State<ListsScreen> {
                     'done': done,
                   }),
                   onClear: () => _change('clear-done', {'list': list['name']}),
+                  onRemoveItem: (text) {
+                    // A swiped-away row must leave the tree at once, so take
+                    // it out locally first; the reload that follows confirms.
+                    setState(() {
+                      _lists = [
+                        for (final entry in _lists)
+                          if (entry['id'] == list['id'])
+                            {
+                              ...entry,
+                              'items': [
+                                for (final item in jsonMaps(entry['items']))
+                                  if (asJsonString(item['text']) != text) item,
+                              ],
+                            }
+                          else
+                            entry,
+                      ];
+                    });
+                    unawaited(
+                      _change('remove', {
+                        'list': list['name'],
+                        'items': [text],
+                      }),
+                    );
+                  },
                   onDelete: () => unawaited(_delete(list)),
                 ),
               ),
@@ -205,8 +230,7 @@ Future<String?> _askText(
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: () =>
-              Navigator.pop(dialogContext, controller.text.trim()),
+          onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
           child: const Text('Add'),
         ),
       ],
@@ -223,6 +247,7 @@ class _ListCard extends StatefulWidget {
     required this.onToggle,
     required this.onClear,
     required this.onDelete,
+    required this.onRemoveItem,
     super.key,
   });
 
@@ -231,6 +256,7 @@ class _ListCard extends StatefulWidget {
   final void Function(String text, bool done) onToggle;
   final VoidCallback onClear;
   final VoidCallback onDelete;
+  final ValueChanged<String> onRemoveItem;
 
   @override
   State<_ListCard> createState() => _ListCardState();
@@ -288,23 +314,35 @@ class _ListCardState extends State<_ListCard> {
             ],
           ),
           for (final item in items)
-            CheckboxListTile(
-              key: ValueKey(item['id']),
-              contentPadding: EdgeInsets.zero,
-              controlAffinity: ListTileControlAffinity.leading,
-              value: asJsonBool(item['done']),
-              onChanged: (value) => widget.onToggle(
-                asJsonString(item['text']) ?? '',
-                value ?? false,
+            Dismissible(
+              key: ValueKey('dismiss-${item['id']}'),
+              direction: DismissDirection.endToStart,
+              onDismissed: (_) =>
+                  widget.onRemoveItem(asJsonString(item['text']) ?? ''),
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 16),
+                color: colors.danger.withValues(alpha: .12),
+                child: Icon(PhosphorIconsRegular.trash, color: colors.danger),
               ),
-              title: Text(
-                asJsonString(item['text']) ?? '',
-                style: asJsonBool(item['done'])
-                    ? TextStyle(
-                        decoration: TextDecoration.lineThrough,
-                        color: colors.muted,
-                      )
-                    : null,
+              child: CheckboxListTile(
+                key: ValueKey(item['id']),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: asJsonBool(item['done']),
+                onChanged: (value) => widget.onToggle(
+                  asJsonString(item['text']) ?? '',
+                  value ?? false,
+                ),
+                title: Text(
+                  asJsonString(item['text']) ?? '',
+                  style: asJsonBool(item['done'])
+                      ? TextStyle(
+                          decoration: TextDecoration.lineThrough,
+                          color: colors.muted,
+                        )
+                      : null,
+                ),
               ),
             ),
           Padding(
