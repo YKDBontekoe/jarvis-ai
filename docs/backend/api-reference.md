@@ -137,7 +137,7 @@ Knowledge graph read/update endpoints are split between `KnowledgeGraphEndpoints
 | GET | `/habits?includeArchived=` (returns `today`, `habits` with streak stats, and `settings`) |
 | POST | `/habits` (`name`, `icon`, `cadence` `daily`/`weekly`, `targetPerWeek` 1–7, optional `timeZoneId`) |
 | GET/PUT/DELETE | `/habits/{id}` |
-| PUT | `/habits/{id}/archived` (`archived`) |
+| PUT | `/habits/{id}/archived`, `PUT /habits/{id}/pause` (`{ until }` YYYY-MM-DD up to 90 days ahead pauses from today; null resumes; the habit DTO carries `pausedUntil` while a pause is on) (`archived`) |
 | POST | `/habits/{id}/check-ins` (`date` optional, up to 7 days back; `done` default true) |
 | GET/PUT | `/habits/settings` (`eveningCheckIn`, `checkInTime` `HH:mm`, `timeZoneId`) |
 

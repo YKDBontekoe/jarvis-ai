@@ -127,6 +127,30 @@ public sealed class HabitService(
         return HabitOperation<HabitSummary>.Ok(await SummarizeAsync(updated, cancellationToken));
     }
 
+    public const int MaxPauseDays = 90;
+
+    public async Task<HabitOperation<HabitSummary>> SetPausedAsync(Guid id, Guid ownerId, DateOnly? until,
+        CancellationToken cancellationToken)
+    {
+        var habit = await habits.GetAsync(id, ownerId, cancellationToken);
+        if (habit is null) return HabitOperation<HabitSummary>.NotFound();
+        if (habit.IsArchived)
+            return HabitOperation<HabitSummary>.Invalid("habit", "Restore the habit before pausing it.");
+        var today = await TodayAsync(ownerId, cancellationToken);
+        if (until is { } end)
+        {
+            if (end < today) return HabitOperation<HabitSummary>.Invalid("until", "Pick a day that has not passed.");
+            if (end > today.AddDays(MaxPauseDays))
+                return HabitOperation<HabitSummary>.Invalid("until", $"A pause can last at most {MaxPauseDays} days.");
+        }
+        var updated = habit with
+        {
+            PausedFrom = until is null ? null : today, PausedUntil = until, UpdatedAt = clock.GetUtcNow()
+        };
+        if (!await habits.UpdateAsync(updated, cancellationToken)) return HabitOperation<HabitSummary>.NotFound();
+        return HabitOperation<HabitSummary>.Ok(await SummarizeAsync(updated, today, cancellationToken));
+    }
+
     public Task<bool> DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) =>
         habits.DeleteAsync(id, ownerId, cancellationToken);
 

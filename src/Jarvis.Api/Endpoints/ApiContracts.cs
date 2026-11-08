@@ -110,10 +110,12 @@ public sealed record ConversationSummaryDto(
     int MessageCount);
 public sealed record HabitRequest(string? Name, string? Icon, string? Cadence, int? TargetPerWeek, string? TimeZoneId);
 public sealed record HabitArchiveRequest(bool Archived);
+public sealed record HabitPauseRequest(DateOnly? Until);
 public sealed record HabitCheckInRequest(DateOnly? Date, bool? Done);
 public sealed record HabitStatsDto(DateOnly Today, int CurrentStreak, int BestStreak, string StreakUnit, bool DoneToday,
     int ThisWeekCount, int TotalCheckIns, bool OpenToday, IReadOnlyList<DateOnly> RecentDates);
 public sealed record HabitDto(Guid Id, string Name, string? Icon, string Cadence, int TargetPerWeek, bool Archived,
-    DateTimeOffset? ArchivedAt, HabitStatsDto Stats, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    DateTimeOffset? ArchivedAt, HabitStatsDto Stats, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt,
+    DateOnly? PausedUntil = null);
 public sealed record HabitsOverviewDto(DateOnly Today, IReadOnlyList<HabitDto> Habits,
     Jarvis.Application.Habits.HabitSettings Settings);

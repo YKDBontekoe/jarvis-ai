@@ -60,7 +60,7 @@ public static partial class ToolGroups
             ["ListWhatsAppChats", "ReadWhatsAppChat", "SearchWhatsAppMessages", "SendWhatsAppMessage"],
             WhatsAppKeywords()),
         new("habits", "Habit tracking: list habits, check in, create a habit, archive or restore one",
-            ["GetHabits", "CheckInHabits", "CreateHabit", "ArchiveHabit", "DeleteHabit"],
+            ["GetHabits", "CheckInHabits", "CreateHabit", "ArchiveHabit", "PauseHabit", "DeleteHabit"],
             HabitKeywords()),
         new("journal", "The user's daily journal: write or read entries",
             ["SaveJournalEntry", "ListJournalEntries"],

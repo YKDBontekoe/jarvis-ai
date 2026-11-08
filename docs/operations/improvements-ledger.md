@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 100 improvements in this ledger.**
+**Count so far: 103 improvements in this ledger.**
 
 ## Images go to the model as images
 
@@ -137,6 +137,9 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 
 Seen but left alone: Home lists the five oldest-due promises, so with five or more overdue promises one due today is not on Home. That may be intended (overdue first), so it is a question for the owner, not a fix.
+101. Pause a habit until a day (up to 90 days) and resume it: new `paused_from`/`paused_until` columns (migration `AddHabitPause`), a paused habit is not asked about (evening question, briefing) and its streak skips the paused days; a pause never rescues days already missed. API `PUT /habits/{id}/pause`, owner-scoped, audited by id.
+102. The assistant pauses and resumes a habit by name (`PauseHabit`); on the real model "I'm on holiday until next Sunday, pause my Piano habit" stored the right end date and "I'm back, resume" cleared it.
+103. The habit screen's menu has Pause… (date picker) and Resume, and shows "Paused until"; widget-tested.
 
 ## Real-model evidence
 
@@ -161,5 +164,4 @@ The numbered list counts separately checkable changes. Several features are numb
 ## Gaps found but not built
 
 - placing to-dos on days other than today (the agenda for other days is read-only);
-- pausing (not archiving) a habit;
 - reschedule needs no new tool: snoozing already moves a reminder to a new time.

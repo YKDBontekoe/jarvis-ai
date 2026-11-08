@@ -224,4 +224,39 @@ void main() {
     expect(body['done'], isTrue);
     expect(find.text('3'), findsWidgets);
   });
+
+  testWidgets('a habit can be paused until a day and resumed', (tester) async {
+    final habit = HabitView.fromJson(_habit('1', 'Run', streak: 2, best: 6));
+    http.on('PUT', '/api/v1/habits/1/pause', {
+      ..._habit('1', 'Run', streak: 2, best: 6),
+      'pausedUntil': '2026-10-08',
+    });
+    await show(tester, HabitDetailScreen(http: http.client(), habit: habit));
+
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pause…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    final pause = http.sent('PUT', '/api/v1/habits/1/pause').single.body as Map;
+    expect(pause['until'], matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));
+    expect(find.textContaining('Paused until 8/10'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('More'));
+    await tester.pumpAndSettle();
+    expect(find.text('Resume'), findsOneWidget);
+    http.on(
+      'PUT',
+      '/api/v1/habits/1/pause',
+      _habit('1', 'Run', streak: 2, best: 6),
+    );
+    await tester.tap(find.text('Resume'));
+    await tester.pumpAndSettle();
+
+    final resume = http.sent('PUT', '/api/v1/habits/1/pause').last.body as Map;
+    expect(resume['until'], isNull);
+    expect(find.textContaining('Paused until'), findsNothing);
+  });
 }

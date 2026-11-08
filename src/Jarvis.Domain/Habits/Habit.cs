@@ -14,9 +14,14 @@ public sealed record Habit(
     int TargetPerWeek,
     DateTimeOffset? ArchivedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    DateOnly? PausedFrom = null,
+    DateOnly? PausedUntil = null)
 {
     public bool IsArchived => ArchivedAt is not null;
+
+    /// <summary>A paused habit is not asked about and its streak skips the paused days; both dates are inclusive.</summary>
+    public bool IsPausedOn(DateOnly day) => PausedFrom is { } from && PausedUntil is { } until && day >= from && day <= until;
 }
 
 /// <summary>One day on which the owner did a <see cref="Habit"/>. There is at most one check-in per habit per day.</summary>

@@ -20,6 +20,8 @@ internal sealed class HabitConfiguration : IEntityTypeConfiguration<HabitEntity>
         builder.Property(x => x.Cadence).HasColumnName("cadence").HasMaxLength(10).IsRequired();
         builder.Property(x => x.TargetPerWeek).HasColumnName("target_per_week");
         builder.Property(x => x.ArchivedAt).HasColumnName("archived_at");
+        builder.Property(x => x.PausedFrom).HasColumnName("paused_from");
+        builder.Property(x => x.PausedUntil).HasColumnName("paused_until");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at");
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
         builder.HasIndex(x => new { x.OwnerId, x.ArchivedAt });

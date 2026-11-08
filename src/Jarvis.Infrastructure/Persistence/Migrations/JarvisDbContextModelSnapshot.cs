@@ -2968,6 +2968,14 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
 
+                    b.Property<DateOnly?>("PausedFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("paused_from");
+
+                    b.Property<DateOnly?>("PausedUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("paused_until");
+
                     b.Property<int>("TargetPerWeek")
                         .HasColumnType("integer")
                         .HasColumnName("target_per_week");

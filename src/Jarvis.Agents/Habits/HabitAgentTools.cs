@@ -137,6 +137,37 @@ internal sealed class HabitAgentTools(IHabitService service, IAuditEventStore au
         return "The habit and its check-ins are deleted.";
     }
 
+    [Description("Pause a habit for a while (a holiday, an illness) so it is not asked about and its streak is not broken by the paused days, or resume it. Pass the habit by its name and the last day of the pause as YYYY-MM-DD (at most 90 days ahead), or leave the date empty to resume. Use ArchiveHabit to stop tracking for good. Never pause a habit on your own because it is missed.")]
+    public async Task<string> PauseHabitAsync(
+        [Description("The habit, by its name in the user's habit list.")] string habit,
+        [Description("The last day of the pause, YYYY-MM-DD. Empty resumes the habit.")] string? until = null,
+        CancellationToken cancellationToken = default)
+    {
+        DateOnly? end = null;
+        if (!string.IsNullOrWhiteSpace(until))
+        {
+            if (!DateOnly.TryParseExact(until.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+                return "I could not read that date. Use YYYY-MM-DD, or leave it empty to resume.";
+            end = parsed;
+        }
+        var wanted = (habit ?? "").Trim();
+        var active = (await service.ListAsync(currentUser.OwnerId, false, cancellationToken)).ToList();
+        var matches = active.Where(x => x.Habit.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0 && wanted.Length > 0)
+            matches = active.Where(x => x.Habit.Name.Contains(wanted, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matches.Count == 0)
+            return "No active habit matches. The candidates are " + Join(active.Select(x => x.Habit.Name)) + ".";
+        if (matches.Count > 1)
+            return $"\"{AgentText.Limit(wanted, HabitRules.MaxNameLength)}\" matches more than one habit (" +
+                   Join(matches.Select(x => x.Habit.Name)) + "); ask the user which one.";
+        var result = await service.SetPausedAsync(matches[0].Habit.Id, currentUser.OwnerId, end, cancellationToken);
+        if (!result.Succeeded) return "I could not change that habit: " + result.Message;
+        await AuditAsync(end is null ? "habit.resumed" : "habit.paused", cancellationToken, [matches[0].Habit.Id]);
+        return end is null
+            ? $"\"{result.Value!.Habit.Name}\" is active again."
+            : $"Paused \"{result.Value!.Habit.Name}\" until {end:yyyy-MM-dd}. Its streak is not broken by those days.";
+    }
+
     internal static string Describe(HabitSummary summary)
     {
         var habit = summary.Habit;

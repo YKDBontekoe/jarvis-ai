@@ -84,7 +84,7 @@ internal static class ApiMappers
         return new HabitDto(habit.Id, habit.Name, habit.Icon, habit.Cadence, habit.TargetPerWeek, habit.IsArchived,
             habit.ArchivedAt, new HabitStatsDto(stats.Today, stats.CurrentStreak, stats.BestStreak, stats.StreakUnit,
                 stats.DoneToday, stats.ThisWeekCount, stats.TotalCheckIns, summary.IsOpenToday, stats.RecentDates),
-            habit.CreatedAt, habit.UpdatedAt);
+            habit.CreatedAt, habit.UpdatedAt, habit.IsPausedOn(stats.Today) ? habit.PausedUntil : null);
     }
 
     public static IEnumerable<ToolApprovalDto> ToDtos(this IEnumerable<ToolApprovalRecord> approvals) =>

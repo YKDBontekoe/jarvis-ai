@@ -106,6 +106,37 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
     }
   }
 
+  Future<void> _pause() async {
+    final today = _habit.today;
+    final until = await showDatePicker(
+      context: context,
+      helpText: 'Pause until',
+      initialDate: today.add(const Duration(days: 7)),
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 90)),
+    );
+    if (until == null || !mounted) return;
+    await _setPause(
+      '${until.year.toString().padLeft(4, '0')}-${until.month.toString().padLeft(2, '0')}-${until.day.toString().padLeft(2, '0')}',
+    );
+  }
+
+  Future<void> _setPause(String? until) async {
+    try {
+      final response = await widget.http.put<dynamic>(
+        '/api/v1/habits/${_habit.id}/pause',
+        data: {'until': until},
+      );
+      if (!mounted) return;
+      setState(() {
+        _habit = HabitView.fromJson(jsonObject(response.data) ?? const {});
+        _changed = true;
+      });
+    } on DioException catch (error) {
+      _showError(error, 'Could not pause the habit.');
+    }
+  }
+
   Future<void> _delete() async {
     final confirmed = await showJarvisConfirm(
       context,
@@ -163,6 +194,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
               onSelected: (value) => switch (value) {
                 'archive' => unawaited(_setArchived(true)),
                 'restore' => unawaited(_setArchived(false)),
+                'pause' => unawaited(_pause()),
+                'resume' => unawaited(_setPause(null)),
                 _ => unawaited(_delete()),
               },
               itemBuilder: (_) => [
@@ -170,6 +203,11 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                   value: habit.archived ? 'restore' : 'archive',
                   child: Text(habit.archived ? 'Restore' : 'Archive'),
                 ),
+                if (!habit.archived)
+                  PopupMenuItem(
+                    value: habit.paused ? 'resume' : 'pause',
+                    child: Text(habit.paused ? 'Resume' : 'Pause…'),
+                  ),
                 const PopupMenuItem(value: 'delete', child: Text('Delete')),
               ],
             ),
@@ -206,6 +244,8 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                   Text(
                     habit.archived
                         ? '${habit.cadenceLabel} · Archived'
+                        : habit.paused
+                        ? '${habit.cadenceLabel} · Paused until ${habit.pausedUntil!.day}/${habit.pausedUntil!.month}'
                         : habit.isWeekly
                         ? '${habit.cadenceLabel} · ${habit.progressLabel}'
                         : habit.cadenceLabel,
