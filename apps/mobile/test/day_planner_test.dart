@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/planner/day_planner_format.dart';
 import 'package:jarvis_mobile/features/planner/day_planner_screen.dart';
 import 'package:jarvis_mobile/schedule_format.dart';
+import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 
 import 'support/fixture_http.dart';
 
@@ -336,7 +337,7 @@ void main() {
     }
 
     expect(http.sent('GET', '/api/v1/planner/day').length, 7);
-    final button = tester.widget<IconButton>(
+    final button = tester.widget<CircleIconButton>(
       find.byKey(const Key('planner-prev-day')),
     );
     expect(button.onPressed, isNull);

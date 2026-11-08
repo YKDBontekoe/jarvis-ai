@@ -7,6 +7,7 @@ import '../../ui/phosphor_icons.dart';
 import 'task_details_screen.dart';
 import '../watches/condition_watches_screen.dart';
 import '../approvals/approvals_screen.dart';
+import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
@@ -166,7 +167,10 @@ class _TasksScreenState extends State<TasksScreen> {
   String _date(dynamic value) {
     final date = jsonDate(value, local: true);
     if (date == null) return '';
-    return MaterialLocalizations.of(context).formatMediumDate(date);
+    // Recent tasks read as "Today 10:15" or "Wed 09:00"; older ones by date.
+    return DateTime.now().difference(date).inDays < 6
+        ? friendlyWhen(context, date)
+        : MaterialLocalizations.of(context).formatMediumDate(date);
   }
 
   static const _activeStatuses = {
@@ -297,9 +301,14 @@ class _TasksScreenState extends State<TasksScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      RollingNumber(
                         '$value',
-                        style: Theme.of(context).textTheme.headlineSmall,
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -355,6 +364,8 @@ class _TasksScreenState extends State<TasksScreen> {
               children: [
                 Text(
                   asJsonString(task['title']) ?? 'Task',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleSmall
                       ?.copyWith(fontSize: 15, height: 1.3),
                 ),

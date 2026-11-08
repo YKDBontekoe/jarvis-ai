@@ -231,4 +231,5 @@ abstract final class PhosphorIconsFill {
 abstract final class PhosphorIconsBold {
   static const arrowUp = IconData(0xe08e, fontFamily: 'PhosphorBold');
   static const waveform = IconData(0xe802, fontFamily: 'PhosphorBold');
+  static const plus = IconData(0xe3d4, fontFamily: 'PhosphorBold');
 }

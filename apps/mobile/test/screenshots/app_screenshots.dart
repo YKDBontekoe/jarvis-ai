@@ -9,6 +9,7 @@ import 'package:jarvis_mobile/theme.dart';
 import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 import 'package:jarvis_mobile/ui/phosphor_icons.dart';
 import 'package:jarvis_mobile/main.dart';
+import 'package:jarvis_mobile/schedule_format.dart' show deviceTimeZoneLookup;
 
 import 'fixtures.dart';
 import 'proactive_fixtures.dart';
@@ -22,6 +23,7 @@ void main() {
   setUpAll(loadAppFonts);
   setUp(() {
     mockPlatformChannels();
+    deviceTimeZoneLookup = () async => 'Europe/Amsterdam';
     http = ScreenshotHttp(fixtureRoutes(withApproval: false));
     debugJarvisHttpAdapter = http;
   });

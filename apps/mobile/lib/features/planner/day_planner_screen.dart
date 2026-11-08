@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../l10n/l10n.dart';
 import '../../schedule_format.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import '../chat/mcp_setup.dart';
@@ -361,14 +363,32 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
                           .copyWith(fontSize: 34),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      summary,
-                      key: const Key('planner-summary'),
-                      style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
+                    // The day's summary with the day switcher beside it; the
+                    // switcher drops under the summary when space runs out.
+                    SizedBox(
+                      width: double.infinity,
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 8,
+                        children: [
+                          Text(
+                            summary,
+                            key: const Key('planner-summary'),
+                            style: TextStyle(
+                              color: colors.inkSoft,
+                              fontSize: 13.5,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                          _dayNavigator(),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 10),
-                    _dayNavigator(),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 14),
                     _DayStrip(today: today),
                   ],
                 ),
@@ -511,32 +531,52 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
           ).difference(DateTime(today.year, today.month, today.day)).inDays;
     final current = base == null ? 0 : offset(base);
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          key: const Key('planner-prev-day'),
-          tooltip: 'Previous day',
-          onPressed: today == null || current <= -_daysBack
-              ? null
-              : () => _shift(-1),
-          icon: const Icon(PhosphorIconsRegular.caretLeft, size: 20),
-        ),
-        IconButton(
-          key: const Key('planner-next-day'),
-          tooltip: 'Next day',
-          onPressed: today == null || current >= _daysAhead
-              ? null
-              : () => _shift(1),
-          icon: const Icon(PhosphorIconsRegular.caretRight, size: 20),
-        ),
-        if (_viewing != null)
-          TextButton(
+        if (_viewing != null) ...[
+          PillAction(
             key: const Key('planner-today'),
+            compact: true,
+            label: 'Today',
+            icon: PhosphorIconsRegular.arrowBendUpLeft,
             onPressed: () {
+              HapticFeedback.selectionClick();
               setState(() => _viewing = null);
               unawaited(_load());
             },
-            child: const Text('Back to today'),
           ),
+          const SizedBox(width: 8),
+        ],
+        ToolbarCapsule(
+          children: [
+            CircleIconButton(
+              key: const Key('planner-prev-day'),
+              bare: true,
+              size: 44,
+              tooltip: 'Previous day',
+              icon: PhosphorIconsRegular.caretLeft,
+              onPressed: today == null || current <= -_daysBack
+                  ? null
+                  : () {
+                      HapticFeedback.selectionClick();
+                      _shift(-1);
+                    },
+            ),
+            CircleIconButton(
+              key: const Key('planner-next-day'),
+              bare: true,
+              size: 44,
+              tooltip: 'Next day',
+              icon: PhosphorIconsRegular.caretRight,
+              onPressed: today == null || current >= _daysAhead
+                  ? null
+                  : () {
+                      HapticFeedback.selectionClick();
+                      _shift(1);
+                    },
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -581,13 +621,22 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
               IconButton.filled(
                 key: const Key('planner-add'),
                 tooltip: 'Add to-do',
+                style: IconButton.styleFrom(
+                  backgroundColor: colors.ink,
+                  foregroundColor: colors.onInk,
+                  disabledBackgroundColor: colors.surfaceMuted,
+                  disabledForegroundColor: colors.muted,
+                ),
                 onPressed: _adding ? null : () => unawaited(_add()),
                 icon: _adding
-                    ? const SizedBox.square(
+                    ? SizedBox.square(
                         dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 1.8),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.8,
+                          color: colors.muted,
+                        ),
                       )
-                    : const Icon(PhosphorIconsRegular.plus, size: 18),
+                    : const Icon(PhosphorIconsBold.plus, size: 18),
               ),
             ],
           ),
