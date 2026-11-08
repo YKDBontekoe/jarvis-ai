@@ -165,6 +165,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
                           ?? ModelSettings.Default;
         var chatClient = await chatClients.GetChatClientAsync(ownerId, purpose, cancellationToken,
             ProfileScope.OverlayModels(ownerModels, snapshot));
+        // Someone is waiting on an interactive reply; background task runs keep the standard service tier.
+        if (task is null) chatClient = CodexCliChatClient.MarkInteractive(chatClient);
         return _agent = agentFactory.Create(chatClient, mcpToolHost.Tools,
             new AgentBuildContext(ownerId, task?.Id, conversationId, snapshot));
     }

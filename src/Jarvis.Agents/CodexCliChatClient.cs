@@ -17,7 +17,8 @@ namespace Jarvis.Agents;
 /// </summary>
 public sealed partial class CodexCliChatClient(CodexExecutable executable, string? model = null, string? visionModel = null,
     IReadOnlyDictionary<string, string>? modelClasses = null, bool enableWebSearch = true,
-    int turnTimeoutSeconds = 300, CodexProcessLimiter? processLimiter = null, CodexAccess? access = null) : IChatClient
+    int turnTimeoutSeconds = 300, CodexProcessLimiter? processLimiter = null, CodexAccess? access = null,
+    string? chatServiceTier = CodexCliChatClient.PriorityServiceTier) : IChatClient
 {
     private readonly CodexAccess _access = access ?? CodexAccess.Open;
 
@@ -86,7 +87,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         return await RunCodexAsync(prompt, options?.ModelId ?? model,
             GetReasoningEffort(options),
             CallableToolNames(tools, options), null, IsBackground(options),
-            cancellationToken);
+            cancellationToken, IsInteractive(options));
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
@@ -103,7 +104,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         var runTask = RunCodexAsync(prompt, options?.ModelId ?? model,
             GetReasoningEffort(options),
             CallableToolNames(tools, options), updates.Writer, IsBackground(options),
-            cancellationToken);
+            cancellationToken, IsInteractive(options));
         try
         {
             await foreach (var update in updates.Reader.ReadAllAsync(cancellationToken))
@@ -121,6 +122,51 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
 
     /// <summary>Set by the model resolver for work that must not take the last process slot from an interactive turn.</summary>
     internal const string BackgroundPriorityProperty = "jarvis_background";
+
+    /// <summary>Set by the model resolver on interactive chat calls: someone is waiting for the reply.</summary>
+    internal const string InteractiveProperty = "jarvis_interactive";
+
+    /// <summary>OpenAI priority processing, Codex's "Fast" mode: lower latency, at a higher plan usage cost.</summary>
+    public const string PriorityServiceTier = "priority";
+
+    /// <summary>Marks every call through <paramref name="client"/> as interactive chat.</summary>
+    public static IChatClient MarkInteractive(IChatClient client) => new InteractiveChatClient(client);
+
+    private sealed class InteractiveChatClient(IChatClient inner) : DelegatingChatClient(inner)
+    {
+        public override Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            base.GetResponseAsync(messages, Mark(options), cancellationToken);
+
+        public override IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
+            ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            base.GetStreamingResponseAsync(messages, Mark(options), cancellationToken);
+
+        // Disposing the shared provider client is not this wrapper's job.
+        protected override void Dispose(bool disposing) { }
+
+        private static ChatOptions Mark(ChatOptions? options)
+        {
+            options = options?.Clone() ?? new ChatOptions();
+            options.AdditionalProperties ??= [];
+            options.AdditionalProperties[InteractiveProperty] = true;
+            return options;
+        }
+    }
+
+    private static bool IsInteractive(ChatOptions? options) =>
+        options?.AdditionalProperties is not null &&
+        options.AdditionalProperties.TryGetValue(InteractiveProperty, out var flag) &&
+        flag is true;
+
+    /// <summary>
+    /// The service tier for an interactive call, when one is configured and the signed-in account offers it for this
+    /// model. Background work always uses the standard tier, so the extra cost only buys speed someone is waiting for.
+    /// </summary>
+    internal static string? SelectServiceTier(string? configuredTier, bool interactive, IReadOnlySet<string> modelTiers) =>
+        interactive && !string.IsNullOrWhiteSpace(configuredTier) && modelTiers.Contains(configuredTier.Trim())
+            ? configuredTier.Trim()
+            : null;
 
     private static bool IsBackground(ChatOptions? options) =>
         options?.AdditionalProperties is not null &&
@@ -165,7 +211,8 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
 
     private async Task<ChatResponse> RunCodexAsync(PromptPayload prompt, string? requestedModel,
         string? reasoningEffort, IReadOnlySet<string> toolNames,
-        ChannelWriter<ChatResponseUpdate>? updates, bool background, CancellationToken cancellationToken)
+        ChannelWriter<ChatResponseUpdate>? updates, bool background, CancellationToken cancellationToken,
+        bool interactive = false)
     {
         await _processSlots.WaitAsync(background, cancellationToken);
         AppServerProcess? server = null;
@@ -197,6 +244,9 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                 var modelCatalog = await GetModelCatalogAsync(rpc, executablePath, runToken);
                 var resolvedModel = ResolveModel(modelCatalog, ResolveModelSelector(selectedModel), modality,
                     allowCompatibleFallback: prompt.Images.Count > 0 && visionModel is null && !hasVisionClass);
+                var serviceTier = SelectServiceTier(chatServiceTier, interactive,
+                    modelCatalog.FirstOrDefault(candidate => candidate.Model == resolvedModel)?.ServiceTiers ??
+                    new HashSet<string>());
                 var threadId = await rpc.StartThreadAsync(scratch, resolvedModel, runToken);
                 var rawResponse = new StringBuilder();
                 StructuredTextStreamDecoder textDecoder = new();
@@ -237,6 +287,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                 using var modelActivity = ActivitySource.StartActivity("jarvis.model.completion");
                 GenAiTelemetry.TagChat(modelActivity, "openai", resolvedModel);
                 modelActivity?.SetTag("gen_ai.request.input_images", prompt.Images.Count);
+                modelActivity?.SetTag("gen_ai.request.service_tier", serviceTier ?? "default");
                 var modelCallStarted = Stopwatch.GetTimestamp();
                 var modelOutcome = "failed";
                 CodexTokenUsage? usage = null;
@@ -244,7 +295,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                 try
                 {
                     var turn = await rpc.RunTurnAsync(threadId, prompt, resolvedModel, reasoningEffort, OnDelta,
-                        runToken, ReportNativeTool);
+                        runToken, ReportNativeTool, serviceTier);
                     usage = turn.Usage;
                     webSearches += turn.WebSearchActions;
                     modelOutcome = "completed";
@@ -304,7 +355,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                     try
                     {
                         var retry = await rpc.RunTurnAsync(threadId, retryPrompt, resolvedModel, reasoningEffort,
-                            OnDelta, runToken, ReportNativeTool);
+                            OnDelta, runToken, ReportNativeTool, serviceTier);
                         usage = AddUsage(usage, retry.Usage);
                         webSearches += retry.WebSearchActions;
                         if (retry.Usage is { } retryUsage)
@@ -549,7 +600,11 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         return details;
     }
 
-    private sealed record AvailableModel(string Model, string? Id, IReadOnlySet<string> InputModalities, bool IsDefault);
+    private sealed record AvailableModel(string Model, string? Id, IReadOnlySet<string> InputModalities, bool IsDefault)
+    {
+        /// <summary>Service tier ids the account may request for this model, such as <see cref="PriorityServiceTier"/>.</summary>
+        public IReadOnlySet<string> ServiceTiers { get; init; } = new HashSet<string>();
+    }
 
     private static string Limit(string value, int maxLength) => value.Length <= maxLength ? value : value[..maxLength];
 }

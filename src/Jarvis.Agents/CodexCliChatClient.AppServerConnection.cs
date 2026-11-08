@@ -42,7 +42,20 @@ public sealed partial class CodexCliChatClient
                         : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     var isDefault = item.TryGetProperty("isDefault", out var defaultElement) &&
                                     defaultElement.ValueKind == JsonValueKind.True;
-                    models.Add(new AvailableModel(modelId, id, modalities, isDefault));
+                    var tiers = new HashSet<string>(StringComparer.Ordinal);
+                    if (item.TryGetProperty("serviceTiers", out var serviceTiers) &&
+                        serviceTiers.ValueKind == JsonValueKind.Array)
+                        foreach (var tier in serviceTiers.EnumerateArray())
+                            if (tier.ValueKind == JsonValueKind.Object && tier.TryGetProperty("id", out var tierId) &&
+                                tierId.GetString() is { Length: > 0 } tierName)
+                                tiers.Add(tierName);
+                    // Older catalogs list the fast tier as an "additional speed tier" named "fast".
+                    if (item.TryGetProperty("additionalSpeedTiers", out var speedTiers) &&
+                        speedTiers.ValueKind == JsonValueKind.Array &&
+                        speedTiers.EnumerateArray().Any(tier => tier.ValueKind == JsonValueKind.String &&
+                                                                tier.GetString() == "fast"))
+                        tiers.Add(PriorityServiceTier);
+                    models.Add(new AvailableModel(modelId, id, modalities, isDefault) { ServiceTiers = tiers });
                 }
                 cursor = result.TryGetProperty("nextCursor", out var nextCursor) &&
                          nextCursor.ValueKind == JsonValueKind.String ? nextCursor.GetString() : null;
@@ -68,14 +81,14 @@ public sealed partial class CodexCliChatClient
 
         public async Task<CodexTurnMetrics> RunTurnAsync(string threadId, PromptPayload prompt, string modelId,
             string? reasoningEffort, Action<string?, string> onDelta, CancellationToken cancellationToken,
-            Action<string, string, string>? onNativeTool = null)
+            Action<string, string, string>? onNativeTool = null, string? serviceTier = null)
         {
             _latestUsage = null;
             var webSearches = 0;
             // Tool validation is performed by the outer client after parsing the structured response.
             // The prompt itself contains the exact allowlisted function definitions.
             var requestId = ++_requestId;
-            await WriteAsync("turn/start", new
+            var turnParameters = JsonSerializer.SerializeToNode(new
             {
                 threadId,
                 model = modelId,
@@ -85,7 +98,11 @@ public sealed partial class CodexCliChatClient
                 input = new object[] { new { type = "text", text = prompt.Text } }
                     .Concat(prompt.Images.Select(url => (object)new { type = "image", url, detail = "auto" })).ToArray(),
                 outputSchema = OutputSchema
-            }, cancellationToken, requestId);
+            }, JsonOptions)!.AsObject();
+            // Left out unless chosen: an explicit null asks for standard routing and would override the model's own
+            // catalog default.
+            if (serviceTier is not null) turnParameters["serviceTier"] = serviceTier;
+            await WriteAsync("turn/start", turnParameters, cancellationToken, requestId);
 
             while (true)
             {
