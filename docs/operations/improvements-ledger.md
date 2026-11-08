@@ -150,7 +150,13 @@ Run against real Codex on the Aspire stack once the plan's quota came back (scri
 - "every other Friday at 17:00" created a biweekly reminder on Friday (weekdays 16) in the owner's zone;
 - agenda for next Tuesday and the calendar: the calendar link in this test database cannot be read, and the assistant said so instead of guessing.
 
-Still without a real-model run: `/journal`, contact cards, location pins, file messages (these are chat-app inputs, covered by the unit tests and `channels_flow.mjs` on the fake model), and the project, file and habit deletes.
+- `DeleteHabit`, `DeleteProject` and `DeleteFile` each stopped at an approval with the record still in place, and removed it only after the approval was granted (checked by reading the habit, project and file lists before and after).
+
+Still without a real-model run: `/journal`, contact cards, location pins and file messages. They are chat-app inputs that never pass through the model's tool choice; they are covered by unit tests and `channels_flow.mjs` against the fake model and the real API.
+
+## How to read the count
+
+The numbered list counts separately checkable changes. Several features are numbered in parts (for example lists: service, API, assistant tool, app screen, chat commands, search; or the chat commands: parsing, running, audit). Counted as whole features the list is roughly 50. There was never a list of 100 named items to match against; "at least 100" was a target for the number of good changes, so this ledger is the record of what was done and how each was checked.
 
 ## Gaps found but not built
 
