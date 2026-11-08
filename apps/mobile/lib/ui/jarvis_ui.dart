@@ -1407,12 +1407,14 @@ class HeaderAction extends StatelessWidget {
   // a primary one stays a filled circle so it still reads as the main action.
   Widget _iconOnly(Widget leading) => collapsesWhenNarrow
       ? IconButton(
+          // The tooltip names the button for screen readers.
           tooltip: label,
           onPressed: busy ? null : onPressed,
-          icon: Semantics(label: label, excludeSemantics: true, child: leading),
+          icon: ExcludeSemantics(child: leading),
         )
       : Tooltip(
           message: label,
+          excludeFromSemantics: true,
           child: _button(
             onPressed: busy ? null : onPressed,
             style: _style().copyWith(
@@ -1542,6 +1544,9 @@ class CircleIconButton extends StatelessWidget {
     );
     return Tooltip(
       message: tooltip,
+      // The Semantics below already names the button; without this a screen
+      // reader hears the name twice.
+      excludeFromSemantics: true,
       child: Semantics(
         button: true,
         enabled: onPressed != null,

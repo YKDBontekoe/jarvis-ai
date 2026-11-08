@@ -121,4 +121,26 @@ void main() {
     expect(cleared, 1);
     expect(find.byTooltip('Clear search'), findsNothing);
   });
+
+  testWidgets('round icon buttons are named once for screen readers', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: Scaffold(
+          body: CircleIconButton(
+            icon: Icons.chevron_right,
+            tooltip: 'Next day',
+            onPressed: () {},
+          ),
+        ),
+      ),
+    );
+    expect(find.bySemanticsLabel('Next day'), findsOneWidget);
+    final node = tester.getSemantics(find.bySemanticsLabel('Next day'));
+    expect(node.tooltip, isEmpty);
+    handle.dispose();
+  });
 }
