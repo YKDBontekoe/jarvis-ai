@@ -592,6 +592,16 @@ class _ReceiptThumb extends StatelessWidget {
           height: 64,
           fit: BoxFit.cover,
           cacheWidth: 192,
+          semanticLabel: 'Receipt photo, tap to open',
+          errorBuilder: (context, _, _) => Container(
+            width: 64,
+            height: 64,
+            color: JarvisColors.of(context).surfaceMuted,
+            child: Icon(
+              PhosphorIconsRegular.receipt,
+              color: JarvisColors.of(context).muted,
+            ),
+          ),
         ),
       ),
     ),

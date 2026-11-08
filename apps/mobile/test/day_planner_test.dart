@@ -79,7 +79,7 @@ void main() {
     expect(minutesOfDay('08:30:00'), 510);
     expect(minutesOfDay('nope'), isNull);
     expect(timeOfDayValue(1050), '17:30:00');
-    expect(longDayLabel(DateTime(2026, 10, 2)), 'Friday, October 2');
+    expect(longDayLabel(DateTime(2026, 10, 2)), 'Friday 2 October');
     expect(
       planResultMessage(0, const []),
       'Nothing to plan. Add a to-do first.',

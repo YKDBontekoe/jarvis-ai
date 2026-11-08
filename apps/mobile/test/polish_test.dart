@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
 import 'package:jarvis_mobile/theme.dart';
 import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 
@@ -57,5 +60,34 @@ void main() {
         .where((d) => d.shape == BoxShape.circle)
         .single;
     expect(dot.color, JarvisColors.dark.danger);
+  });
+
+  testWidgets('double-tapping a photo zooms in and double-tapping again fits '
+      'it', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: PhotoViewerPage(bytes: Uint8List(0), title: 'Receipt'),
+      ),
+    );
+    Matrix4 matrix() => tester
+        .widget<InteractiveViewer>(find.byType(InteractiveViewer))
+        .transformationController!
+        .value;
+    expect(matrix().getMaxScaleOnAxis(), 1);
+
+    Future<void> doubleTap() async {
+      final center = tester.getCenter(find.byType(InteractiveViewer));
+      await tester.tapAt(center);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tapAt(center);
+      await tester.pumpAndSettle();
+    }
+
+    await doubleTap();
+    expect(matrix().getMaxScaleOnAxis(), closeTo(2.5, .01));
+    await doubleTap();
+    expect(matrix().getMaxScaleOnAxis(), closeTo(1, .01));
+    expect(find.text('This photo cannot be shown.'), findsOneWidget);
   });
 }

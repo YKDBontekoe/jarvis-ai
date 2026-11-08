@@ -721,6 +721,8 @@ class _BirthdayStrip extends StatelessWidget {
           final person = people[index];
           final today = person.birthdayToday;
           final age = person.turningAge;
+          // Within a week the countdown takes the birthday lilac.
+          final soon = !today && (person.daysUntilBirthday ?? 99) <= 7;
           return SizedBox(
             width: 148 * scale,
             child: SurfaceCard(
@@ -754,7 +756,7 @@ class _BirthdayStrip extends StatelessWidget {
                             ? PhosphorIconsRegular.cake
                             : PhosphorIconsRegular.gift,
                         size: 18,
-                        color: today ? colors.rose : colors.muted,
+                        color: today || soon ? colors.roseText : colors.muted,
                       ),
                     ],
                   ),
@@ -773,8 +775,14 @@ class _BirthdayStrip extends StatelessWidget {
                     birthdayCountdown(person),
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: today ? FontWeight.w600 : FontWeight.w500,
-                      color: today ? colors.ink : colors.inkSoft,
+                      fontWeight: today || soon
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: today
+                          ? colors.ink
+                          : soon
+                          ? colors.roseText
+                          : colors.inkSoft,
                     ),
                   ),
                   Text(

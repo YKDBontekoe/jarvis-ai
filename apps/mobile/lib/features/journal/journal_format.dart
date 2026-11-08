@@ -55,7 +55,7 @@ String formatJournalDate(DateTime date, {DateTime? now}) {
   if (age == 0) return 'Today';
   if (age == 1) return 'Yesterday';
   final suffix = day.year == today.year ? '' : ' ${day.year}';
-  return '${_weekdays[day.weekday - 1]}, ${day.day} ${_months[day.month - 1]}$suffix';
+  return '${_weekdays[day.weekday - 1]} ${day.day} ${_months[day.month - 1]}$suffix';
 }
 
 /// Splits a comma or whitespace separated tag field into clean tags.

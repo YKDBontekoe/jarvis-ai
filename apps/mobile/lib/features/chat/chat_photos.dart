@@ -257,11 +257,67 @@ class _PhotoTileState extends State<_PhotoTile> {
 }
 
 /// A photo on black, pinch to zoom.
-class PhotoViewerPage extends StatelessWidget {
+class PhotoViewerPage extends StatefulWidget {
   const PhotoViewerPage({required this.bytes, required this.title, super.key});
 
   final Uint8List bytes;
   final String title;
+
+  @override
+  State<PhotoViewerPage> createState() => _PhotoViewerPageState();
+}
+
+/// Full-screen photo: pinch to zoom, double-tap to zoom in where you tap and
+/// double-tap again to fit.
+class _PhotoViewerPageState extends State<PhotoViewerPage>
+    with SingleTickerProviderStateMixin {
+  final _transform = TransformationController();
+  late final _zoom = AnimationController(
+    vsync: this,
+    duration: JarvisMotion.base,
+  );
+  Animation<Matrix4>? _animation;
+  Offset _tap = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _zoom.addListener(() {
+      if (_animation case final animation?) _transform.value = animation.value;
+    });
+  }
+
+  @override
+  void dispose() {
+    _zoom.dispose();
+    _transform.dispose();
+    super.dispose();
+  }
+
+  void _toggleZoom() {
+    final zoomedIn = _transform.value.getMaxScaleOnAxis() > 1.01;
+    const scale = 2.5;
+    final target = zoomedIn
+        ? Matrix4.identity()
+        : (Matrix4.identity()
+            ..translateByDouble(
+              -_tap.dx * (scale - 1),
+              -_tap.dy * (scale - 1),
+              0,
+              1,
+            )
+            ..scaleByDouble(scale, scale, 1, 1));
+    HapticFeedback.selectionClick();
+    if (JarvisMotion.reduced(context)) {
+      _transform.value = target;
+      return;
+    }
+    _animation = Matrix4Tween(
+      begin: _transform.value,
+      end: target,
+    ).animate(CurvedAnimation(parent: _zoom, curve: JarvisMotion.standard));
+    _zoom.forward(from: 0);
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -269,11 +325,31 @@ class PhotoViewerPage extends StatelessWidget {
     appBar: AppBar(
       backgroundColor: Colors.black,
       foregroundColor: Colors.white,
-      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      systemOverlayStyle: SystemUiOverlayStyle.light,
+      title: Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
     ),
-    body: InteractiveViewer(
-      maxScale: 5,
-      child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
+    body: GestureDetector(
+      onDoubleTapDown: (details) => _tap = details.localPosition,
+      onDoubleTap: _toggleZoom,
+      child: InteractiveViewer(
+        transformationController: _transform,
+        maxScale: 5,
+        child: Center(
+          child: Image.memory(
+            widget.bytes,
+            fit: BoxFit.contain,
+            semanticLabel: widget.title,
+            errorBuilder: (_, _, _) => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'This photo cannot be shown.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 15),
+              ),
+            ),
+          ),
+        ),
+      ),
     ),
   );
 }
