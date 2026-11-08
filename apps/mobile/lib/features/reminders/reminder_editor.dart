@@ -265,10 +265,13 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
       );
       return;
     }
-    if ((_recurrence == 'weekly' || _recurrence == 'biweekly') && _weekdays == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Choose at least one weekday.')),
-      );
+    if ((_recurrence == 'weekly' || _recurrence == 'biweekly') &&
+        _weekdays == 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Choose at least one weekday.')),
+        );
       return;
     }
     await _send(

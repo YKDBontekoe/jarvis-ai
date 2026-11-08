@@ -165,14 +165,16 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
     }
     final label = channelKind(kind).label;
     final phone = asJsonString(linked['phone']);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$label linked${phone == null ? '' : ' as $phone'}. '
-          'Message yourself in $label to chat with Jarvis.',
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            '$label linked${phone == null ? '' : ' as $phone'}. '
+            'Message yourself in $label to chat with Jarvis.',
+          ),
         ),
-      ),
-    );
+      );
   }
 
   @override

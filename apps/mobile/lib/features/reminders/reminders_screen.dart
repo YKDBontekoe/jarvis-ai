@@ -294,7 +294,8 @@ abstract class _RemindersController extends State<RemindersScreen>
           'title': created.title,
           'dueAt': localDueAt.toUtc().toIso8601String(),
           if (created.recurrence != 'once') 'recurrence': created.recurrence,
-          if (created.recurrence == 'weekly' || created.recurrence == 'biweekly')
+          if (created.recurrence == 'weekly' ||
+              created.recurrence == 'biweekly')
             'weekdays': created.weekdays,
           'timeZoneId': timeZoneId,
           'localTime': localTime,
@@ -775,7 +776,8 @@ abstract class _RemindersController extends State<RemindersScreen>
 
   void _showError(String message) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showMessage(String message) => _showError(message);

@@ -161,11 +161,13 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
 
   void _showError(DioException error, String fallback) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(firstProblemMessage(error.response?.data) ?? fallback),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(firstProblemMessage(error.response?.data) ?? fallback),
+        ),
+      );
   }
 
   @override

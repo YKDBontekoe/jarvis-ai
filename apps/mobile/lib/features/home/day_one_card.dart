@@ -104,9 +104,11 @@ class _DayOneCardState extends State<DayOneCard> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _brief = before);
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(content: Text('Could not save the brief time')),
-      );
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Could not save the brief time')),
+        );
     } finally {
       if (mounted) setState(() => _saving = null);
     }

@@ -132,7 +132,8 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _condition(Map<String, dynamic> watch) {

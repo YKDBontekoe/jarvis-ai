@@ -170,11 +170,13 @@ class _AgentsScreenState extends State<AgentsScreen> {
       // The secret is already off-screen even if the clipboard write fails.
     }
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Token copied. It will not be shown again.'),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Token copied. It will not be shown again.'),
+        ),
+      );
   }
 
   Future<void> _removeAgent(String? id) async {

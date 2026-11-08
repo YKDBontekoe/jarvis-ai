@@ -168,7 +168,8 @@ class _CodingRunDetailScreenState extends State<CodingRunDetailScreen> {
       await Clipboard.setData(ClipboardData(text: url));
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Link copied.')));
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Link copied.')));
     }
   }
 

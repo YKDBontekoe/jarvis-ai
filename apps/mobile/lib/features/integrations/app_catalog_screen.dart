@@ -735,9 +735,11 @@ class _AppKeysDialogState extends State<AppKeysDialog> {
     if (!mounted) return;
     if (result.ok || result.errorKind == 'paused') {
       Navigator.of(context).pop(true);
-      messenger?.showSnackBar(
-        SnackBar(content: Text('${widget.appName}: ${result.message}')),
-      );
+      messenger
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('${widget.appName}: ${result.message}')),
+        );
       return;
     }
     setState(() {

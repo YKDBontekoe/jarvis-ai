@@ -152,19 +152,21 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
         },
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              retrying
-                  ? 'Jarvis resumed the previous decision.'
-                  : rememberCategory
-                  ? 'Allowed from now on. Jarvis can do this without asking.'
-                  : approved
-                  ? 'Tool call approved.'
-                  : 'Tool call rejected.',
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                retrying
+                    ? 'Jarvis resumed the previous decision.'
+                    : rememberCategory
+                    ? 'Allowed from now on. Jarvis can do this without asking.'
+                    : approved
+                    ? 'Tool call approved.'
+                    : 'Tool call rejected.',
+              ),
             ),
-          ),
-        );
+          );
       }
       await _load();
     } on DioException catch (error) {
@@ -173,16 +175,19 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
             ? 'This approval was already decided.'
             : 'Jarvis could not process this decision.';
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
         await _load();
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Jarvis could not process this decision.'),
-          ),
-        );
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('Jarvis could not process this decision.'),
+            ),
+          );
         await _load();
       }
     } finally {
@@ -250,9 +255,11 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
       await _load();
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Jarvis could not turn this off.')),
-        );
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Jarvis could not turn this off.')),
+          );
       }
     } finally {
       if (mounted) setState(() => _processingId = null);

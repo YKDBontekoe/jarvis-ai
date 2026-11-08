@@ -160,26 +160,30 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
         },
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            on
-                ? 'Jarvis now reads along with ${chat.name}.'
-                : 'Jarvis stopped reading ${chat.name}.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              on
+                  ? 'Jarvis now reads along with ${chat.name}.'
+                  : 'Jarvis stopped reading ${chat.name}.',
+            ),
           ),
-        ),
-      );
+        );
     } on DioException catch (error) {
       if (!mounted) return;
       _revert(chat);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ??
-                'Could not change ${chat.name}.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ??
+                  'Could not change ${chat.name}.',
+            ),
           ),
-        ),
-      );
+        );
     } catch (_) {
       if (mounted) _revert(chat);
     } finally {

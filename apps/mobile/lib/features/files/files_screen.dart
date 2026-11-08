@@ -453,7 +453,8 @@ class _FilesScreenState extends State<FilesScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatSize(dynamic value) => formatFileSize(asJsonInt(value));
@@ -957,8 +958,7 @@ String uploadContentTypeFor(String fileName) {
     'yaml' || 'yml' => 'application/yaml',
     'docx' =>
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'pptx' =>
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'jpg' || 'jpeg' => 'image/jpeg',
     'png' => 'image/png',
     'webp' => 'image/webp',

@@ -93,14 +93,16 @@ class _HabitsScreenState extends State<HabitsScreen> {
     } on DioException catch (error) {
       if (!mounted) return;
       _replace(habit);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ??
-                'Could not update ${habit.name}.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ??
+                  'Could not update ${habit.name}.',
+            ),
           ),
-        ),
-      );
+        );
     } finally {
       _pending.remove(habit.id);
     }

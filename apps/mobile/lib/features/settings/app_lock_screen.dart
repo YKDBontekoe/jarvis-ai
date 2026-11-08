@@ -35,15 +35,17 @@ class _AppLockScreenState extends State<AppLockScreen> {
   Future<void> _toggle(AppLockController controller, bool value) async {
     final changed = await controller.setEnabled(value);
     if (!mounted || changed) return;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(
-        content: Text(
-          _available == false
-              ? 'This device has no Face ID, Touch ID, or passcode set up.'
-              : 'The lock was not changed because Face ID did not confirm it.',
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            _available == false
+                ? 'This device has no Face ID, Touch ID, or passcode set up.'
+                : 'The lock was not changed because Face ID did not confirm it.',
+          ),
         ),
-      ),
-    );
+      );
   }
 
   @override

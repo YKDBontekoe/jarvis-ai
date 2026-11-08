@@ -60,14 +60,16 @@ class _ListsScreenState extends State<ListsScreen> {
       await _load();
     } on DioException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ??
-                'That did not work. Try again.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ??
+                  'That did not work. Try again.',
+            ),
           ),
-        ),
-      );
+        );
     }
   }
 
@@ -119,9 +121,11 @@ class _ListsScreenState extends State<ListsScreen> {
       await _load();
     } on DioException {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not delete the list.')),
-        );
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Could not delete the list.')),
+          );
       }
     }
   }

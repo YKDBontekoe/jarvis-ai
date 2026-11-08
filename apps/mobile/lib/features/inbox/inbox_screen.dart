@@ -94,13 +94,15 @@ class _InboxScreenState extends State<InboxScreen> {
       return true;
     } on DioException catch (error) {
       if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ?? 'That did not work.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+            ),
           ),
-        ),
-      );
+        );
       return false;
     } finally {
       if (mounted) setState(() => _busy.remove(id));
@@ -151,11 +153,13 @@ class _InboxScreenState extends State<InboxScreen> {
       ),
     );
     if (!added || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Added to today. Plan your day to place it.'),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Added to today. Plan your day to place it.'),
+        ),
+      );
   }
 
   Future<void> _copyDraft(Map<String, dynamic> nudge) async {
@@ -163,9 +167,11 @@ class _InboxScreenState extends State<InboxScreen> {
       ClipboardData(text: asJsonString(nudge['draft']) ?? ''),
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Draft copied. Nothing was sent.')),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Draft copied. Nothing was sent.')),
+      );
   }
 
   Future<void> _quietNudge(

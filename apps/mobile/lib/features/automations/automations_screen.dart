@@ -876,9 +876,11 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
   void _save() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_weekdays == 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Choose at least one day.')));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Choose at least one day.')),
+        );
       return;
     }
     final name = _name.text.trim();

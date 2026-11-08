@@ -125,9 +125,11 @@ class _SnoozeSheet extends StatelessWidget {
     );
     final instant = instantInZone(wall, zoneId) ?? wall.toUtc();
     if (!instant.isAfter(clock())) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(content: Text('Choose a time in the future.')),
-      );
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Choose a time in the future.')),
+        );
       return;
     }
     Navigator.of(context).pop(SnoozeChoice.until(instant));

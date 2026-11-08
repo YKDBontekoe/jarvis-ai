@@ -92,9 +92,11 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
       final text = asJsonString(response.data) ?? '';
       await Clipboard.setData(ClipboardData(text: text));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('SKILL.md copied to the clipboard.')),
-        );
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('SKILL.md copied to the clipboard.')),
+          );
       }
     } on DioException catch (error) {
       if (!mounted) return;

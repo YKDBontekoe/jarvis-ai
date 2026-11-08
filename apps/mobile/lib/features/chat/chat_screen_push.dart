@@ -98,15 +98,17 @@ mixin _ChatScreenPush on _ChatScreenController {
     }
     if (!mounted) return;
     final notification = message.notification;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(notification?.title ?? 'Jarvis needs your attention.'),
-        action: SnackBarAction(
-          label: 'Open',
-          onPressed: () => _offerPush(message.data),
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(notification?.title ?? 'Jarvis needs your attention.'),
+          action: SnackBarAction(
+            label: 'Open',
+            onPressed: () => _offerPush(message.data),
+          ),
         ),
-      ),
-    );
+      );
   }
 
   /// A tap on a notification or on one of its buttons. Done and Snooze run in
@@ -146,14 +148,16 @@ mixin _ChatScreenPush on _ChatScreenController {
     if (!mounted || _signedOut) return;
     setState(() => _homeRevision++);
     unawaited(_refreshUnreadNotifications());
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        action: failed
-            ? SnackBarAction(label: 'Open', onPressed: () => _offerPush(data))
-            : null,
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          action: failed
+              ? SnackBarAction(label: 'Open', onPressed: () => _offerPush(data))
+              : null,
+        ),
+      );
   }
 
   /// A notification tap goes through the shared queue: it waits for sign-in and

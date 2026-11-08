@@ -78,14 +78,16 @@ class _AccountsTabState extends State<AccountsTab>
       await _load();
     } on DioException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ??
-                'Could not add the account.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ??
+                  'Could not add the account.',
+            ),
           ),
-        ),
-      );
+        );
     }
   }
 

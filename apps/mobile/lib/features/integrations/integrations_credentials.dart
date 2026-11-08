@@ -178,13 +178,17 @@ mixin _IntegrationsCredentials on _IntegrationsController {
     final key = managed ? provider : host;
     if (key.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Key saved. Checking the app…')),
-    );
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Key saved. Checking the app…')),
+      );
     final result = await testAppConnection(widget.http, key);
     if (!mounted) return;
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text(result.message)));
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(result.message)));
   }
 
   Future<void> _deleteSecret(String provider, String secretName) async {

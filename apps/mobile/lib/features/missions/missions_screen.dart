@@ -91,14 +91,16 @@ class _MissionsScreenState extends State<MissionsScreen> {
       if (mounted && id != null) await _open(id);
     } on DioException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              firstProblemMessage(error.response?.data) ??
-                  'Jarvis could not plan that.',
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                firstProblemMessage(error.response?.data) ??
+                    'Jarvis could not plan that.',
+              ),
             ),
-          ),
-        );
+          );
       }
     } finally {
       if (mounted) setState(() => _planning = false);

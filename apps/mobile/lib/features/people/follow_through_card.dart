@@ -116,13 +116,15 @@ class _FollowThroughCardState extends State<FollowThroughCard> {
       setState(() => _data = FollowThroughData.fromJson(response.data));
     } on DioException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ?? 'That did not work.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+            ),
           ),
-        ),
-      );
+        );
     } finally {
       if (mounted) setState(() => _busy = false);
     }

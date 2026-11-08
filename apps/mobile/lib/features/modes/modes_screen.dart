@@ -64,7 +64,8 @@ class _ModesScreenState extends State<ModesScreen> {
         setState(() => _error = message);
       } else {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -140,13 +141,16 @@ class _ModesScreenState extends State<ModesScreen> {
       await _loadCard();
     } on DioException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                firstProblemMessage(error.response?.data) ??
+                    'That did not work.',
+              ),
             ),
-          ),
-        );
+          );
       }
     }
   }

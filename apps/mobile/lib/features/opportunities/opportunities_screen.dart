@@ -82,22 +82,26 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
       if (mounted) await _load();
     } on DioException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ?? 'That did not work.',
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+            ),
           ),
-        ),
-      );
+        );
     }
   }
 
   Future<void> _open(String destination) async {
     final page = widget.pageFor(destination);
     if (page == null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(content: Text('That page is not available here.')),
-      );
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('That page is not available here.')),
+        );
       return;
     }
     await Navigator.of(context)

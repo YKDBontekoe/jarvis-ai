@@ -382,9 +382,13 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
       tiles.pin(_tileId, TileSize.square);
     }
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(pinned ? 'Removed from Home.' : 'Added to Home.')),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(pinned ? 'Removed from Home.' : 'Added to Home.'),
+        ),
+      );
   }
 
   // -------------------------------------------------------------------- build

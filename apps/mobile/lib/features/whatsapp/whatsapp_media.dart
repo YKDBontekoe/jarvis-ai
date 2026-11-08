@@ -635,5 +635,6 @@ String _fileName(WhatsAppMedia media, String messageId) {
 
 void _note(BuildContext context, String message) {
   ScaffoldMessenger.maybeOf(context)
-      ?.showSnackBar(SnackBar(content: Text(message)));
+    ?..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
 }
