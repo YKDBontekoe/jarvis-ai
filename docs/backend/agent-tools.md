@@ -53,7 +53,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Time zone | `PreferenceAgentTools` `SetHomeTimeZone` | No approval; only changes how future times are read, scheduled reminders keep their moment |
 | This chat | `ConversationAgentTools` `RenameThisChat`, `PinThisChat` | No approval; only the current chat, never in background tasks |
 | Calendar | `CalendarAgentTools` `GetCalendarEvents` (the owner's ICS link; says so when none is connected) | Read-only; titles are untrusted text |
-| Lists | `ListAgentTools` `GetLists`, `AddToList`, `TickListItems`, `RemoveFromList`, `ClearTickedListItems` (stored in owner settings section `lists`) | No approval (owner's own lists); deleting a whole list is app-only |
+| Lists | `ListAgentTools` `GetLists`, `AddToList`, `TickListItems`, `RemoveFromList`, `RenameList`, `ClearTickedListItems` (stored in owner settings section `lists`) | No approval (owner's own lists); deleting a whole list is app-only |
 | File cleanup | `FileDeletionTools` `DeleteFile` | **Requires approval**; only offered when the message is about deleting a file, never in background tasks |
 | Reminders | `ReminderAgentTools` create/list/cancel/snooze/complete; recurrence is `none`, `daily`, `weekdays`, `weekly` or `biweekly` (every other week on the chosen weekdays) | — |
 | Files | `FileAgentTools` search (hybrid retrieval, model rerank) / list; `FileContextContributor` adds matching passages from attached sources each turn | — |

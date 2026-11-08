@@ -92,6 +92,17 @@ class _ListsScreenState extends State<ListsScreen> {
     });
   }
 
+  Future<void> _rename(Map<String, dynamic> list) async {
+    final name = await _askText(
+      context,
+      title: 'Rename list',
+      hint: asJsonString(list['name']) ?? '',
+      label: 'New name',
+    );
+    if (name == null) return;
+    await _change('rename', {'list': list['name'], 'newName': name});
+  }
+
   Future<void> _delete(Map<String, dynamic> list) async {
     final name = asJsonString(list['name']) ?? 'this list';
     final ok = await showJarvisConfirm(
@@ -196,6 +207,7 @@ class _ListsScreenState extends State<ListsScreen> {
                     );
                   },
                   onDelete: () => unawaited(_delete(list)),
+                  onRename: () => unawaited(_rename(list)),
                 ),
               ),
           ],
@@ -211,33 +223,66 @@ Future<String?> _askText(
   required String hint,
   required String label,
 }) async {
-  final controller = TextEditingController();
   final result = await showJarvisDialog<String>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        maxLength: 60,
-        textCapitalization: TextCapitalization.sentences,
-        decoration: InputDecoration(hintText: hint, labelText: label),
-        onSubmitted: (value) => Navigator.pop(dialogContext, value.trim()),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
-          child: const Text('Add'),
-        ),
-      ],
-    ),
+    builder: (dialogContext) =>
+        _AskTextDialog(title: title, hint: hint, label: label),
   );
-  controller.dispose();
   return result == null || result.isEmpty ? null : result;
+}
+
+/// Owns its text controller, so it is only disposed once the dialog has fully
+/// left the screen (disposing it right after the route pops breaks the
+/// closing animation).
+class _AskTextDialog extends StatefulWidget {
+  const _AskTextDialog({
+    required this.title,
+    required this.hint,
+    required this.label,
+  });
+
+  final String title;
+  final String hint;
+  final String label;
+
+  @override
+  State<_AskTextDialog> createState() => _AskTextDialogState();
+}
+
+class _AskTextDialogState extends State<_AskTextDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(widget.title),
+    content: TextField(
+      controller: _controller,
+      autofocus: true,
+      maxLength: 60,
+      textCapitalization: TextCapitalization.sentences,
+      decoration: InputDecoration(
+        hintText: widget.hint,
+        labelText: widget.label,
+      ),
+      onSubmitted: (value) => Navigator.pop(context, value.trim()),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _controller.text.trim()),
+        child: const Text('Add'),
+      ),
+    ],
+  );
 }
 
 class _ListCard extends StatefulWidget {
@@ -247,6 +292,7 @@ class _ListCard extends StatefulWidget {
     required this.onToggle,
     required this.onClear,
     required this.onDelete,
+    required this.onRename,
     required this.onRemoveItem,
     super.key,
   });
@@ -256,6 +302,7 @@ class _ListCard extends StatefulWidget {
   final void Function(String text, bool done) onToggle;
   final VoidCallback onClear;
   final VoidCallback onDelete;
+  final VoidCallback onRename;
   final ValueChanged<String> onRemoveItem;
 
   @override
@@ -293,9 +340,16 @@ class _ListCardState extends State<_ListCard> {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  name,
-                  style: Theme.of(context).textTheme.titleMedium,
+                child: InkWell(
+                  key: Key('list-title-${widget.list['id']}'),
+                  onLongPress: widget.onRename,
+                  child: Semantics(
+                    hint: 'Long press to rename',
+                    child: Text(
+                      name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
                 ),
               ),
               Text(

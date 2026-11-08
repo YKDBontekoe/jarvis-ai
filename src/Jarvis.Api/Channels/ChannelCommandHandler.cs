@@ -178,6 +178,9 @@ public sealed class ChannelCommandHandler(
             case ListCommand.Remove remove:
                 var removed = await lists.RemoveItemsAsync(ownerId, remove.List, remove.Items, cancellationToken);
                 return removed.Succeeded ? ListCommands.Render(removed.Value!) : "I could not remove that: " + removed.Message;
+            case ListCommand.Rename rename:
+                var renamed = await lists.RenameAsync(ownerId, rename.List, rename.NewName, cancellationToken);
+                return renamed.Succeeded ? $"Renamed to {renamed.Value!.Name}." : "I could not rename that: " + renamed.Message;
             case ListCommand.Clear clear:
                 var cleared = await lists.ClearDoneAsync(ownerId, clear.List, cancellationToken);
                 return cleared.Succeeded ? ListCommands.Render(cleared.Value!) : "I could not clear that: " + cleared.Message;

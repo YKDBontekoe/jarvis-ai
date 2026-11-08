@@ -15,6 +15,7 @@ internal sealed class ListToolContributor(IListService lists, ICurrentUser curre
         yield return AIFunctionFactory.Create(tools.AddToListAsync);
         yield return AIFunctionFactory.Create(tools.TickListItemsAsync);
         yield return AIFunctionFactory.Create(tools.RemoveFromListAsync);
+        yield return AIFunctionFactory.Create(tools.RenameListAsync);
         yield return AIFunctionFactory.Create(tools.ClearTickedListItemsAsync);
     }
 }
@@ -79,6 +80,16 @@ internal sealed class ListAgentTools(IListService lists, ICurrentUser currentUse
         return result.Succeeded
             ? $"Updated \"{result.Value!.Name}\": {result.Value.Items.Count} item(s) left."
             : "I could not remove that: " + result.Message;
+    }
+
+    [Description("Rename a list when the user asks (\"call my shopping list Groceries\").")]
+    public async Task<string> RenameListAsync(
+        [Description("The list's current name.")] string list,
+        [Description("The new name.")] string newName,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await lists.RenameAsync(currentUser.OwnerId, list, newName, cancellationToken);
+        return result.Succeeded ? $"The list is now called \"{result.Value!.Name}\"." : "I could not rename it: " + result.Message;
     }
 
     [Description("Remove the ticked items from a list, only when the user asks to clean it up. Open items stay.")]

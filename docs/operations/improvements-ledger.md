@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 96 improvements in this ledger. The goal of 100 has not been reached.**
+**Count so far: 100 improvements in this ledger.**
 
 ## Images go to the model as images
 
@@ -129,6 +129,10 @@ A numbered list of what was changed in the QA-and-improvement effort, so each it
 94. `/habits` shows every habit with today's tick and streak.
 95. `/month` gives this month's total, count and top three categories. All run in `channels_flow.mjs` (25 checks) against the stack.
 96. Swipe an item away on the Lists screen to remove it (it leaves the screen at once, the server confirms by reload); widget-tested, which also caught that a swiped row must be taken out of the tree before the network call.
+97. Lists can be renamed (service, `POST /lists/rename`; a clash with another list is refused, changing only capitals is allowed), checked in `lists_flow.mjs` and unit tests.
+98. The assistant can rename a list (`RenameList`) and `/rename shopping: groceries` works from WhatsApp and Signal.
+99. Long-press a list title in the app to rename it (widget-tested).
+100. The Lists screen's name dialogs no longer dispose their text field while the dialog is still closing, which threw an assertion the moment the rename test ran; the dialog now owns its controller.
 
 A mistake worth recording: writing the guard test for item 59 overwrote an existing test file (`ApprovalPolicyTests.cs`) and silently dropped 36 tests; the count fell from 2511 to 2482. I noticed because the total was lower than the sum of what I had added, restored the file from git, and moved the guard into its own file. Counts are now 2518.
 

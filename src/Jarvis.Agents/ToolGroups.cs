@@ -51,7 +51,7 @@ public static partial class ToolGroups
             ["DeleteFile"],
             FileCleanupKeywords()),
         new("lists", "Plain lists such as shopping or packing: show, add items, tick them off, clear the ticked ones",
-            ["GetLists", "AddToList", "TickListItems", "RemoveFromList", "ClearTickedListItems"],
+            ["GetLists", "AddToList", "TickListItems", "RemoveFromList", "RenameList", "ClearTickedListItems"],
             ListKeywords()),
         new("people", "Contacts the user keeps up with: details, birthdays, logging contact, relationship radar",
             ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar", "GetPersonFollowThrough"],

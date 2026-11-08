@@ -27,6 +27,15 @@ assert.deepEqual(ticked.data.items.filter(i => i.done).map(i => i.text).sort(), 
 const cleared = await request('POST', '/lists/clear-done', { list: name });
 assert.deepEqual(cleared.data.items.map(i => i.text), ['Eggs']);
 
+console.log('Renaming...');
+const renamed = await request('POST', '/lists/rename', { list: name, newName: name + ' renamed' });
+assert.equal(renamed.status, 200, renamed.text);
+assert.equal(renamed.data.name, name + ' renamed');
+assert.equal(renamed.data.items.length, 1);
+assert.equal((await request('POST', '/lists/rename', { list: name + ' renamed', newName: '' })).status, 400);
+const back = await request('POST', '/lists/rename', { list: name + ' renamed', newName: name });
+assert.equal(back.data.name, name);
+
 console.log('Bad input and unknown lists...');
 assert.equal((await request('POST', '/lists/items', { list: '', items: ['x'] })).status, 400);
 assert.equal((await request('POST', '/lists/items', { list: name, items: [' '] })).status, 400);

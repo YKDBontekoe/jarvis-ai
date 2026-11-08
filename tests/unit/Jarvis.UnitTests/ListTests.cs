@@ -242,4 +242,36 @@ public sealed class ListTests
         Assert.Contains("1 item(s) left", await tools.RemoveFromListAsync("Shopping", ["eggs"]), StringComparison.Ordinal);
         Assert.StartsWith("I could not remove that", await tools.RemoveFromListAsync("Shopping", ["zebra"]), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Renaming_keeps_the_items_refuses_a_clash_and_stays_with_the_owner()
+    {
+        var service = Create();
+        await service.AddItemsAsync(Owner, "Shopping", ["Milk"], default);
+        await service.AddItemsAsync(Owner, "Packing", ["Passport"], default);
+
+        var renamed = await service.RenameAsync(Owner, "shop", "  Groceries\n", default);
+        var clash = await service.RenameAsync(Owner, "Groceries", "packing", default);
+        var same = await service.RenameAsync(Owner, "Groceries", "GROCERIES", default);
+
+        Assert.Equal("Groceries", renamed.Value!.Name);
+        Assert.Equal(["Milk"], renamed.Value.Items.Select(i => i.Text));
+        Assert.Equal(ListFailure.Invalid, clash.Failure);
+        Assert.True(same.Succeeded, "changing only the capitals is allowed");
+        Assert.Equal(ListFailure.Invalid, (await service.RenameAsync(Owner, "Groceries", " ", default)).Failure);
+        Assert.Equal(ListFailure.NotFound, (await service.RenameAsync(Guid.NewGuid(), "Groceries", "x", default)).Failure);
+    }
+
+    [Fact]
+    public async Task Rename_works_from_chat_commands_and_the_assistant()
+    {
+        Assert.Equal(new ListCommand.Rename("shopping", "groceries"), ListCommands.Parse("/rename shopping: groceries"));
+        Assert.IsType<ListCommand.Usage>(ListCommands.Parse("/rename shopping"));
+        Assert.IsType<ListCommand.Usage>(ListCommands.Parse("/rename : x"));
+        var tools = new ListAgentTools(Create(), new User());
+        await tools.AddToListAsync("Shopping", ["Milk"]);
+
+        Assert.Contains("now called \"Groceries\"", await tools.RenameListAsync("Shopping", "Groceries"), StringComparison.Ordinal);
+        Assert.StartsWith("I could not rename it", await tools.RenameListAsync("Garage", "x"), StringComparison.Ordinal);
+    }
 }

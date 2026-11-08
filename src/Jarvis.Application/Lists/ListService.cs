@@ -61,6 +61,10 @@ public interface IListService
     Task<ListOperation<ListRecord>> RemoveItemsAsync(Guid ownerId, string listName, IReadOnlyList<string> items,
         CancellationToken cancellationToken);
 
+    /// <summary>Gives a list a new name. Refused when another list already has that name.</summary>
+    Task<ListOperation<ListRecord>> RenameAsync(Guid ownerId, string listName, string newName,
+        CancellationToken cancellationToken);
+
     /// <summary>Removes the ticked items from a list.</summary>
     Task<ListOperation<ListRecord>> ClearDoneAsync(Guid ownerId, string listName, CancellationToken cancellationToken);
 
@@ -175,6 +179,22 @@ public sealed class ListService(IOwnerSettingsStore settings, TimeProvider? time
         all[index] = all[index] with { Items = current, UpdatedAt = clock.GetUtcNow() };
         await SaveAsync(ownerId, all, cancellationToken);
         return ListOperation<ListRecord>.Ok(all[index]);
+    }
+
+    public async Task<ListOperation<ListRecord>> RenameAsync(Guid ownerId, string listName, string newName,
+        CancellationToken cancellationToken)
+    {
+        var name = ListRules.Clean(newName, ListRules.MaxNameLength);
+        if (name is null) return ListOperation<ListRecord>.Invalid("A list needs a name.");
+        using var turn = await LockAsync(ownerId, cancellationToken);
+        var all = (await LoadAsync(ownerId, cancellationToken)).ToList();
+        var found = Find(all, listName);
+        if (found.Failure != ListFailure.None) return new ListOperation<ListRecord>(null, found.Failure, found.Message);
+        if (all.Where((l, i) => i != found.Index).Any(l => l.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+            return ListOperation<ListRecord>.Invalid("Another list already has that name.");
+        all[found.Index] = all[found.Index] with { Name = name, UpdatedAt = clock.GetUtcNow() };
+        await SaveAsync(ownerId, all, cancellationToken);
+        return ListOperation<ListRecord>.Ok(all[found.Index]);
     }
 
     public async Task<ListOperation<ListRecord>> ClearDoneAsync(Guid ownerId, string listName,

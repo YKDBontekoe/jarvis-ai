@@ -9,6 +9,8 @@ public sealed record ListDoneRequest(string? List, IReadOnlyList<string>? Items,
 
 public sealed record ListNameRequest(string? List);
 
+public sealed record ListRenameRequest(string? List, string? NewName);
+
 /// <summary>Plain lists (shopping, packing, ...) the owner keeps; items are ticked off and cleared.</summary>
 internal static class ListEndpoints
 {
@@ -30,6 +32,10 @@ internal static class ListEndpoints
         group.MapPost("/remove", async (ListItemsRequest request, IListService lists, ICurrentUser user, CancellationToken ct) =>
             Result(await lists.RemoveItemsAsync(user.OwnerId, request.List ?? "", request.Items ?? [], ct)))
             .WithName("RemoveListItems");
+
+        group.MapPost("/rename", async (ListRenameRequest request, IListService lists, ICurrentUser user, CancellationToken ct) =>
+            Result(await lists.RenameAsync(user.OwnerId, request.List ?? "", request.NewName ?? "", ct)))
+            .WithName("RenameList");
 
         group.MapPost("/clear-done", async (ListNameRequest request, IListService lists, ICurrentUser user, CancellationToken ct) =>
             Result(await lists.ClearDoneAsync(user.OwnerId, request.List ?? "", ct)))

@@ -13,6 +13,8 @@ public abstract record ListCommand
 
     public sealed record Clear(string List) : ListCommand;
 
+    public sealed record Rename(string List, string NewName) : ListCommand;
+
     public sealed record Remove(string List, IReadOnlyList<string> Items) : ListCommand;
 
     public sealed record Usage(string Message) : ListCommand;
@@ -41,6 +43,12 @@ public static class ListCommands
                 return new ListCommand.Show(null);
             case "/list":
                 return rest.Length == 0 ? new ListCommand.Show(null) : new ListCommand.Show(rest);
+            case "/rename":
+                var split = rest.IndexOf(':');
+                if (split <= 0 || split == rest.Length - 1) return new ListCommand.Usage(UsageText);
+                var from = rest[..split].Trim();
+                var to = rest[(split + 1)..].Trim();
+                return from.Length == 0 || to.Length == 0 ? new ListCommand.Usage(UsageText) : new ListCommand.Rename(from, to);
             case "/clear":
                 return rest.Length == 0 ? new ListCommand.Usage(UsageText) : new ListCommand.Clear(rest);
             case "/add" or "/done" or "/remove":

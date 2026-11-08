@@ -137,4 +137,26 @@ void main() {
     expect(body['list'], 'Shopping');
     expect(body['items'], ['Milk']);
   });
+
+  testWidgets('long-pressing a list title renames it', (tester) async {
+    http.on('GET', '/api/v1/lists', [
+      _list('1', 'Shopping', [_item('a', 'Milk')]),
+    ]);
+    http.on(
+      'POST',
+      '/api/v1/lists/rename',
+      _list('1', 'Groceries', [_item('a', 'Milk')]),
+    );
+    await show(tester);
+
+    await tester.longPress(find.byKey(const Key('list-title-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Groceries');
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+
+    final body = http.sent('POST', '/api/v1/lists/rename').single.body as Map;
+    expect(body['list'], 'Shopping');
+    expect(body['newName'], 'Groceries');
+  });
 }
