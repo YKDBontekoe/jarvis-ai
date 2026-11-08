@@ -949,6 +949,7 @@ mixin _ChatScreenUi on _ChatScreenController {
                   child: ChatComposer(
                     controller: _input,
                     onSend: () => unawaited(_send()),
+                    onEngaged: _prewarmNextTurn,
                     onCancel: _busy
                         ? () => unawaited(_cancelActiveRun())
                         : null,

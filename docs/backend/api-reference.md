@@ -31,6 +31,7 @@ Agent2Agent (outside `/api/v1` group auth pattern):
 | POST | `/conversations/{id}/messages` | Send user message (starts agent turn). Optional `imageFileIds` (up to 4 of the owner's JPEG/PNG/WebP files, 8 MB each) are shown to the model in that turn only; stored history keeps a note instead of the image |
 | POST | `/conversations/{id}/regenerate` | Answer the last user message again, replacing the last reply. 409 while approvals are open or when that reply used tools (so actions are never repeated) |
 | POST | `/conversations/{id}/cancel` | Cancel in-flight run |
+| POST | `/conversations/prewarm` | 202 `{started}`. Starts a Codex process and the owner's MCP server connections so the next reply does not wait for them. The app calls it when the composer gains focus or gets its first letter; repeats within 45 s are ignored (`started: false`). Changes no data |
 | POST | `/conversations/{id}/summary` | Read-only recap: `summary`, `keyPoints`, `actionItems`, `messageCount`. Nothing is stored. 409 when the chat has fewer than 2 messages, 503 when the model is unavailable |
 | GET | `/approvals` | Pending tool approvals. Each row includes `category`, `categoryLabel`, and `canRememberCategory` |
 | GET | `/approvals/standing` | Categories the owner always allows (`category`, `label`, `grantedAt`, `expiresAt`, `scope`) |

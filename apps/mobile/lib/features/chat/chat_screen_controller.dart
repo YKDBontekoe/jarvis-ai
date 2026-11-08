@@ -6,6 +6,27 @@ abstract class _ChatScreenController extends State<ChatScreen>
     with WidgetsBindingObserver {
   late final _auth = AuthSession(enabled: !widget.skipAuthentication);
   final _http = createJarvisHttp();
+
+  /// When the server was last asked to get ready for a reply.
+  DateTime? _lastPrewarm;
+
+  /// Asks the server to start the slow parts of a reply (Codex and the owner's
+  /// integrations) while the message is still being typed. At most every 40 s,
+  /// and silent: a failure only means the reply starts them itself.
+  void _prewarmNextTurn() {
+    final now = DateTime.now();
+    final last = _lastPrewarm;
+    if (last != null && now.difference(last) < const Duration(seconds: 40)) {
+      return;
+    }
+    _lastPrewarm = now;
+    unawaited(
+      _http
+          .post<void>('/api/v1/conversations/prewarm')
+          .then((_) {}, onError: (Object _) {}),
+    );
+  }
+
   final _input = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();

@@ -163,6 +163,7 @@ internal static class ApiServiceRegistration
         services.AddScoped<ApprovalDecisionService>();
         services.AddSingleton<RemoteQueryHost>();
         services.AddSingleton<RemoteQueryExecutor>();
+        services.AddSingleton<TurnPrewarmer>();
         services.AddSingleton<VoiceBackendSession>();
         services.AddSingleton<VoiceRuntime>();
         services.AddHostedService(provider => provider.GetRequiredService<VoiceRuntime>());
