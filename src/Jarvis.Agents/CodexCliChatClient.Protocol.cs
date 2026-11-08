@@ -155,6 +155,19 @@ public sealed partial class CodexCliChatClient
             prompt.AppendLine("\nSystem instructions:");
             prompt.AppendLine(options.Instructions);
         }
+        // Tool schemas come before the conversation. The conversation grows on every model call (each tool step adds a
+        // request and a result), while the offered tools rarely change, so this keeps the header, instructions and
+        // tool list a prefix the provider can cache across a turn's steps and across turns. Always-on tools come first
+        // and grouped tools last, in group order, so loading a group only changes the end of the list.
+        if (tools.Count > 0)
+        {
+            prompt.AppendLine("\nAvailable Jarvis functions (Jarvis validates and executes these; do not claim execution):");
+            foreach (var tool in OrderForCaching(tools))
+            {
+                prompt.Append("- ").Append(tool.Name).Append(": ").AppendLine(tool.Description ?? string.Empty);
+                prompt.Append("  Input JSON Schema: ").AppendLine(tool.JsonSchema.GetRawText());
+            }
+        }
         prompt.AppendLine("\nConversation:");
         var toolNamesByCallId = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var message in messages)
@@ -199,20 +212,22 @@ public sealed partial class CodexCliChatClient
                     throw new InvalidOperationException("The conversation context exceeds the Codex CLI request size limit.");
             }
         }
-        // Tool schemas come after the conversation: the instructions and history form a prefix that only grows, so a
-        // change in the offered groups (LoadTools, a deferred tool being called) invalidates just this tail.
-        if (tools.Count > 0)
-        {
-            prompt.AppendLine("\nAvailable Jarvis functions (Jarvis validates and executes these; do not claim execution):");
-            foreach (var tool in tools)
-            {
-                prompt.Append("- ").Append(tool.Name).Append(": ").AppendLine(tool.Description ?? string.Empty);
-                prompt.Append("  Input JSON Schema: ").AppendLine(tool.JsonSchema.GetRawText());
-            }
-        }
         prompt.AppendLine("\nReturn only the JSON object required by the output schema.");
         return new PromptPayload(prompt.ToString(), images);
     }
 
     internal sealed record PromptPayload(string Text, IReadOnlyList<string> Images);
+
+    /// <summary>Always-on tools in their given order, then grouped tools by group, so a group change only moves the tail.</summary>
+    internal static IEnumerable<AIFunction> OrderForCaching(IReadOnlyList<AIFunction> tools) =>
+        tools.Select((tool, index) => (Tool: tool, Index: index, Group: GroupRank(tool.Name)))
+            .OrderBy(entry => entry.Group).ThenBy(entry => entry.Index).Select(entry => entry.Tool);
+
+    private static int GroupRank(string toolName)
+    {
+        if (ToolGroups.ForTool(toolName) is not { } group) return -1;
+        for (var index = 0; index < ToolGroups.All.Count; index++)
+            if (ToolGroups.All[index].Id == group.Id) return index;
+        return int.MaxValue;
+    }
 }

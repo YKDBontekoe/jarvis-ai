@@ -45,19 +45,40 @@ public sealed class AgentContextPlacementTests
     }
 
     [Fact]
-    public void The_prompt_prefix_does_not_change_when_the_offered_tools_change()
+    public void The_prompt_prefix_through_the_tools_does_not_change_as_the_conversation_grows()
+    {
+        var options = new ChatOptions { Instructions = "Be brief." };
+        AIFunction[] tools = [AIFunctionFactory.Create(() => "ok", "CreateReminder")];
+        var first = CodexCliChatClient.BuildPrompt([new ChatMessage(ChatRole.User, "hello")], options, tools, false).Text;
+        var next = CodexCliChatClient.BuildPrompt(
+        [
+            new ChatMessage(ChatRole.User, "hello"),
+            new ChatMessage(ChatRole.Assistant, "Hi."),
+            new ChatMessage(ChatRole.User, "remind me")
+        ], options, tools, false).Text;
+
+        // Every tool step and every turn appends to the conversation; everything before it must stay a cacheable prefix.
+        var conversationStart = first.IndexOf("\nConversation:", StringComparison.Ordinal);
+        Assert.True(first.IndexOf("Available Jarvis functions", StringComparison.Ordinal) < conversationStart);
+        Assert.Equal(first[..conversationStart], next[..conversationStart]);
+        Assert.EndsWith("Return only the JSON object required by the output schema.", first.TrimEnd());
+    }
+
+    [Fact]
+    public void Loading_a_tool_group_only_changes_the_end_of_the_tool_list()
     {
         var messages = new[] { new ChatMessage(ChatRole.User, "hello") };
-        var options = new ChatOptions { Instructions = "Be brief." };
         AIFunction Tool(string name) => AIFunctionFactory.Create(() => "ok", name);
 
-        var before = CodexCliChatClient.BuildPrompt(messages, options, [Tool("CreateReminder")], false).Text;
-        var after = CodexCliChatClient.BuildPrompt(messages, options, [Tool("CreateReminder"), Tool("LogExpense")], false).Text;
+        // A grouped tool registered before an always-on one still goes after it.
+        var before = CodexCliChatClient.BuildPrompt(messages, null, [Tool("CreateReminder"), Tool("Remember")], false).Text;
+        var after = CodexCliChatClient.BuildPrompt(messages, null,
+            [Tool("CreateReminder"), Tool("LogExpense"), Tool("Remember")], false).Text;
 
-        var conversationEnd = before.IndexOf("\nAvailable Jarvis functions", StringComparison.Ordinal);
-        Assert.True(conversationEnd > before.IndexOf("[user]", StringComparison.Ordinal));
-        Assert.Equal(before[..conversationEnd], after[..conversationEnd]);
-        Assert.EndsWith("Return only the JSON object required by the output schema.", before.TrimEnd());
+        var alwaysOnEnd = before.IndexOf("\nConversation:", StringComparison.Ordinal);
+        Assert.Equal(before[..alwaysOnEnd], after[..alwaysOnEnd]);
+        Assert.True(after.IndexOf("- LogExpense:", StringComparison.Ordinal) >
+                    after.IndexOf("- Remember:", StringComparison.Ordinal));
     }
 
     private static AIAgent CreateAgent(RecordingChatClient client, string contextText = ContextMarker)

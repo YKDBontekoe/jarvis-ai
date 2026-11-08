@@ -64,7 +64,8 @@ async function handle(request) {
       return send({ id: request.id, result: { userAgent: 'jarvis-fixture/1.0' } });
     case 'model/list':
       return send({ id: request.id, result: { data: [
-        { id: MODEL, model: MODEL, inputModalities: ['text', 'image'], isDefault: true },
+        { id: MODEL, model: MODEL, inputModalities: ['text', 'image'], isDefault: true,
+          serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Priority processing' }] },
         { id: 'gpt-6.1-sol', model: 'gpt-6.1-sol', inputModalities: ['text'], isDefault: false },
       ], nextCursor: null } });
     case 'thread/realtime/listVoices':

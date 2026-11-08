@@ -30,12 +30,15 @@ public static class DependencyInjection
             throw new InvalidOperationException("Codex:MaxConcurrentProcesses must be between 1 and 16.");
         services.AddSingleton(_ => new CodexProcessLimiter(maxCodexProcesses));
         var codexAccess = CodexAccess.From(configuration);
+        // Codex "Fast" mode (OpenAI priority processing) for interactive chat; "default" or empty turns it off.
+        var chatServiceTier = configuration["Codex:ChatServiceTier"] ?? CodexCliChatClient.PriorityServiceTier;
+        if (chatServiceTier.Trim() is "" or "default") chatServiceTier = null;
         var recordAiContent = configuration.GetValue("Sentry:RecordAiContent", false);
         services.AddSingleton<IChatClient>(serviceProvider => SentryChatInstrumentation.Instrument(
                 new CodexCliChatClient(
                     serviceProvider.GetRequiredService<CodexExecutable>(), model, visionModel,
                     modelClasses, enableWebSearch, turnTimeoutSeconds,
-                    serviceProvider.GetRequiredService<CodexProcessLimiter>(), codexAccess),
+                    serviceProvider.GetRequiredService<CodexProcessLimiter>(), codexAccess, chatServiceTier),
                 recordAiContent)
             .AsBuilder()
             .UseOpenTelemetry(

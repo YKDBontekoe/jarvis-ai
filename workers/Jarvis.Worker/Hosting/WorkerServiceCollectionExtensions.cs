@@ -79,6 +79,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddScoped<Jarvis.Application.Planner.IDayPlannerService, Jarvis.Application.Planner.DayPlannerService>();
         services.AddScoped<WatchMetricReader>();
         services.AddJarvisMemory();
+        services.AddSingleton<McpConnectionPool>();
         services.AddScoped<McpToolHost>();
         services.AddJarvisAgent(configuration);
         services.AddHttpClient("a2a", client => client.Timeout = TimeSpan.FromSeconds(30));

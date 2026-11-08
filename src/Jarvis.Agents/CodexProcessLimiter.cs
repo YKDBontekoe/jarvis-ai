@@ -9,12 +9,16 @@ public sealed class CodexProcessLimiter : IDisposable
     public const int MaxConcurrentProcesses = 2;
 
     private readonly SemaphoreSlim _slots;
+
+    /// <summary>How many Codex processes may run at once.</summary>
+    public int Capacity { get; }
     private readonly SemaphoreSlim? _backgroundSlots;
 
     public CodexProcessLimiter(int maxConcurrentProcesses = MaxConcurrentProcesses)
     {
         if (maxConcurrentProcesses < 1)
             throw new ArgumentOutOfRangeException(nameof(maxConcurrentProcesses));
+        Capacity = maxConcurrentProcesses;
         _slots = new SemaphoreSlim(maxConcurrentProcesses, maxConcurrentProcesses);
         // With a single slot there is nothing to reserve, so background work shares it with chat.
         if (maxConcurrentProcesses > 1)

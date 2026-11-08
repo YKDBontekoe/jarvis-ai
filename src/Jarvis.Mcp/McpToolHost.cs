@@ -15,9 +15,10 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     ILoggerFactory loggerFactory,
     ICurrentUser currentUser, IIntegrationCredentialStore credentialStore,
     IUserMcpServerRegistry userMcpServers, IOwnerMcpPolicyStore ownerPolicy,
-    ICustomMcpServerStore customServers) : IAsyncDisposable
+    ICustomMcpServerStore customServers, McpConnectionPool? connectionPool = null) : IAsyncDisposable
 {
     private readonly List<IAsyncDisposable> _clients = [];
+    private readonly List<McpConnectionPool.Lease> _leases = [];
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _pendingState =
         new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _stateGate = new(1, 1);
@@ -133,15 +134,20 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             servers.Add(server);
         }
 
+        // Credentials and statuses go through the scoped database context, which allows one operation at a time, so
+        // they are resolved in order. Starting servers and listing their tools only touches the network and child
+        // processes; that runs for all servers at once, because this sits in front of every chat turn and one at a
+        // time it cost the sum of every server's start-up (often over ten seconds) before the model could begin.
+        var slots = new List<(McpServerOptions Server, McpServerConnectionStatus? Status,
+            IReadOnlyDictionary<string, string>? Secrets)>(servers.Count);
         foreach (var server in servers)
         {
-            IAsyncDisposable? client = null;
             try
             {
                 if (CustomScriptIssue(server) is { } scriptIssue)
                 {
-                    statuses.Add(await BuildStatusAsync(server, "unavailable", 0, scriptIssue, true, null,
-                        cancellationToken));
+                    slots.Add((server, await BuildStatusAsync(server, "unavailable", 0, scriptIssue, true, null,
+                        cancellationToken), null));
                     continue;
                 }
                 var credentialResolution = server.MissingRequiredSecrets
@@ -149,34 +155,61 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                     : await ResolveCredentialsAsync(server, cancellationToken);
                 if (!credentialResolution.Ready)
                 {
-                    statuses.Add(server.SignInExpired
+                    slots.Add((server, server.SignInExpired
                         ? await BuildStatusAsync(server, "needs_sign_in", 0, "sign_in_expired", true, null,
                             cancellationToken)
                         : await BuildStatusAsync(server, "needs_credentials", 0, "credentials_required", true,
-                            null, cancellationToken));
+                            null, cancellationToken), null));
                     continue;
                 }
-                var serverSecrets = credentialResolution.Secrets;
-                if (IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider))
-                {
-                    if (server.Transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase))
-                        await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
-                }
+                slots.Add((server, null, credentialResolution.Secrets));
+            }
+            catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
+                                              CancellationExceptions.Unwrap(exception) is { } canceled)
+            {
+                throw canceled;
+            }
+            catch (Exception exception)
+            {
+                slots.Add((server, await FailureStatusAsync(server, exception, cancellationToken), null));
+            }
+        }
 
-                // A server that hangs while starting (for example an npx package that cannot download) must
-                // cost one status entry, not the whole agent turn, so bound the connect and tool listing.
-                using var connectTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                connectTimeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(server.ConnectionTimeoutSeconds, 1, 300)));
-                var connectedClient = await McpClient.CreateAsync(CreateTransport(server, loggerFactory),
-                    cancellationToken: connectTimeout.Token);
-                client = connectedClient;
-                var availableTools = await connectedClient.ListToolsAsync(cancellationToken: connectTimeout.Token);
+        var connections = await Task.WhenAll(slots.Select(slot => slot.Status is null
+            ? ConnectAsync(slot.Server, cancellationToken)
+            : Task.FromResult<ServerConnection?>(null)));
+        if (cancellationToken.IsCancellationRequested)
+        {
+            foreach (var connection in connections)
+                if (connection is not null) await CloseConnectionAsync(connection);
+            var canceled = connections.Select(connection => connection?.Failure)
+                .Select(failure => failure is null ? null : CancellationExceptions.Unwrap(failure))
+                .FirstOrDefault(failure => failure is not null);
+            if (canceled is not null) throw canceled;
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        for (var index = 0; index < slots.Count; index++)
+        {
+            var (server, earlyStatus, serverSecrets) = slots[index];
+            if (earlyStatus is not null)
+            {
+                statuses.Add(earlyStatus);
+                continue;
+            }
+            var connection = connections[index]!;
+            var open = connection.Client is not null;
+            try
+            {
+                if (connection.Failure is { } failure) throw failure;
+                var connectedClient = connection.Client!;
+                var availableTools = connection.Tools!;
                 var allowAllTools = McpToolSelection.AllowsAll(server.AllowedTools);
                 var availableNames = availableTools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
                 if (allowAllTools && availableNames.Count > McpToolSelection.MaxTools)
                 {
-                    await CloseQuietlyAsync(connectedClient);
-                    client = null;
+                    await CloseConnectionAsync(connection);
+                    open = false;
                     statuses.Add(await BuildStatusAsync(server, "unavailable", 0, "too_many_tools", true, null,
                         cancellationToken));
                     logger.LogWarning("Skipping MCP server {ServerName}: it exposes {ToolCount} tools, above the {MaxTools} tool limit.",
@@ -191,8 +224,8 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
                     allowed.IntersectWith(availableNames);
                     if (allowed.Count == 0)
                     {
-                        await CloseQuietlyAsync(connectedClient);
-                        client = null;
+                        await CloseConnectionAsync(connection);
+                        open = false;
                         statuses.Add(await BuildStatusAsync(server, "disabled", 0, "no_matching_tools", true, [],
                             cancellationToken));
                         continue;
@@ -228,9 +261,10 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
 
                 tools.AddRange(selected);
                 foreach (var tool in selected) toolNames.Add(tool.Name);
-                _clients.Add(connectedClient);
+                if (connection.Lease is { } lease) _leases.Add(lease);
+                else _clients.Add(connectedClient);
                 Remember(server, new LiveSession(connectedClient, transportSecrets));
-                client = null;
+                open = false;
                 statuses.Add(await BuildStatusAsync(server, "connected", selected.Length, null, true,
                     selected.Select(tool => tool.Name).ToArray(), cancellationToken) with
                 {
@@ -241,25 +275,82 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
             catch (Exception exception) when (cancellationToken.IsCancellationRequested &&
                                               CancellationExceptions.Unwrap(exception) is { } canceled)
             {
-                if (client is not null) await client.DisposeAsync();
+                if (open) await CloseConnectionAsync(connection);
+                for (var rest = index + 1; rest < slots.Count; rest++)
+                    if (connections[rest] is { } pending) await CloseConnectionAsync(pending);
                 throw canceled;
             }
             catch (Exception exception)
             {
-                if (client is not null) await CloseQuietlyAsync(client);
-                var issue = exception is ArgumentException or InvalidOperationException
-                    ? "invalid_configuration"
-                    : CancellationExceptions.Unwrap(exception) is not null ? "connection_timed_out"
-                    : "server_unavailable";
-                statuses.Add(await BuildStatusAsync(server, "unavailable", 0, issue, true, null, cancellationToken));
-                logger.LogWarning("Skipping MCP server {ServerName} after initialization failure ({FailureType}).",
-                    server.Name, exception.GetType().Name);
+                if (open) await CloseConnectionAsync(connection, healthy: false);
+                statuses.Add(await FailureStatusAsync(server, exception, cancellationToken));
             }
         }
 
         _tools = tools;
         _statuses = statuses;
         _initialized = true;
+    }
+
+    /// <summary>A started server and its tools, or why it could not start. Never throws.</summary>
+    private sealed record ServerConnection(McpClient? Client, IList<McpClientTool>? Tools, Exception? Failure,
+        McpConnectionPool.Lease? Lease = null);
+
+    /// <summary>Gives a pooled connection back, or closes one this request opened for itself.</summary>
+    private async Task CloseConnectionAsync(ServerConnection connection, bool healthy = true)
+    {
+        if (connection.Lease is { } lease) connectionPool?.Release(lease, healthy);
+        else if (connection.Client is { } client) await CloseQuietlyAsync(client);
+    }
+
+    /// <summary>Self-built servers save their state through this request's host, so they always connect afresh.</summary>
+    private bool IsPoolable(McpServerOptions server) =>
+        connectionPool is not null && server.Command != McpStdioCommandValidator.CustomScriptCommand &&
+        server.Script is null;
+
+    /// <summary>
+    /// Starts one server and lists its tools. It touches only the network and the server process, never the
+    /// database, so <see cref="InitializeAsync"/> runs it for every server at once.
+    /// </summary>
+    private async Task<ServerConnection?> ConnectAsync(McpServerOptions server, CancellationToken cancellationToken)
+    {
+        McpClient? client = null;
+        try
+        {
+            var poolKey = IsPoolable(server) ? McpConnectionPool.KeyFor(currentUser.OwnerId, server) : null;
+            if (poolKey is not null && await connectionPool!.TryRentAsync(poolKey, cancellationToken) is { } reused)
+                return new ServerConnection(reused.Client, reused.Tools, null, reused);
+            if (IntegrationCredentialProviders.IsUserMcpServerId(server.CredentialProvider) &&
+                server.Transport.Equals("streamableHttp", StringComparison.OrdinalIgnoreCase))
+                await McpServerEndpointValidator.ValidateAsync(server.Endpoint, cancellationToken);
+
+            // A server that hangs while starting (for example an npx package that cannot download) must
+            // cost one status entry, not the whole agent turn, so bound the connect and tool listing.
+            using var connectTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            connectTimeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(server.ConnectionTimeoutSeconds, 1, 300)));
+            client = await McpClient.CreateAsync(CreateTransport(server, loggerFactory),
+                cancellationToken: connectTimeout.Token);
+            var tools = await client.ListToolsAsync(cancellationToken: connectTimeout.Token);
+            var lease = poolKey is null ? null : connectionPool!.Add(poolKey, client, tools);
+            return new ServerConnection(client, tools, null, lease);
+        }
+        catch (Exception exception)
+        {
+            // Keep the client: InitializeAsync closes it with the others, in one place.
+            return new ServerConnection(client, null, exception);
+        }
+    }
+
+    private async Task<McpServerConnectionStatus> FailureStatusAsync(McpServerOptions server, Exception exception,
+        CancellationToken cancellationToken)
+    {
+        var issue = exception is ArgumentException or InvalidOperationException
+            ? "invalid_configuration"
+            : CancellationExceptions.Unwrap(exception) is not null ? "connection_timed_out"
+            : "server_unavailable";
+        logger.LogWarning("Skipping MCP server {ServerName} after initialization failure ({FailureType}).",
+            server.Name, exception.GetType().Name);
+        return await BuildStatusAsync(server, "unavailable", 0, issue, true, null, cancellationToken);
     }
 
     private async Task<McpServerOptions> CreateUserServerOptionsAsync(UserMcpServer userServer,
@@ -591,6 +682,9 @@ public sealed partial class McpToolHost(IConfiguration configuration, ILogger<Mc
     {
         foreach (var client in _clients)
             await client.DisposeAsync();
+        foreach (var lease in _leases)
+            connectionPool?.Release(lease);
+        _leases.Clear();
         foreach (var provider in _pendingState.Keys.ToArray())
             await PersistScriptStateAsync(provider, CancellationToken.None);
     }

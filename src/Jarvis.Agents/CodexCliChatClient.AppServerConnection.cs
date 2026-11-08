@@ -6,8 +6,8 @@ namespace Jarvis.Agents;
 /// <summary>JSON-RPC over the Codex app-server process's stdio.</summary>
 public sealed partial class CodexCliChatClient
 {
-    private sealed class AppServerConnection(StreamWriter writer, StreamReader reader, Task<string> stderrTask,
-        CodexAccess access, string scratch)
+    private sealed class AppServerConnection(StreamWriter writer, StreamReader reader,
+        Func<CancellationToken, Task<string>> readStderrAfterExit, CodexAccess access, string scratch)
     {
         private int _requestId;
         private CodexTokenUsage? _latestUsage;
@@ -42,7 +42,20 @@ public sealed partial class CodexCliChatClient
                         : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     var isDefault = item.TryGetProperty("isDefault", out var defaultElement) &&
                                     defaultElement.ValueKind == JsonValueKind.True;
-                    models.Add(new AvailableModel(modelId, id, modalities, isDefault));
+                    var tiers = new HashSet<string>(StringComparer.Ordinal);
+                    if (item.TryGetProperty("serviceTiers", out var serviceTiers) &&
+                        serviceTiers.ValueKind == JsonValueKind.Array)
+                        foreach (var tier in serviceTiers.EnumerateArray())
+                            if (tier.ValueKind == JsonValueKind.Object && tier.TryGetProperty("id", out var tierId) &&
+                                tierId.GetString() is { Length: > 0 } tierName)
+                                tiers.Add(tierName);
+                    // Older catalogs list the fast tier as an "additional speed tier" named "fast".
+                    if (item.TryGetProperty("additionalSpeedTiers", out var speedTiers) &&
+                        speedTiers.ValueKind == JsonValueKind.Array &&
+                        speedTiers.EnumerateArray().Any(tier => tier.ValueKind == JsonValueKind.String &&
+                                                                tier.GetString() == "fast"))
+                        tiers.Add(PriorityServiceTier);
+                    models.Add(new AvailableModel(modelId, id, modalities, isDefault) { ServiceTiers = tiers });
                 }
                 cursor = result.TryGetProperty("nextCursor", out var nextCursor) &&
                          nextCursor.ValueKind == JsonValueKind.String ? nextCursor.GetString() : null;
@@ -68,14 +81,14 @@ public sealed partial class CodexCliChatClient
 
         public async Task<CodexTurnMetrics> RunTurnAsync(string threadId, PromptPayload prompt, string modelId,
             string? reasoningEffort, Action<string?, string> onDelta, CancellationToken cancellationToken,
-            Action<string, string, string>? onNativeTool = null)
+            Action<string, string, string>? onNativeTool = null, string? serviceTier = null)
         {
             _latestUsage = null;
             var webSearches = 0;
             // Tool validation is performed by the outer client after parsing the structured response.
             // The prompt itself contains the exact allowlisted function definitions.
             var requestId = ++_requestId;
-            await WriteAsync("turn/start", new
+            var turnParameters = JsonSerializer.SerializeToNode(new
             {
                 threadId,
                 model = modelId,
@@ -85,7 +98,11 @@ public sealed partial class CodexCliChatClient
                 input = new object[] { new { type = "text", text = prompt.Text } }
                     .Concat(prompt.Images.Select(url => (object)new { type = "image", url, detail = "auto" })).ToArray(),
                 outputSchema = OutputSchema
-            }, cancellationToken, requestId);
+            }, JsonOptions)!.AsObject();
+            // Left out unless chosen: an explicit null asks for standard routing and would override the model's own
+            // catalog default.
+            if (serviceTier is not null) turnParameters["serviceTier"] = serviceTier;
+            await WriteAsync("turn/start", turnParameters, cancellationToken, requestId);
 
             while (true)
             {
@@ -99,6 +116,11 @@ public sealed partial class CodexCliChatClient
                 }
 
                 if (!root.TryGetProperty("method", out var method)) continue;
+                // A reused process can still deliver a late notification of the thread before this one.
+                if (root.TryGetProperty("params", out var scope) && scope.ValueKind == JsonValueKind.Object &&
+                    scope.TryGetProperty("threadId", out var scopeThread) &&
+                    scopeThread.ValueKind == JsonValueKind.String && scopeThread.GetString() != threadId)
+                    continue;
                 var methodName = method.GetString();
                 if (methodName == "thread/tokenUsage/updated" && root.TryGetProperty("params", out var usageParameters) &&
                     usageParameters.TryGetProperty("tokenUsage", out var threadUsage) &&
@@ -199,15 +221,7 @@ public sealed partial class CodexCliChatClient
             var line = await reader.ReadLineAsync(cancellationToken);
             if (line is null)
             {
-                string stderr;
-                try
-                {
-                    stderr = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
-                }
-                catch (TimeoutException)
-                {
-                    stderr = "";
-                }
+                var stderr = await readStderrAfterExit(cancellationToken);
                 throw new InvalidOperationException("Codex CLI app-server exited unexpectedly: " + Limit(stderr.Trim(), 2_000));
             }
             return JsonDocument.Parse(line);
