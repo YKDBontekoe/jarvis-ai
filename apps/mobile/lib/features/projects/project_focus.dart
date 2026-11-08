@@ -296,6 +296,7 @@ class _FocusSheetState extends State<_FocusSheet> {
             ),
             const SizedBox(height: 14),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('project-outcome-field'),
               controller: _outcome,
               maxLength: 300,
@@ -323,6 +324,7 @@ class _FocusSheetState extends State<_FocusSheet> {
             ),
             const SizedBox(height: 18),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('project-next-note-field'),
               controller: _note,
               maxLength: 200,

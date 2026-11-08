@@ -419,6 +419,7 @@ class _CorrectionSheetState extends State<_CorrectionSheet> {
             ),
             const SizedBox(height: 12),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('memory-correction-field'),
               controller: _text,
               autofocus: true,

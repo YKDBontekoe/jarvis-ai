@@ -225,6 +225,7 @@ class _FocusSheetState extends State<_FocusSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('focus-intention'),
             controller: _intention,
             maxLength: 200,
@@ -305,6 +306,7 @@ class _ReflectionSheetState extends State<_ReflectionSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('focus-note'),
             controller: _note,
             maxLength: 500,

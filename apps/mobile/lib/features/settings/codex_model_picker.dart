@@ -61,6 +61,7 @@ class _CodexModelPickerState extends State<CodexModelPicker> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TextField(
+                textInputAction: TextInputAction.search,
                 controller: _search,
                 autofocus: true,
                 decoration: const InputDecoration(
@@ -73,6 +74,8 @@ class _CodexModelPickerState extends State<CodexModelPicker> {
             const SizedBox(height: 8),
             Expanded(
               child: ListView.separated(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 itemCount: models.length + (query.isEmpty ? 1 : 0),
                 separatorBuilder: (_, _) => const Divider(indent: 20),
                 itemBuilder: (context, index) {

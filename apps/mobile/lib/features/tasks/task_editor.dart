@@ -83,6 +83,7 @@ class _NewTaskDialogState extends State<_NewTaskDialog> with SubmitState {
         mainAxisSize: MainAxisSize.min,
         children: [
           TextFormField(
+            textCapitalization: TextCapitalization.sentences,
             controller: _title,
             autofocus: true,
             maxLength: 200,
@@ -94,6 +95,7 @@ class _NewTaskDialogState extends State<_NewTaskDialog> with SubmitState {
           ),
           const SizedBox(height: 12),
           TextFormField(
+            textCapitalization: TextCapitalization.sentences,
             controller: _prompt,
             minLines: 2,
             maxLines: 5,

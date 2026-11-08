@@ -249,6 +249,7 @@ class _AccountDialogState extends State<_AccountDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
+              textCapitalization: TextCapitalization.words,
               key: const Key('account-name'),
               controller: _name,
               autofocus: !editing,
@@ -269,6 +270,7 @@ class _AccountDialogState extends State<_AccountDialog> {
               onChanged: (value) => setState(() => _type = value ?? _type),
             ),
             TextField(
+              textCapitalization: TextCapitalization.words,
               key: const Key('account-bank'),
               controller: _bank,
               decoration: const InputDecoration(labelText: 'Bank (optional)'),

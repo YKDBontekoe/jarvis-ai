@@ -339,6 +339,7 @@ class _PeopleScreenState extends State<PeopleScreen>
         onRefresh: _load,
         empty: _empty(),
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(
             16,
             8,

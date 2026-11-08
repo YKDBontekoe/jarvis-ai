@@ -897,6 +897,7 @@ class _CellSheetState extends State<_CellSheet> {
               ],
             ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('cell-note'),
             controller: _note,
             maxLength: 300,
@@ -907,6 +908,7 @@ class _CellSheetState extends State<_CellSheet> {
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('cell-source'),
             controller: _source,
             maxLength: 300,

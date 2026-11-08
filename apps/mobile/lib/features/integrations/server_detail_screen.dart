@@ -1017,6 +1017,7 @@ class _OverrideDialogState extends State<_OverrideDialog> {
         ),
         const SizedBox(height: 12),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('app-override-reason'),
           controller: _controller,
           maxLines: 3,

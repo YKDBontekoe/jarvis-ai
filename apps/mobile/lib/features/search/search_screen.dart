@@ -329,6 +329,7 @@ class SearchResultsBody extends StatelessWidget {
       );
     }
     final list = ListView.separated(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       itemCount: results.length,
       separatorBuilder: (_, _) => const SizedBox(height: 6),
@@ -413,6 +414,7 @@ class _RecentList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 24),
       children: [
         ...leading,

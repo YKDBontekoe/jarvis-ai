@@ -268,6 +268,7 @@ class _NewComparisonSheetState extends State<_NewComparisonSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('comparison-title-field'),
             controller: _title,
             maxLength: 120,
@@ -279,6 +280,7 @@ class _NewComparisonSheetState extends State<_NewComparisonSheet> {
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('comparison-options-field'),
             controller: _options,
             minLines: 2,
@@ -291,6 +293,7 @@ class _NewComparisonSheetState extends State<_NewComparisonSheet> {
           ),
           const SizedBox(height: 8),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('comparison-criteria-field'),
             controller: _criteria,
             minLines: 2,

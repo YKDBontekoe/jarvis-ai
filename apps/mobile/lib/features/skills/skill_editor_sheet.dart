@@ -133,6 +133,7 @@ class _SkillEditorSheetState extends State<SkillEditorSheet> {
           else ...[
             if (widget.existing == null)
               TextField(
+                textCapitalization: TextCapitalization.words,
                 key: const Key('skill-name'),
                 controller: _name,
                 decoration: const InputDecoration(
@@ -143,6 +144,7 @@ class _SkillEditorSheetState extends State<SkillEditorSheet> {
               ),
             const SizedBox(height: 12),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('skill-description'),
               controller: _description,
               maxLines: 2,
@@ -152,6 +154,7 @@ class _SkillEditorSheetState extends State<SkillEditorSheet> {
             ),
             const SizedBox(height: 12),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('skill-instructions'),
               controller: _instructions,
               minLines: 6,

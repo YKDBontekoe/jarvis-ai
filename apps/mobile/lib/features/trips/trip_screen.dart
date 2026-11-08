@@ -505,6 +505,7 @@ class _OptionSheetState extends State<_OptionSheet> {
           ),
           _label('What is it?'),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('option-title'),
             controller: _title,
             decoration: const InputDecoration(hintText: 'TAP flight 08:15'),
@@ -611,12 +612,14 @@ class _ItemSheetState extends State<_ItemSheet> {
           ),
           const SizedBox(height: 8),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('item-title'),
             controller: _title,
             decoration: const InputDecoration(labelText: 'What will you do?'),
           ),
           const SizedBox(height: 8),
           TextField(
+            textCapitalization: TextCapitalization.words,
             key: const Key('item-place'),
             controller: _place,
             decoration: const InputDecoration(labelText: 'Where (optional)'),

@@ -160,6 +160,7 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
               margin: const EdgeInsets.only(bottom: 12),
             ),
           TextFormField(
+            textCapitalization: TextCapitalization.words,
             controller: _name,
             maxLength: 80,
             buildCounter: quietCounter,
@@ -169,12 +170,14 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
                 : null,
           ),
           TextFormField(
+            textCapitalization: TextCapitalization.sentences,
             controller: _description,
             maxLength: 500,
             buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'Description'),
           ),
           TextFormField(
+            textCapitalization: TextCapitalization.sentences,
             controller: _instructions,
             minLines: 3,
             maxLines: 8,
@@ -188,12 +191,14 @@ class _ProfileEditorSheetState extends State<ProfileEditorSheet> {
             ),
           ),
           TextFormField(
+            textCapitalization: TextCapitalization.words,
             controller: _preferredName,
             maxLength: 60,
             buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'Preferred name'),
           ),
           TextFormField(
+            textCapitalization: TextCapitalization.sentences,
             controller: _replyLanguage,
             maxLength: 40,
             buildCounter: quietCounter,

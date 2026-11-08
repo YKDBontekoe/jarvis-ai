@@ -418,6 +418,8 @@ class _PickerSheetState extends State<_PickerSheet> {
               else
                 Flexible(
                   child: ListView.builder(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     shrinkWrap: true,
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                     itemCount: visible.length,

@@ -272,6 +272,7 @@ class _TransactionsTabState extends State<TransactionsTab>
                   : 'Add spending, income or transfers, or import a bank statement from an account.',
             ),
             child: ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
               children: [
                 for (final item in _items) _row(context, item, colors),

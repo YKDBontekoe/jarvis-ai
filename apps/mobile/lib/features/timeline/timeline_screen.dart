@@ -136,6 +136,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
           onRetry: _load,
           emptyScrolls: true,
           empty: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
               _controls(colors),
@@ -150,6 +151,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
             ],
           ),
           child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
               _controls(colors),

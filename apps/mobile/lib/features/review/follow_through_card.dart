@@ -392,6 +392,7 @@ class _AcceptSheetState extends State<_AcceptSheet> {
             )
           else
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('follow-through-note'),
               controller: _note,
               autofocus: true,

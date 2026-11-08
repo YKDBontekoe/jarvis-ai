@@ -213,6 +213,7 @@ class _LessonScreenState extends State<LessonScreen> {
               style: TextStyle(color: colors.muted, fontSize: 13),
             ),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: Key('lesson-answer-$id'),
               controller: controller,
               decoration: const InputDecoration(

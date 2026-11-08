@@ -82,6 +82,7 @@ class _MemoryEditorDialogState extends State<_MemoryEditorDialog> {
             ),
             const SizedBox(height: 12),
             TextFormField(
+              textCapitalization: TextCapitalization.sentences,
               controller: _content,
               autofocus: true,
               minLines: 2,

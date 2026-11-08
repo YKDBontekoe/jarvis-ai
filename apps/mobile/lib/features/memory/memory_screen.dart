@@ -403,6 +403,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
                       : 'No memories yet. Add one to get started.',
                 )
               : ListView.builder(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: EdgeInsets.fromLTRB(
                     16,
                     10,

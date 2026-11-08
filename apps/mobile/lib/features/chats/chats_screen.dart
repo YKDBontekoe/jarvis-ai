@@ -260,6 +260,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                   child: TextField(
+                    textInputAction: TextInputAction.search,
                     key: const Key('chats-filter-field'),
                     controller: _query,
                     focusNode: _searchFocus,
@@ -316,6 +317,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                 onNewChat: widget.onNewChat,
                               )
                             : CustomScrollView(
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
                                 key: const Key('chats-list'),
                                 controller: _list,
                                 physics: const AlwaysScrollableScrollPhysics(),
@@ -1315,6 +1318,7 @@ class _Empty extends StatelessWidget {
       _ => null,
     };
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         SizedBox(

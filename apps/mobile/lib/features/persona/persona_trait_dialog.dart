@@ -39,6 +39,7 @@ class _TraitDialogState extends State<_TraitDialog> {
           ),
         const SizedBox(height: 12),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('trait-statement'),
           controller: _statement,
           autofocus: true,

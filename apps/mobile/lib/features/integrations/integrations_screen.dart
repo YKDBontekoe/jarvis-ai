@@ -169,6 +169,7 @@ class _IntegrationsScreenState extends _IntegrationsController
         : OrbRefresh(
             onRefresh: _load,
             child: ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
               children: [
                 ContentWidth(

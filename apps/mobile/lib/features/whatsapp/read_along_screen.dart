@@ -349,6 +349,7 @@ class _ReadAlongScreenState extends State<ReadAlongScreen> {
         child: OrbRefresh(
           onRefresh: _load,
           child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             key: const Key('read-along-list'),
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(

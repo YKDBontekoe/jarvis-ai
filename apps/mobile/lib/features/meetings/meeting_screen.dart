@@ -421,6 +421,7 @@ class _MeetingScreenState extends State<MeetingScreen>
                     children: [
                       Expanded(
                         child: TextField(
+                          textCapitalization: TextCapitalization.sentences,
                           key: Key('meeting-agenda-line-$i'),
                           controller: _agenda[i],
                           decoration: const InputDecoration(
@@ -496,6 +497,7 @@ class _MeetingScreenState extends State<MeetingScreen>
                 style: TextStyle(fontSize: 13, color: colors.inkSoft),
               ),
               TextField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('meeting-notes'),
                 controller: _notes,
                 minLines: 2,
@@ -527,6 +529,7 @@ class _MeetingScreenState extends State<MeetingScreen>
                 style: TextStyle(fontSize: 13, color: colors.inkSoft),
               ),
               TextField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('meeting-debrief'),
                 controller: _debrief,
                 minLines: 3,
@@ -817,6 +820,7 @@ class _AcceptSheetState extends State<_AcceptSheet> {
           ),
           if (!_decision) ...[
             TextField(
+              textCapitalization: TextCapitalization.words,
               key: const Key('accept-who'),
               controller: _who,
               decoration: const InputDecoration(labelText: 'With whom'),

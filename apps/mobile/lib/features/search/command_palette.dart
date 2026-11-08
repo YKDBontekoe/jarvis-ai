@@ -222,6 +222,7 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     child: TextField(
+                      textInputAction: TextInputAction.search,
                       controller: _query,
                       focusNode: _focus,
                       autofocus: true,
@@ -280,6 +281,8 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                   Expanded(
                     child: _query.text.trim().isEmpty
                         ? ListView(
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
                             padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
                             children: [
                               ..._contextTiles(''),

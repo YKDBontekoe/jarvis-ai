@@ -593,11 +593,13 @@ class _CommitmentDialogState extends State<_CommitmentDialog> {
         ),
         const SizedBox(height: 12),
         TextField(
+          textCapitalization: TextCapitalization.words,
           key: const Key('commitment-who'),
           controller: _who,
           decoration: const InputDecoration(labelText: 'Who'),
         ),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('commitment-what'),
           controller: _what,
           decoration: const InputDecoration(labelText: 'What was promised'),

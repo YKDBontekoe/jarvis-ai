@@ -231,12 +231,14 @@ class _NewTripSheetState extends State<_NewTripSheet> {
           ),
           _label('Name'),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('trip-title'),
             controller: _title,
             decoration: const InputDecoration(hintText: 'Lisbon in November'),
           ),
           _label('Where to'),
           TextField(
+            textCapitalization: TextCapitalization.words,
             key: const Key('trip-destination'),
             controller: _destination,
             decoration: const InputDecoration(hintText: 'Lisbon'),

@@ -147,6 +147,7 @@ class _NewWatchDialogState extends State<_NewWatchDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
+                textCapitalization: TextCapitalization.sentences,
                 controller: _title,
                 autofocus: true,
                 maxLength: 200,

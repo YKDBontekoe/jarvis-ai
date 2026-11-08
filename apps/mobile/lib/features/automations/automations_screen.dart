@@ -914,6 +914,7 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextFormField(
+                textCapitalization: TextCapitalization.words,
                 key: const Key('automation-name'),
                 controller: _name,
                 autofocus: true,
@@ -978,6 +979,7 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
                 style: text.labelMedium?.copyWith(color: colors.muted),
               ),
               TextFormField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('automation-title'),
                 controller: _title,
                 maxLength: 120,
@@ -988,6 +990,7 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
                 ),
               ),
               TextFormField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('automation-body'),
                 controller: _body,
                 maxLength: 500,

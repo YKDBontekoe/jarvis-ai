@@ -413,6 +413,7 @@ class _SettingsViewState extends State<SettingsView> {
     final colors = JarvisColors.of(context);
     return SafeArea(
       child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         controller: _list,
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [

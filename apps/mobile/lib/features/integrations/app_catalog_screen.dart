@@ -264,6 +264,7 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
       body: AbsorbPointer(
         absorbing: _busy,
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
           children: [
             ContentWidth(

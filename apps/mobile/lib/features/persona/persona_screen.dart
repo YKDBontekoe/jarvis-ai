@@ -304,6 +304,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
           children: [
             Expanded(
               child: TextField(
+                textCapitalization: TextCapitalization.words,
                 key: const Key('persona-name'),
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'Call me'),
@@ -312,6 +313,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: TextField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('persona-language'),
                 controller: _language,
                 decoration: const InputDecoration(
@@ -324,6 +326,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
         ),
         const SizedBox(height: 12),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('persona-instructions'),
           controller: _instructions,
           minLines: 3,

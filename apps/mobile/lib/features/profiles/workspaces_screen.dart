@@ -303,6 +303,7 @@ class _WorkspaceSheetState extends State<_WorkspaceSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.words,
             key: const Key('workspace-name'),
             controller: _name,
             maxLength: 60,
@@ -353,6 +354,7 @@ class _WorkspaceSheetState extends State<_WorkspaceSheet> {
           ],
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('workspace-instruction'),
             controller: _instruction,
             maxLength: 400,

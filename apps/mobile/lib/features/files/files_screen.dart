@@ -520,6 +520,7 @@ class _FilesScreenState extends State<FilesScreen> {
         message: 'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
       ),
       child: ListView.builder(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         itemCount:
             (_files.isEmpty ? 0 : 1) +
@@ -998,6 +999,7 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('New collection'),
     content: TextField(
+      textCapitalization: TextCapitalization.words,
       controller: _controller,
       autofocus: true,
       maxLength: 80,

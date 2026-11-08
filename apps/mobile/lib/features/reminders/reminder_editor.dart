@@ -321,6 +321,7 @@ class _NewReminderDialogState extends State<_NewReminderDialog>
                   ),
                 ),
               TextFormField(
+                textCapitalization: TextCapitalization.sentences,
                 controller: _title,
                 autofocus: true,
                 maxLength: 300,

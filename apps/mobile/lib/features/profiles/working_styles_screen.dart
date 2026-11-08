@@ -151,6 +151,7 @@ class _WorkingStylesScreenState extends State<WorkingStylesScreen> {
                       ),
                       const SizedBox(height: 16),
                       TextField(
+                        textCapitalization: TextCapitalization.sentences,
                         key: const Key('styles-task'),
                         controller: _task,
                         maxLength: 500,

@@ -501,6 +501,7 @@ class _ChatPickerSheetState extends State<_ChatPickerSheet> {
               ),
               const SizedBox(height: 10),
               TextField(
+                textInputAction: TextInputAction.search,
                 key: const Key('chat-picker-filter'),
                 onChanged: (value) => setState(() => _filter = value),
                 decoration: const InputDecoration(

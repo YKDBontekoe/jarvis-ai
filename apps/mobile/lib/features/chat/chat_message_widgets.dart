@@ -517,6 +517,7 @@ Future<String?> showFeedbackNoteDialog(BuildContext context) async {
     builder: (dialogContext) => AlertDialog(
       title: const Text('What should Jarvis do differently?'),
       content: TextField(
+        textCapitalization: TextCapitalization.sentences,
         key: const Key('feedback-note'),
         controller: controller,
         autofocus: true,
@@ -700,21 +701,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Under Reduce Motion the indicator holds still; the label and elapsed
-    // time still say Jarvis is working.
-    if (JarvisMotion.reduced(context)) {
-      _controller
-        ..stop()
-        ..value = .5;
-    } else if (!_controller.isAnimating) {
-      _controller.repeat();
-    }
-  }
+  )..repeat();
 
   @override
   void dispose() {

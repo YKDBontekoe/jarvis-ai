@@ -560,6 +560,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
             children: [
               Expanded(
                 child: TextField(
+                  textCapitalization: TextCapitalization.sentences,
                   key: const Key('planner-new-title'),
                   controller: _titleController,
                   focusNode: _titleFocus,

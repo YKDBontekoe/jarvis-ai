@@ -400,6 +400,7 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
           }),
         ),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('studio-title'),
           controller: _title,
           decoration: const InputDecoration(
@@ -407,6 +408,7 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
           ),
         ),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('studio-detail'),
           controller: _detail,
           decoration: const InputDecoration(
@@ -505,6 +507,7 @@ class _NameDialogState extends State<_NameDialog> {
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('Name this webhook'),
     content: TextField(
+      textCapitalization: TextCapitalization.sentences,
       key: const Key('webhook-name'),
       controller: _name,
       autofocus: true,

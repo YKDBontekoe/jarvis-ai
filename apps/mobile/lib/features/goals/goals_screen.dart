@@ -246,6 +246,7 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
           Text('New goal', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('goal-title-field'),
             controller: _title,
             maxLength: 200,
@@ -257,6 +258,7 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('goal-why-field'),
             controller: _why,
             maxLength: 300,

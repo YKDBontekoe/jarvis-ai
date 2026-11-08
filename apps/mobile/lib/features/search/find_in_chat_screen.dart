@@ -227,6 +227,7 @@ class _FindInChatScreenState extends State<FindInChatScreen> {
       );
     }
     return ListView.separated(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
       itemCount: _hits.length + 1,
       separatorBuilder: (_, _) => const SizedBox(height: 6),

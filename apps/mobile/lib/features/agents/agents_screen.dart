@@ -76,6 +76,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
+                textCapitalization: TextCapitalization.words,
                 controller: name,
                 decoration: const InputDecoration(labelText: 'Name'),
               ),

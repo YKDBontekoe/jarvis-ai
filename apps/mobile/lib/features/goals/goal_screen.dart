@@ -663,6 +663,7 @@ class _CheckInSheetState extends State<_CheckInSheet> {
         children: [
           Text('Check in', style: Theme.of(context).textTheme.titleMedium),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('checkin-progress'),
             controller: _progress,
             maxLength: 300,
@@ -673,6 +674,7 @@ class _CheckInSheetState extends State<_CheckInSheet> {
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('checkin-friction'),
             controller: _friction,
             maxLength: 300,
@@ -682,6 +684,7 @@ class _CheckInSheetState extends State<_CheckInSheet> {
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('checkin-adjustment'),
             controller: _adjustment,
             maxLength: 300,
@@ -761,6 +764,7 @@ class _ExperimentSheetState extends State<_ExperimentSheet> {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('experiment-change'),
             controller: _change,
             maxLength: 200,
@@ -771,6 +775,7 @@ class _ExperimentSheetState extends State<_ExperimentSheet> {
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('experiment-benefit'),
             controller: _benefit,
             maxLength: 200,
