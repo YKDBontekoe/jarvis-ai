@@ -64,9 +64,13 @@ class _CodexModelPickerState extends State<CodexModelPicker> {
                 textInputAction: TextInputAction.search,
                 controller: _search,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
                   hintText: 'Search installed Codex models',
+                  suffixIcon: SearchClearButton(
+                    controller: _search,
+                    onCleared: () => setState(() {}),
+                  ),
                 ),
                 onChanged: (_) => setState(() {}),
               ),

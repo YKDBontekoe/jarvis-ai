@@ -136,6 +136,15 @@ void main() {
     final body = http.sent('POST', '/api/v1/lists/remove').single.body as Map;
     expect(body['list'], 'Shopping');
     expect(body['items'], ['Milk']);
+
+    // Undo puts the item back.
+    http.on('POST', '/api/v1/lists/items', <String, Object>{});
+    expect(find.text('Removed “Milk”'), findsOneWidget);
+    await tester.tap(find.text('Undo'));
+    await tester.pump(const Duration(seconds: 1));
+    final undo = http.sent('POST', '/api/v1/lists/items').single.body as Map;
+    expect(undo['list'], 'Shopping');
+    expect(undo['items'], ['Milk']);
   });
 
   testWidgets('long-pressing a list title renames it', (tester) async {

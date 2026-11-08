@@ -75,6 +75,45 @@ class _ListsScreenState extends State<ListsScreen> {
     }
   }
 
+  /// Removes an item and offers Undo, which puts it back (ticked again if
+  /// it was ticked).
+  Future<void> _removeWithUndo(
+    Map<String, dynamic> list,
+    String text,
+    bool wasDone,
+  ) async {
+    final name = list['name'];
+    final messenger = ScaffoldMessenger.of(context);
+    await _change('remove', {
+      'list': name,
+      'items': [text],
+    });
+    if (!mounted) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('Removed “$text”'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () => unawaited(() async {
+              await _change('items', {
+                'list': name,
+                'items': [text],
+              });
+              if (wasDone) {
+                await _change('done', {
+                  'list': name,
+                  'items': [text],
+                  'done': true,
+                });
+              }
+            }()),
+          ),
+        ),
+      );
+  }
+
   Future<void> _newList() async {
     final name = await _askText(
       context,
@@ -188,6 +227,11 @@ class _ListsScreenState extends State<ListsScreen> {
                   }),
                   onClear: () => _change('clear-done', {'list': list['name']}),
                   onRemoveItem: (text) {
+                    final wasDone = jsonMaps(list['items']).any(
+                      (item) =>
+                          asJsonString(item['text']) == text &&
+                          asJsonBool(item['done']),
+                    );
                     // A swiped-away row must leave the tree at once, so take
                     // it out locally first; the reload that follows confirms.
                     setState(() {
@@ -205,12 +249,7 @@ class _ListsScreenState extends State<ListsScreen> {
                             entry,
                       ];
                     });
-                    unawaited(
-                      _change('remove', {
-                        'list': list['name'],
-                        'items': [text],
-                      }),
-                    );
+                    unawaited(_removeWithUndo(list, text, wasDone));
                   },
                   onDelete: () => unawaited(_delete(list)),
                   onRename: () => unawaited(_rename(list)),

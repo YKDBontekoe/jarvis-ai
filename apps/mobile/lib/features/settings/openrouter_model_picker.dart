@@ -104,9 +104,16 @@ class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
               textInputAction: TextInputAction.search,
               controller: _search,
               autofocus: true,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
                 hintText: 'Search models, e.g. claude, gemini, llama',
+                suffixIcon: SearchClearButton(
+                  controller: _search,
+                  onCleared: () {
+                    _debounce?.cancel();
+                    unawaited(_load());
+                  },
+                ),
               ),
               onChanged: (_) {
                 _debounce?.cancel();

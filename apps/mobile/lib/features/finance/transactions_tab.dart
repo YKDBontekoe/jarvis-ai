@@ -184,11 +184,15 @@ class _TransactionsTabState extends State<TransactionsTab>
                         controller: _search,
                         textInputAction: TextInputAction.search,
                         onSubmitted: (_) => unawaited(_load()),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           hintText: 'Search shop or note',
-                          prefixIcon: Icon(
+                          prefixIcon: const Icon(
                             PhosphorIconsRegular.magnifyingGlass,
                             size: 18,
+                          ),
+                          suffixIcon: SearchClearButton(
+                            controller: _search,
+                            onCleared: () => unawaited(_load()),
                           ),
                           isDense: true,
                         ),

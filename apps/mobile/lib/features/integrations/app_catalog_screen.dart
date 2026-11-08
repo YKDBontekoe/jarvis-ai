@@ -281,9 +281,15 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
                       _debounce?.cancel();
                       _runSearch(value);
                     },
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(
+                        PhosphorIconsRegular.magnifyingGlass,
+                      ),
                       hintText: 'Search apps, like Notion or web search',
+                      suffixIcon: SearchClearButton(
+                        controller: _search,
+                        onCleared: () => _onChanged(''),
+                      ),
                     ),
                   ),
                   if (_busy) ...[

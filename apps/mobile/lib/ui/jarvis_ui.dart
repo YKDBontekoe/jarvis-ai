@@ -1997,3 +1997,44 @@ Widget? quietCounter(
     ),
   );
 }
+
+/// The × at the end of a search field: shown only while there is text, it
+/// empties the field, keeps the keyboard where it is and calls [onCleared] so
+/// the results reset like they would after deleting by hand.
+class SearchClearButton extends StatelessWidget {
+  const SearchClearButton({
+    required this.controller,
+    required this.onCleared,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final VoidCallback onCleared;
+
+  @override
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) => AnimatedSwitcher(
+          duration: JarvisMotion.of(context, JarvisMotion.fast),
+          transitionBuilder: (child, animation) =>
+              ScaleTransition(scale: animation, child: child),
+          child: value.text.isEmpty
+              ? const SizedBox.shrink()
+              : IconButton(
+                  key: const ValueKey('search-clear'),
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    controller.clear();
+                    onCleared();
+                  },
+                  icon: Icon(
+                    PhosphorIconsRegular.xCircle,
+                    size: 18,
+                    color: JarvisColors.of(context).muted,
+                  ),
+                ),
+        ),
+      );
+}

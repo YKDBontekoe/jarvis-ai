@@ -90,4 +90,35 @@ void main() {
     expect(matrix().getMaxScaleOnAxis(), closeTo(1, .01));
     expect(find.text('This photo cannot be shown.'), findsOneWidget);
   });
+
+  testWidgets('the search clear button shows with text and empties the '
+      'field', (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    var cleared = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildJarvisTheme(),
+        home: Scaffold(
+          body: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              suffixIcon: SearchClearButton(
+                controller: controller,
+                onCleared: () => cleared++,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.byTooltip('Clear search'), findsNothing);
+    await tester.enterText(find.byType(TextField), 'rosa');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Clear search'));
+    await tester.pumpAndSettle();
+    expect(controller.text, isEmpty);
+    expect(cleared, 1);
+    expect(find.byTooltip('Clear search'), findsNothing);
+  });
 }

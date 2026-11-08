@@ -165,11 +165,19 @@ class _SearchScreenState extends State<SearchScreen> {
                 _scheduleSearch();
               },
               onSubmitted: (_) => unawaited(_runSearch()),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Search conversations, memories, files…',
-                prefixIcon: Icon(
+                prefixIcon: const Icon(
                   PhosphorIconsRegular.magnifyingGlass,
                   size: 18,
+                ),
+                suffixIcon: SearchClearButton(
+                  controller: _query,
+                  onCleared: () {
+                    setState(() {});
+                    _scheduleSearch();
+                    _focus.requestFocus();
+                  },
                 ),
               ),
             ),

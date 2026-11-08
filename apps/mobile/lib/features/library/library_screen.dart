@@ -310,9 +310,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
             controller: _search,
             textInputAction: TextInputAction.search,
             onSubmitted: (_) => unawaited(_load()),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Search what you saved',
-              prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
+              prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
+              suffixIcon: SearchClearButton(
+                controller: _search,
+                onCleared: () => unawaited(_load()),
+              ),
             ),
           ),
           const SizedBox(height: 12),
