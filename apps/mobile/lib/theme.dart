@@ -90,6 +90,10 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
         stops: const [0, .85],
       );
 
+  /// Text in the relationship lilac: [rose] itself is too light to read on
+  /// a light surface (2:1), so light mode uses a deeper lilac (4.9:1).
+  Color get roseText => isDark ? rose : const Color(0xff6d5bd0);
+
   /// Dims the screen behind sheets and dialogs without going black.
   Color get scrim => (isDark ? const Color(0xff000000) : ink).withValues(
     alpha: isDark ? .5 : .28,

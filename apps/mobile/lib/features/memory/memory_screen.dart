@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../ui/phosphor_icons.dart';
 
@@ -241,6 +242,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Future<void> _togglePinned(Map<String, dynamic> memory) async {
+    HapticFeedback.selectionClick();
     final id = jsonId(memory);
     if (id == null) return;
     final pinned = !asJsonBool(memory['isPinned']);

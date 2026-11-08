@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../search/context_commands.dart';
@@ -103,6 +104,7 @@ class _GoalScreenState extends State<GoalScreen>
   Future<void> _plan() => _send(() => widget.http.post<dynamic>('$_path/plan'));
 
   Future<void> _act(String itemId, String action, {int? minutes}) async {
+    HapticFeedback.lightImpact();
     final zone = action == 'schedule' ? await deviceTimeZoneLookup() : null;
     await _send(
       () => widget.http.post<dynamic>(

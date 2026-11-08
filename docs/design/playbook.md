@@ -31,7 +31,8 @@ All colours come from `JarvisColors.of(context)` (`apps/mobile/lib/theme.dart`).
 | `accent` | `#5b4ef0` | `#8f86ff` | Links, counts, selection, Jarvis |
 | `accentDeep` | `#4338ca` | `#c4c0ff` | Text on `accentSoft` |
 | `accentSoft` | `#eeedfe` | `#221f45` | Selected rows, quick-reply chips |
-| `rose` | `#b8a9f5` | `#c9bdfb` | Relationship tags (a lilac, despite the name) |
+| `rose` | `#b8a9f5` | `#c9bdfb` | Relationship tag fills and icons (a lilac, despite the name) |
+| `roseText` | `#6d5bd0` | `#c9bdfb` | Relationship tag text; `rose` is too light to read as text on light surfaces |
 | `warning` / `warningSoft` | `#b45309` / `#fcf3e6` | `#fbbf24` / `#3a2a12` | Overdue, due now, battery |
 | `danger` / `dangerSoft` | `#dc2626` / `#fcebeb` | `#f87171` / `#3a1c1c` | Destructive, errors |
 | `info` / `infoSoft` | `#2563eb` / `#e7eefd` | `#7aa2ff` / `#1a2347` | Tasks, neutral info |

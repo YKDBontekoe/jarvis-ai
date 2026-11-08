@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
@@ -265,6 +266,7 @@ class _PeopleScreenState extends State<PeopleScreen>
   }
 
   Future<void> _logContact(PersonData person) async {
+    HapticFeedback.lightImpact();
     setState(() => _busy.add(person.id));
     try {
       final response = await widget.http.post<dynamic>(

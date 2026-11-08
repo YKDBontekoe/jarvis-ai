@@ -203,6 +203,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
   }
 
   Future<void> _toggle(Map<String, dynamic> item) async {
+    HapticFeedback.selectionClick();
     final id = asJsonString(item['id']);
     if (id == null || _busyItems.contains(id)) return;
     setState(() => _busyItems.add(id));
@@ -238,6 +239,7 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
   }
 
   Future<void> _pin(Map<String, dynamic> item) async {
+    HapticFeedback.selectionClick();
     final id = asJsonString(item['id']);
     if (id == null || _busyItems.contains(id)) return;
     setState(() => _busyItems.add(id));

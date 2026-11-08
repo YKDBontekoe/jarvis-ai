@@ -143,6 +143,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
   /// Puts the promise on today's plan; it stays open until the owner finishes it.
   Future<void> _planToday(CommitmentData item) async {
+    HapticFeedback.lightImpact();
     final zone = await deviceTimeZoneLookup();
     final added = await _run(
       item.id,
@@ -163,6 +164,7 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Future<void> _copyDraft(Map<String, dynamic> nudge) async {
+    HapticFeedback.selectionClick();
     await Clipboard.setData(
       ClipboardData(text: asJsonString(nudge['draft']) ?? ''),
     );
