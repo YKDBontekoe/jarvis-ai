@@ -138,11 +138,22 @@ A mistake worth recording: writing the guard test for item 59 overwrote an exist
 
 Seen but left alone: Home lists the five oldest-due promises, so with five or more overdue promises one due today is not on Home. That may be intended (overdue first), so it is a question for the owner, not a fix.
 
+## Real-model evidence
+
+Run against real Codex on the Aspire stack once the plan's quota came back (scripts `ask2` and `ask3`; all replies were checked against what was stored):
+
+- create a goal, pause it, delete it (the delete stopped at an approval, status 202 and pending, as designed);
+- set the home time zone (stored as Europe/Lisbon);
+- rename and pin the chat (title "Book plans");
+- stop tracking a habit (archived, history kept);
+- add to a shopping list, tick an item and read the list back (stored: oat milk open, eggs ticked);
+- "every other Friday at 17:00" created a biweekly reminder on Friday (weekdays 16) in the owner's zone;
+- agenda for next Tuesday and the calendar: the calendar link in this test database cannot be read, and the assistant said so instead of guessing.
+
+Still without a real-model run: `/journal`, contact cards, location pins, file messages (these are chat-app inputs, covered by the unit tests and `channels_flow.mjs` on the fake model), and the project, file and habit deletes.
+
 ## Gaps found but not built
 
-Found by asking the real model 20 everyday requests. Still open:
-
-- planning (placing to-dos) for days other than today; the agenda for other days is read-only;
-- pausing (not archiving) a habit.
-
-The new tools in items 38 to 47 have unit tests only; they were not yet run against the real model because the Codex plan was out of quota.
+- placing to-dos on days other than today (the agenda for other days is read-only);
+- pausing (not archiving) a habit;
+- reschedule needs no new tool: snoozing already moves a reminder to a new time.
