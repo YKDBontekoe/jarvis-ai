@@ -17,7 +17,7 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
     IConversationStore conversations, IJarvisTaskRepository tasks, IAssistantProfileService profiles,
     IOwnerSettingsStore settings, ICurrentUser currentUser, IFileService files,
     IStandingApprovalService standingApprovals, IApprovalPolicy approvalPolicy,
-    IConversationFileContextRepository fileContext) : IJarvisAgent
+    IConversationFileContextRepository fileContext, IChatClient? codexClient = null) : IJarvisAgent
 {
     private const int MaxAutomaticApprovalsPerTurn = 16;
     private bool _backgroundTask;
@@ -151,6 +151,8 @@ public sealed class JarvisAgent(JarvisAgentFactory agentFactory, IChatClientReso
     private async Task<AIAgent> GetAgentAsync(Guid conversationId, CancellationToken cancellationToken)
     {
         if (_agent is not null) return _agent;
+        // Start a Codex process now so its launch overlaps the integration and context work below.
+        codexClient?.GetService<CodexCliChatClient>()?.Prewarm();
         await mcpToolHost.InitializeAsync(cancellationToken);
         var ownerId = currentUser.OwnerId;
         var conversation = await conversations.GetAsync(conversationId, ownerId, cancellationToken);

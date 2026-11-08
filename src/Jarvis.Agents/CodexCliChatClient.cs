@@ -43,7 +43,6 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
     private const int MaxTotalImageDataLength = 16_000_000;
     private const int MaxImageCount = 4;
     private static readonly TimeSpan ModelCatalogLifetime = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan GracefulExitWait = TimeSpan.FromMilliseconds(300);
     private static readonly TimeSpan StderrDrainWait = TimeSpan.FromMilliseconds(500);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     // Prompt text is not HTML; keep '+', quotes-in-text, and non-ASCII readable while
@@ -149,6 +148,7 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
 
     public void Dispose()
     {
+        DisposePool();
         if (processLimiter is null) _processSlots.Dispose();
         _modelCatalogLock.Dispose();
     }
@@ -168,30 +168,27 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
         ChannelWriter<ChatResponseUpdate>? updates, bool background, CancellationToken cancellationToken)
     {
         await _processSlots.WaitAsync(background, cancellationToken);
-        var scratch = Path.Combine(Path.GetTempPath(), "jarvis-codex-" + Guid.NewGuid().ToString("N"));
+        AppServerProcess? server = null;
+        var reusable = false;
         try
         {
-            Directory.CreateDirectory(scratch);
-            var executablePath = executable.Resolve();
-            using var process = new Process { StartInfo = CreateAppServerStart(executablePath, scratch, enableWebSearch, _access) };
-            if (!process.Start()) throw new InvalidOperationException("Could not start the Codex CLI app-server.");
-
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(_turnTimeout);
             var runToken = timeout.Token;
-            using var killOnCancellation = runToken.Register(() =>
-            {
-                try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
-                catch (InvalidOperationException) { }
-                catch (System.ComponentModel.Win32Exception) { }
-            });
-            var stderrTask = process.StandardError.ReadToEndAsync();
-            using var writer = process.StandardInput;
-            using var reader = process.StandardOutput;
+            var executablePath = executable.Resolve();
             try
             {
-                var rpc = new AppServerConnection(writer, reader, stderrTask, _access, scratch);
-                await rpc.InitializeAsync(runToken);
+                server = await RentAsync(executablePath, runToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw new TimeoutException($"Codex CLI model turn exceeded {_turnTimeout.TotalSeconds:0} seconds.");
+            }
+            var process = server;
+            using var killOnCancellation = runToken.Register(process.Kill);
+            var scratch = server.Scratch;
+            {
+                var rpc = server.Rpc;
                 var modality = prompt.Images.Count > 0 ? "image" : "text";
                 var hasVisionClass = _modelClasses.ContainsKey("vision");
                 var selectedModel = prompt.Images.Count > 0
@@ -204,8 +201,13 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                 var rawResponse = new StringBuilder();
                 StructuredTextStreamDecoder textDecoder = new();
                 string? agentMessageId = null;
-                void ReportNativeTool(string callId, string toolName, string phase) =>
+                // Codex's own shell can leave a background process behind; such a process is not handed to a later call.
+                var ranNativeWork = false;
+                void ReportNativeTool(string callId, string toolName, string phase)
+                {
+                    if (toolName is NativeToolProgress.RunCommand or NativeToolProgress.EditFiles) ranNativeWork = true;
                     updates?.TryWrite(NativeToolProgress.Create(callId, toolName, phase));
+                }
                 // Codex can answer one turn with several agent messages, for example the same structured
                 // response twice or a short one before a hosted web search. Each message is a complete
                 // response on its own, so only the last one is parsed.
@@ -379,29 +381,17 @@ public sealed partial class CodexCliChatClient(CodexExecutable executable, strin
                         ModelId = resolvedModel,
                         Contents = [new UsageContent(reportedUsage)]
                     });
-                // The thread is ephemeral and the response is complete, so nothing is left worth waiting for:
-                // give the process a moment to exit on its own, then kill it. This sits on every tool step.
-                writer.Close();
-                using var shutdown = new CancellationTokenSource(GracefulExitWait);
-                try { await process.WaitForExitAsync(shutdown.Token); }
-                catch (OperationCanceledException) { process.Kill(entireProcessTree: true); }
+                reusable = !ranNativeWork;
                 return new ChatResponse(assistant) { ModelId = resolvedModel, Usage = reportedUsage };
-            }
-            finally
-            {
-                try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
-                catch (InvalidOperationException) { }
-                catch (System.ComponentModel.Win32Exception) { }
-                try { await stderrTask.WaitAsync(StderrDrainWait); }
-                catch (TimeoutException) { }
-                catch (OperationCanceledException) { }
             }
         }
         finally
         {
-            try { Directory.Delete(scratch, recursive: true); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            if (server is not null)
+            {
+                if (reusable && !cancellationToken.IsCancellationRequested) Return(server);
+                else server.Dispose();
+            }
             _processSlots.Release(background);
             updates?.TryComplete();
         }

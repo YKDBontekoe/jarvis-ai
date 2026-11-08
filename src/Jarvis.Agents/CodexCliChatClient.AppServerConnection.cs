@@ -6,8 +6,8 @@ namespace Jarvis.Agents;
 /// <summary>JSON-RPC over the Codex app-server process's stdio.</summary>
 public sealed partial class CodexCliChatClient
 {
-    private sealed class AppServerConnection(StreamWriter writer, StreamReader reader, Task<string> stderrTask,
-        CodexAccess access, string scratch)
+    private sealed class AppServerConnection(StreamWriter writer, StreamReader reader,
+        Func<CancellationToken, Task<string>> readStderrAfterExit, CodexAccess access, string scratch)
     {
         private int _requestId;
         private CodexTokenUsage? _latestUsage;
@@ -99,6 +99,11 @@ public sealed partial class CodexCliChatClient
                 }
 
                 if (!root.TryGetProperty("method", out var method)) continue;
+                // A reused process can still deliver a late notification of the thread before this one.
+                if (root.TryGetProperty("params", out var scope) && scope.ValueKind == JsonValueKind.Object &&
+                    scope.TryGetProperty("threadId", out var scopeThread) &&
+                    scopeThread.ValueKind == JsonValueKind.String && scopeThread.GetString() != threadId)
+                    continue;
                 var methodName = method.GetString();
                 if (methodName == "thread/tokenUsage/updated" && root.TryGetProperty("params", out var usageParameters) &&
                     usageParameters.TryGetProperty("tokenUsage", out var threadUsage) &&
@@ -199,15 +204,7 @@ public sealed partial class CodexCliChatClient
             var line = await reader.ReadLineAsync(cancellationToken);
             if (line is null)
             {
-                string stderr;
-                try
-                {
-                    stderr = await stderrTask.WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
-                }
-                catch (TimeoutException)
-                {
-                    stderr = "";
-                }
+                var stderr = await readStderrAfterExit(cancellationToken);
                 throw new InvalidOperationException("Codex CLI app-server exited unexpectedly: " + Limit(stderr.Trim(), 2_000));
             }
             return JsonDocument.Parse(line);

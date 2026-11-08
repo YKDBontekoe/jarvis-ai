@@ -120,6 +120,8 @@ public sealed partial class CodexSignIn(CodexExecutable executable, ILogger<Code
     private void ForgetSignedIn()
     {
         lock (_signedInLock) _signedIn = null;
+        // Kept app-server processes hold the account they started with; new calls must pick up this sign-in.
+        CodexCliChatClient.RetireProcesses();
     }
 
     private async Task<bool> IsSignedInAsync(CancellationToken cancellationToken)
