@@ -153,7 +153,8 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
         actions: [
           if (skill != null)
             PopupMenuButton<String>(
-              tooltip: 'More',
+              icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
+              tooltip: 'Skill actions',
               onSelected: (value) => switch (value) {
                 'export' => unawaited(_export()),
                 'delete' => unawaited(_delete()),

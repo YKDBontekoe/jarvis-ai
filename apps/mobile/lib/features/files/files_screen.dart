@@ -665,6 +665,7 @@ class _FilesScreenState extends State<FilesScreen> {
                     )
                   else
                     PopupMenuButton<String>(
+                      tooltip: 'File actions',
                       enabled: download == null,
                       icon: const Icon(PhosphorIconsRegular.dotsThree),
                       onSelected: (action) {

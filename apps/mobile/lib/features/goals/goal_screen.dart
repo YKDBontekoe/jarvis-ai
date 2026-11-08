@@ -234,6 +234,8 @@ class _GoalScreenState extends State<GoalScreen>
           if (_view != null)
             PopupMenuButton<String>(
               key: const Key('goal-menu'),
+              tooltip: 'Goal actions',
+              icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
               onSelected: (value) => unawaited(_menu(value)),
               itemBuilder: (_) => [
                 if (status == 'active')

@@ -248,6 +248,8 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
         actions: [
           if (details != null)
             PopupMenuButton<String>(
+              icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
+              tooltip: 'Entity actions',
               onSelected: (value) {
                 switch (value) {
                   case 'edit':

@@ -200,6 +200,8 @@ class _AccountDetailScreenState extends State<AccountDetailScreen> {
           if (account != null)
             PopupMenuButton<String>(
               key: const Key('account-menu'),
+              tooltip: 'Account actions',
+              icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
               onSelected: (value) => switch (value) {
                 'edit' => unawaited(_edit()),
                 'archive' => unawaited(
