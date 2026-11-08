@@ -432,8 +432,29 @@ class _DayPlannerScreenState extends State<DayPlannerScreen> {
               ],
               if (_viewing != null) ...[
                 const SizedBox(height: 20),
+                if (items.isNotEmpty) ...[
+                  SectionHeader(
+                    'Kept for this day',
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
+                  ),
+                  GroupedSection(
+                    children: [
+                      for (final item in items)
+                        ListTile(
+                          key: ValueKey('later-${item['id']}'),
+                          title: Text(asJsonString(item['title']) ?? ''),
+                          subtitle: Text(
+                            durationLabel(asJsonInt(item['minutes'], 30)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 Text(
-                  'You are looking ahead. To-dos and focus blocks belong to today, so they are not shown here.',
+                  items.isEmpty
+                      ? 'You are looking ahead. To-dos belong to the day they are for, so there are none here yet. Ask Jarvis to keep one for this day.'
+                      : 'These join your plan when the day comes. Plan my day and focus blocks work on today only.',
                   key: const Key('planner-readonly-note'),
                   style: TextStyle(color: colors.inkSoft, fontSize: 13.5),
                 ),

@@ -36,18 +36,28 @@ internal sealed class PlannerAgentTools(IDayPlannerService planner, ICurrentUser
         }
     }
 
-    [Description("Add a to-do to today's plan with an estimate in minutes (5 to 480, default 30). It is not on the timeline until PlanMyDay places it. Use this for things the user wants to get done today, not for reminders at a fixed time.")]
+    [Description("Add a to-do to today's plan with an estimate in minutes (5 to 480, default 30). It is not on the timeline until PlanMyDay places it. Use this for things the user wants to get done today, or on a later day with the date, not for reminders at a fixed time.")]
     public async Task<string> AddToDayPlanAsync(
         [Description("Short title of the to-do. May be empty when commitmentId is given.")] string title = "",
         [Description("Estimated minutes, 5 to 480.")] int minutes = DayPlannerService.DefaultMinutes,
         [Description("Optional ID of an open promise to plan time for; the promise itself stays open until the user finishes it.")] string? commitmentId = null,
+        [Description("Another day to keep this to-do for, YYYY-MM-DD (up to 90 days ahead). Leave empty for today. It joins that day's plan when the day comes.")] string? date = null,
         CancellationToken cancellationToken = default)
     {
+        DateOnly? forDay = null;
+        if (!string.IsNullOrWhiteSpace(date))
+        {
+            if (!DateOnly.TryParseExact(date.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDay))
+                return "I could not read that date. Use YYYY-MM-DD, or leave it empty for today.";
+            forDay = parsedDay;
+        }
         try
         {
             var item = await planner.AddItemAsync(currentUser.OwnerId, new AddDayPlanItemRequest(title, minutes,
-                    string.IsNullOrWhiteSpace(commitmentId) ? null : "commitment:" + commitmentId.Trim()),
+                    string.IsNullOrWhiteSpace(commitmentId) ? null : "commitment:" + commitmentId.Trim(), forDay),
                 null, cancellationToken);
+            if (forDay is { } later)
+                return $"Kept for {later:dddd yyyy-MM-dd} (item ID {item.Id}): {item.Title}, {item.Minutes} min. It joins that day's plan when the day comes.";
             return $"Added to today's plan (item ID {item.Id}): {item.Title}, {item.Minutes} min. " +
                    "Call PlanMyDay to put it in a free block.";
         }

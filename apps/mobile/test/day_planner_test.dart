@@ -282,11 +282,10 @@ void main() {
     final key =
         '${tomorrow.year}-${tomorrow.month.toString().padLeft(2, '0')}-${tomorrow.day.toString().padLeft(2, '0')}';
     http.on('GET', _base, _day(items: [_item('t1', 'Write report')]));
-    http.on(
-      'GET',
-      '/api/v1/planner/day',
-      {
-        ..._day(entries: [
+    http.on('GET', '/api/v1/planner/day', {
+      ..._day(
+        items: [_item('later1', 'File taxes', minutes: 45)],
+        entries: [
           {
             'kind': 'event',
             'id': null,
@@ -295,10 +294,10 @@ void main() {
             'endAt': _iso(tomorrow.add(const Duration(hours: 1))),
             'done': false,
           },
-        ]),
-        'date': key,
-      },
-    );
+        ],
+      ),
+      'date': key,
+    });
     await show(tester, DayPlannerScreen(http: http.client()));
     expect(find.text('To-dos'), findsOneWidget);
 
@@ -308,6 +307,8 @@ void main() {
     final request = http.sent('GET', '/api/v1/planner/day').single;
     expect(request.query['date'], key);
     expect(find.text('Dentist'), findsOneWidget);
+    expect(find.text('Kept for this day'), findsOneWidget);
+    expect(find.text('File taxes'), findsOneWidget);
     expect(find.byKey(const Key('planner-readonly-note')), findsOneWidget);
     expect(find.text('To-dos'), findsNothing);
     expect(find.byKey(const Key('planner-today')), findsOneWidget);
@@ -327,12 +328,17 @@ void main() {
     await show(tester, DayPlannerScreen(http: http.client()));
 
     for (var i = 0; i < 9; i++) {
-      await tester.tap(find.byKey(const Key('planner-prev-day')), warnIfMissed: false);
+      await tester.tap(
+        find.byKey(const Key('planner-prev-day')),
+        warnIfMissed: false,
+      );
       await tester.pumpAndSettle();
     }
 
     expect(http.sent('GET', '/api/v1/planner/day').length, 7);
-    final button = tester.widget<IconButton>(find.byKey(const Key('planner-prev-day')));
+    final button = tester.widget<IconButton>(
+      find.byKey(const Key('planner-prev-day')),
+    );
     expect(button.onPressed, isNull);
   });
 }

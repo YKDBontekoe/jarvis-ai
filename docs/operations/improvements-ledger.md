@@ -2,7 +2,7 @@
 
 A numbered list of what was changed in the QA-and-improvement effort, so each item can be checked. An item is listed only when it shipped in a commit with a test or an end-to-end check. The earlier QA audit fixes live in the commit messages of `b08af3e`, `1f03b72`, `a92a902`, `a7d387d` and `8f990be`; they are not repeated here.
 
-**Count so far: 103 improvements in this ledger.**
+**Count so far: 106 improvements in this ledger.**
 
 ## Images go to the model as images
 
@@ -140,6 +140,9 @@ Seen but left alone: Home lists the five oldest-due promises, so with five or mo
 101. Pause a habit until a day (up to 90 days) and resume it: new `paused_from`/`paused_until` columns (migration `AddHabitPause`), a paused habit is not asked about (evening question, briefing) and its streak skips the paused days; a pause never rescues days already missed. API `PUT /habits/{id}/pause`, owner-scoped, audited by id.
 102. The assistant pauses and resumes a habit by name (`PauseHabit`); on the real model "I'm on holiday until next Sunday, pause my Piano habit" stored the right end date and "I'm back, resume" cleared it.
 103. The habit screen's menu has Pause… (date picker) and Resume, and shows "Paused until"; widget-tested.
+104. To-dos can be kept for a later day (today to 90 days ahead, up to 60 waiting): stored with the day plan (no migration), shown in that day's agenda, and moved into the plan when the day arrives (moved, not copied). `POST /planner/today/items` takes `date`.
+105. The assistant keeps a to-do for a later day (`AddToDayPlan` with `date`); on the real model "put renew passport on my list for next Wednesday, 30 minutes" was stored under Wednesday 11 November.
+106. The app's look-ahead lists "Kept for this day" read-only and explains when the day's to-dos join the plan; widget-tested.
 
 ## Real-model evidence
 
@@ -163,5 +166,5 @@ The numbered list counts separately checkable changes. Several features are numb
 
 ## Gaps found but not built
 
-- placing to-dos on days other than today (the agenda for other days is read-only);
+- placing (scheduling into free time) to-dos on days other than today: they are kept for the day and joined to the plan when it comes, and Plan my day then places them; a future day cannot be auto-planned in advance;
 - reschedule needs no new tool: snoozing already moves a reminder to a new time.
