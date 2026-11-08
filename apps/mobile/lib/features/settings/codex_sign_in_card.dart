@@ -168,8 +168,16 @@ class _CodexSignInCardState extends State<CodexSignInCard> {
                     label: const Text('Open sign-in page'),
                   ),
                   TextButton.icon(
-                    onPressed: () =>
-                        Clipboard.setData(ClipboardData(text: code)),
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: code));
+                      HapticFeedback.selectionClick();
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(content: Text('Code copied')),
+                        );
+                    },
                     icon: const Icon(PhosphorIconsRegular.copy, size: 18),
                     label: const Text('Copy code'),
                   ),

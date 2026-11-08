@@ -119,7 +119,9 @@ class _SetupScreenState extends State<SetupScreen> {
               key: const Key('setup-bundle-copy'),
               onPressed: () async {
                 await Clipboard.setData(ClipboardData(text: text));
+                HapticFeedback.selectionClick();
                 if (dialog.mounted) Navigator.pop(dialog);
+                if (mounted) _toast('Support report copied');
               },
               child: const Text('Copy'),
             ),

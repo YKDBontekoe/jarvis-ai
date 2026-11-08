@@ -351,11 +351,18 @@ class _InboxScreenState extends State<InboxScreen> {
                   IconButton(
                     tooltip: 'Copy draft',
                     icon: const Icon(PhosphorIconsRegular.copy, size: 18),
-                    onPressed: () => unawaited(
-                      Clipboard.setData(
+                    onPressed: () => unawaited(() async {
+                      await Clipboard.setData(
                         ClipboardData(text: thread.suggestedReply!),
-                      ),
-                    ),
+                      );
+                      HapticFeedback.selectionClick();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(content: Text('Draft copied')),
+                        );
+                    }()),
                   ),
                 ],
               ),

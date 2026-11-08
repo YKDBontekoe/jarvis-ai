@@ -176,11 +176,8 @@ class _AutomationStudioScreenState extends State<AutomationStudioScreen> {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () =>
-                  unawaited(Clipboard.setData(ClipboardData(text: url))),
-              child: const Text('Copy'),
-            ),
+            // Shown once, so the button confirms the copy in place.
+            _CopyOnceButton(text: url),
             FilledButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Done'),
@@ -527,5 +524,32 @@ class _NameDialogState extends State<_NameDialog> {
         child: const Text('Create'),
       ),
     ],
+  );
+}
+
+class _CopyOnceButton extends StatefulWidget {
+  const _CopyOnceButton({required this.text});
+
+  final String text;
+
+  @override
+  State<_CopyOnceButton> createState() => _CopyOnceButtonState();
+}
+
+class _CopyOnceButtonState extends State<_CopyOnceButton> {
+  bool _copied = false;
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    onPressed: () async {
+      await Clipboard.setData(ClipboardData(text: widget.text));
+      HapticFeedback.selectionClick();
+      if (mounted) setState(() => _copied = true);
+    },
+    icon: Icon(
+      _copied ? PhosphorIconsRegular.check : PhosphorIconsRegular.copy,
+      size: 18,
+    ),
+    label: Text(_copied ? 'Copied' : 'Copy'),
   );
 }
