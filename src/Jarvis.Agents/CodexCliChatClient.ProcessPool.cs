@@ -71,8 +71,12 @@ public sealed partial class CodexCliChatClient
             {
                 if (_idle.Count > 0)
                 {
-                    candidate = _idle[^1];
-                    _idle.RemoveAt(_idle.Count - 1);
+                    // Leave a process that holds a conversation's thread for that conversation's next turn: memory
+                    // extraction and other background calls run right after a reply and would otherwise take it.
+                    var index = _idle.FindLastIndex(process => !HoldsThreadLocked(process));
+                    if (index < 0) index = _idle.Count - 1;
+                    candidate = _idle[index];
+                    _idle.RemoveAt(index);
                 }
                 warming = _warming;
             }
@@ -96,8 +100,9 @@ public sealed partial class CodexCliChatClient
         }
     }
 
-    private void Return(AppServerProcess process)
+    private void Return(AppServerProcess? process)
     {
+        if (process is null) return;
         process.Uses++;
         if (process.Uses >= MaxProcessUses || !process.IsAlive || !process.TryClearScratch())
         {
@@ -105,16 +110,28 @@ public sealed partial class CodexCliChatClient
             return;
         }
         process.IdleSince = DateTimeOffset.UtcNow;
+        AppServerProcess? evicted = null;
         lock (_poolSync)
         {
+            if (!_disposed && _idle.Count >= MaxIdleProcesses && HoldsThreadLocked(process))
+            {
+                // A full pool gives up a process without a conversation thread before one with.
+                var spare = _idle.FindIndex(idle => !HoldsThreadLocked(idle));
+                if (spare >= 0)
+                {
+                    evicted = _idle[spare];
+                    _idle.RemoveAt(spare);
+                }
+            }
             if (!_disposed && _idle.Count < MaxIdleProcesses)
             {
                 _idle.Add(process);
                 _idleSweep ??= new Timer(_ => SweepIdle(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
-                return;
+                process = null;
             }
         }
-        process.Dispose();
+        evicted?.Dispose();
+        process?.Dispose();
     }
 
     private void SweepIdle()

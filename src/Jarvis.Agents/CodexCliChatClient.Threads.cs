@@ -178,12 +178,10 @@ public sealed partial class CodexCliChatClient
             switch (content)
             {
                 case FunctionCallContent call:
-                    text.Append("\ncall:").Append(call.Name).Append(' ')
-                        .Append(JsonSerializer.Serialize(call.Arguments, PromptJsonOptions));
+                    text.Append("\ncall:").Append(call.Name).Append(' ').Append(Canonical(call.Arguments));
                     break;
                 case FunctionResultContent result:
-                    text.Append("\nresult:").Append(result.CallId).Append(' ')
-                        .Append(JsonSerializer.Serialize(result.Result, PromptJsonOptions));
+                    text.Append("\nresult:").Append(result.CallId).Append(' ').Append(Canonical(result.Result));
                     break;
                 case DataContent data:
                     text.Append("\ndata:").Append(data.MediaType).Append(' ').Append(Hash(data.Uri));
@@ -192,6 +190,56 @@ public sealed partial class CodexCliChatClient
         }
         return Hash(text.ToString());
     }
+
+    /// <summary>
+    /// The same value written the same way, whether it is the object a tool returned or the JSON it became when the
+    /// conversation was saved and loaded, which may order properties differently and keep the stored escaping (such as
+    /// <c>\u002B</c> for <c>+</c>).
+    /// </summary>
+    internal static string Canonical(object? value)
+    {
+        using var document = JsonDocument.Parse(JsonSerializer.Serialize(value, PromptJsonOptions));
+        var text = new StringBuilder();
+        Write(document.RootElement);
+        return text.ToString();
+
+        void Write(JsonElement element)
+        {
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    text.Append('{');
+                    // Property order is not kept when a conversation is saved and loaded.
+                    foreach (var property in element.EnumerateObject().OrderBy(item => item.Name, StringComparer.Ordinal))
+                    {
+                        text.Append(JsonSerializer.Serialize(property.Name, PromptJsonOptions)).Append(':');
+                        Write(property.Value);
+                        text.Append(',');
+                    }
+                    text.Append('}');
+                    break;
+                case JsonValueKind.Array:
+                    text.Append('[');
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        Write(item);
+                        text.Append(',');
+                    }
+                    text.Append(']');
+                    break;
+                case JsonValueKind.String:
+                    text.Append(JsonSerializer.Serialize(element.GetString(), PromptJsonOptions));
+                    break;
+                default:
+                    text.Append(element.GetRawText());
+                    break;
+            }
+        }
+    }
+
+    /// <summary>True when a conversation's thread lives in <paramref name="process"/>. Call under the pool lock.</summary>
+    private bool HoldsThreadLocked(AppServerProcess process) =>
+        _threads.Values.Any(thread => ReferenceEquals(thread.Process, process));
 
     private static string Hash(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));

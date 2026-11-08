@@ -132,6 +132,48 @@ public sealed class CodexConversationThreadTests : IDisposable
     }
 
     [Fact]
+    public async Task Background_work_between_turns_does_not_take_the_conversations_process()
+    {
+        var (client, turns) = CreateClient(Text("One."), Text("Two."), Text("Three."), Text("Four."), Text("Five."));
+        using var _ = client;
+        var chat = CodexCliChatClient.ForConversation(client, Conversation);
+        // Two kept processes, as a server has once memory extraction runs beside chat.
+        await Task.WhenAll(client.GetResponseAsync([new ChatMessage(ChatRole.User, "SLOW one")], Options()),
+            client.GetResponseAsync([new ChatMessage(ChatRole.User, "SLOW two")], Options()));
+        List<ChatMessage> history = [new(ChatRole.User, "Hi")];
+        history.Add((await chat.GetResponseAsync(history, Options())).Messages.Single());
+
+        // Memory extraction starts right after the reply and is still running when the next message arrives.
+        var extraction = client.GetResponseAsync([new ChatMessage(ChatRole.User, "SLOW extract memories")], Options());
+        await Task.Delay(300);
+        history.Add(new ChatMessage(ChatRole.User, "And then?"));
+        await chat.GetResponseAsync(history, Options());
+        await extraction;
+
+        var sent = ReadTurns(turns);
+        var hi = sent.Single(turn => turn.Text.Contains("\nHi\n"));
+        var next = sent.Single(turn => turn.Text.Contains("And then?"));
+        Assert.Equal(hi.ThreadId, next.ThreadId);
+        Assert.StartsWith("Conversation continues", next.Text);
+    }
+
+    [Fact]
+    public void A_tool_call_reloaded_from_storage_has_the_same_fingerprint()
+    {
+        // A saved conversation can come back with its properties in another order and with JSON's escaping
+        // (\u002B for +); the call Jarvis returned holds plain values in the model's order.
+        var returned = new ChatMessage(ChatRole.Assistant,
+            [new FunctionCallContent("call-1", "CreateReminder", new Dictionary<string, object?>
+                { ["dueAt"] = "2026-11-08T13:05:21+00:00", ["title"] = "stretch é" })]);
+        using var stored = JsonDocument.Parse("""{"title":"stretch \u00e9","dueAt":"2026-11-08T13:05:21\u002B00:00"}""");
+        var reloaded = new ChatMessage(ChatRole.Assistant,
+            [new FunctionCallContent("call-1", "CreateReminder", stored.RootElement.EnumerateObject()
+                .ToDictionary(property => property.Name, property => (object?)property.Value.Clone()))]);
+
+        Assert.Equal(CodexCliChatClient.Fingerprint(returned), CodexCliChatClient.Fingerprint(reloaded));
+    }
+
+    [Fact]
     public async Task Turned_off_every_call_starts_a_new_thread()
     {
         var (client, turns) = CreateClient(threads: false, Text("One."), Text("Two."));
@@ -190,7 +232,7 @@ public sealed class CodexConversationThreadTests : IDisposable
     /// <summary>Replies in order, one per turn, across all threads; records each turn's thread and text.</summary>
     private const string AppServerScript = """
         #!/usr/bin/env python3
-        import json, sys
+        import json, sys, time
         replies = json.loads(REPLIES)
         def send(value):
             print(json.dumps(value), flush=True)
@@ -215,6 +257,8 @@ public sealed class CodexConversationThreadTests : IDisposable
             elif method == "turn/start":
                 params = message["params"]
                 text = "".join(item.get("text", "") for item in params["input"] if item["type"] == "text")
+                if "SLOW" in text:
+                    time.sleep(1.5)
                 with open(TURNS, "a") as log:
                     log.write(json.dumps({"threadId": params["threadId"], "text": text}) + "\n")
                 reply = replies[min(turn, len(replies) - 1)]
