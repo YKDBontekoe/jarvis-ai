@@ -101,11 +101,19 @@ class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: TextField(
+              textInputAction: TextInputAction.search,
               controller: _search,
               autofocus: true,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
                 hintText: 'Search models, e.g. claude, gemini, llama',
+                suffixIcon: SearchClearButton(
+                  controller: _search,
+                  onCleared: () {
+                    _debounce?.cancel();
+                    unawaited(_load());
+                  },
+                ),
               ),
               onChanged: (_) {
                 _debounce?.cancel();
@@ -123,6 +131,8 @@ class _OpenRouterModelPickerState extends State<OpenRouterModelPicker> {
                 : _error != null && _models.isEmpty
                 ? ErrorState(message: _error!, onRetry: _load)
                 : ListView.separated(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     itemCount: _models.length,
                     separatorBuilder: (_, _) => const Divider(indent: 20),
                     itemBuilder: (context, index) {

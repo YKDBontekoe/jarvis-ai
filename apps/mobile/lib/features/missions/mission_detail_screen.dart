@@ -80,7 +80,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         setState(() => _error = message);
       } else {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }

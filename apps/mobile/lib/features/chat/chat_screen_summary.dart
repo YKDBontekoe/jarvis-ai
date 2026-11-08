@@ -71,6 +71,7 @@ mixin _ChatScreenSummary on _ChatScreenController {
     if (date == null || !mounted) return false;
     final time = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: const TimeOfDay(hour: 9, minute: 0),
       helpText: 'Remind me at',
     );
@@ -84,9 +85,11 @@ mixin _ChatScreenSummary on _ChatScreenController {
     );
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (!local.isAfter(DateTime.now())) {
-      messenger?.showSnackBar(
-        const SnackBar(content: Text('Choose a time in the future.')),
-      );
+      messenger
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Choose a time in the future.')),
+        );
       return false;
     }
     final timeZoneId = await deviceTimeZoneLookup() ?? 'UTC';
@@ -102,17 +105,21 @@ mixin _ChatScreenSummary on _ChatScreenController {
               '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:00',
         },
       );
-      messenger?.showSnackBar(const SnackBar(content: Text('Reminder set.')));
+      messenger
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Reminder set.')));
       return true;
     } on DioException catch (error) {
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ??
-                'Jarvis could not create that reminder.',
+      messenger
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ??
+                  'Jarvis could not create that reminder.',
+            ),
           ),
-        ),
-      );
+        );
       return false;
     }
   }

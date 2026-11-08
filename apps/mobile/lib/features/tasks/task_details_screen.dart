@@ -8,6 +8,7 @@ import '../approvals/approvals_screen.dart';
 import '../chat/chat_widgets.dart';
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
+import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../json_maps.dart';
 import '../../ui/jarvis_ui.dart';
@@ -158,8 +159,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
     final date = jsonDate(value, local: true);
     if (date == null) return '';
     final dateText = MaterialLocalizations.of(context).formatMediumDate(date);
-    final timeText = MaterialLocalizations.of(context)
-        .formatTimeOfDay(TimeOfDay.fromDateTime(date));
+    final timeText = clockOf(context, date);
     return '$dateText · $timeText';
   }
 
@@ -203,7 +203,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen>
   Widget _buildDetails() {
     final task = _task!;
     final status = asJsonString(task['status']) ?? 'unknown';
-    final style = statusStyle(status);
+    final style = statusStyle(status, JarvisColors.of(context));
     final conversationId = asJsonString(task['conversationId']);
     final summary = asJsonString(task['summary']);
     final theme = Theme.of(context);

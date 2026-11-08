@@ -128,7 +128,7 @@ void main() {
 
     expect(find.text('Take out the trash'), findsOneWidget);
     expect(
-      find.textContaining('Every weekday · next Tomorrow'),
+      find.textContaining('Every weekday · next tomorrow'),
       findsOneWidget,
     );
   });
@@ -412,7 +412,7 @@ void main() {
       return local.isAfter(today) ? 'Tomorrow' : 'Yesterday';
     }
 
-    expect(find.textContaining('Reminded you ${dayOf(fired)}'), findsOneWidget);
+    expect(find.textContaining('Reminded you ${dayOf(fired).toLowerCase()}'), findsOneWidget);
     await tester.tap(find.byTooltip('Reminder actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remind me again…'));

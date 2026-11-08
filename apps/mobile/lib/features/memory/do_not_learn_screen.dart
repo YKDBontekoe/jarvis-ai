@@ -123,9 +123,11 @@ class _DoNotLearnScreenState extends State<DoNotLearnScreen> {
                       ),
                       const SizedBox(height: 16),
                       TextField(
+                        textCapitalization: TextCapitalization.sentences,
                         key: const Key('dnl-topic'),
                         controller: _topic,
                         maxLength: 60,
+                        buildCounter: quietCounter,
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => unawaited(_add()),
                         decoration: const InputDecoration(

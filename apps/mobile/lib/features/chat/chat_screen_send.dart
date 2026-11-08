@@ -448,15 +448,17 @@ mixin _ChatScreenSend on _ChatScreenController {
           );
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            rating == 'up'
-                ? 'Thanks — Jarvis will keep doing this.'
-                : 'Thanks — Jarvis will learn from this.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              rating == 'up'
+                  ? 'Thanks — Jarvis will keep doing this.'
+                  : 'Thanks — Jarvis will learn from this.',
+            ),
           ),
-        ),
-      );
+        );
     } on DioException catch (error) {
       if (mounted) setState(() => _error = describeApiError(error));
     } catch (_) {

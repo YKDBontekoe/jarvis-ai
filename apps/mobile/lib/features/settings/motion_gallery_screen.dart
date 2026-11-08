@@ -76,7 +76,7 @@ class _MotionGalleryScreenState extends State<MotionGalleryScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Preview effects')),
+      appBar: AppBar(title: const PageTitle('Preview effects')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),

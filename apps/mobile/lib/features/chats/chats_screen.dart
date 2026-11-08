@@ -260,6 +260,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                   child: TextField(
+                    textInputAction: TextInputAction.search,
                     key: const Key('chats-filter-field'),
                     controller: _query,
                     focusNode: _searchFocus,
@@ -272,18 +273,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
                         size: 18,
                         color: colors.muted,
                       ),
-                      suffixIcon: _query.text.isEmpty
-                          ? null
-                          : IconButton(
-                              key: const Key('chats-clear-search'),
-                              tooltip: 'Clear chat search',
-                              onPressed: () => setState(_query.clear),
-                              icon: Icon(
-                                PhosphorIconsRegular.x,
-                                size: 16,
-                                color: colors.inkSoft,
-                              ),
-                            ),
+                      suffixIcon: SearchClearButton(
+                        controller: _query,
+                        buttonKey: const Key('chats-clear-search'),
+                        tooltip: 'Clear chat search',
+                        onCleared: () => setState(() {}),
+                      ),
                       filled: true,
                       fillColor: colors.surfaceMuted,
                       contentPadding: const EdgeInsets.symmetric(vertical: 13),
@@ -316,6 +311,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                 onNewChat: widget.onNewChat,
                               )
                             : CustomScrollView(
+                                keyboardDismissBehavior:
+                                    ScrollViewKeyboardDismissBehavior.onDrag,
                                 key: const Key('chats-list'),
                                 controller: _list,
                                 physics: const AlwaysScrollableScrollPhysics(),
@@ -1315,6 +1312,7 @@ class _Empty extends StatelessWidget {
       _ => null,
     };
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         SizedBox(

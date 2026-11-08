@@ -897,18 +897,22 @@ class _CellSheetState extends State<_CellSheet> {
               ],
             ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('cell-note'),
             controller: _note,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'The facts',
               hintText: '€1,900 including fitting',
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('cell-source'),
             controller: _source,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'Where it came from',
               hintText: 'quote-a.pdf',
@@ -1049,6 +1053,7 @@ class _NameDialogState extends State<_NameDialog> {
       controller: _controller,
       autofocus: true,
       maxLength: 80,
+      buildCounter: quietCounter,
       decoration: InputDecoration(labelText: widget.label),
       onSubmitted: (value) => Navigator.pop(context, value),
     ),

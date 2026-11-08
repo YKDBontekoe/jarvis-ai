@@ -233,18 +233,27 @@ class IconBadge extends StatelessWidget {
 
 /// A compact status label with a leading dot.
 class StatusPill extends StatelessWidget {
-  const StatusPill({required this.label, required this.color, super.key});
+  const StatusPill({required this.label, required this.color, super.key})
+    : status = null;
 
-  StatusPill.forStatus(String status, {super.key})
+  StatusPill.forStatus(String this.status, {super.key})
     : label = statusStyle(status).label,
       color = statusStyle(status).color;
 
   final String label;
   final Color color;
 
+  /// When built from a status, the dot takes that status's colour in the
+  /// current theme rather than the light palette.
+  final String? status;
+
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
+    final color = switch (status) {
+      final status? => statusStyle(status, colors).color,
+      null => this.color,
+    };
     return Container(
       padding: const EdgeInsets.fromLTRB(7, 3, 9, 3),
       decoration: BoxDecoration(
@@ -279,59 +288,65 @@ class StatusPill extends StatelessWidget {
 
 typedef StatusStyle = ({String label, Color color, IconData icon});
 
-/// Shared visual language for task, reminder, watch, and file statuses.
-StatusStyle statusStyle(String status) => switch (status) {
-  'running' || 'processing' => (
-    label: status == 'running' ? 'In progress' : 'Processing',
-    color: JarvisColors.light.info,
-    icon: PhosphorIconsRegular.hourglassMedium,
-  ),
-  'needs_approval' => (
-    label: 'Needs approval',
-    color: JarvisColors.light.warning,
-    icon: PhosphorIconsRegular.shieldWarning,
-  ),
-  'completed' ||
-  'delivered' ||
-  'indexed' ||
-  'triggered' ||
-  'sent' ||
-  'ready' => (
-    label: status == 'ready' ? 'Ready' : _titleCase(status),
-    color: JarvisColors.light.success,
-    icon: PhosphorIconsRegular.checkCircle,
-  ),
-  'failed' || 'error' || 'rejected' => (
-    label: _titleCase(status),
-    color: JarvisColors.light.danger,
-    icon: PhosphorIconsRegular.warningCircle,
-  ),
-  'cancelled' || 'canceled' || 'stopped' || 'expired' => (
-    label: _titleCase(status),
-    color: JarvisColors.light.muted,
-    icon: PhosphorIconsRegular.prohibit,
-  ),
-  'active' || 'pending' || 'scheduled' => (
-    label: _titleCase(status),
-    color: JarvisColors.light.accent,
-    icon: PhosphorIconsRegular.clock,
-  ),
-  'waiting' => (
-    label: 'Waiting',
-    color: JarvisColors.light.violet,
-    icon: PhosphorIconsRegular.pauseCircle,
-  ),
-  'queued' => (
-    label: 'Queued',
-    color: JarvisColors.light.inkSoft,
-    icon: PhosphorIconsRegular.clock,
-  ),
-  _ => (
-    label: status.isEmpty ? 'Unknown' : _titleCase(status),
-    color: JarvisColors.light.inkSoft,
-    icon: PhosphorIconsRegular.circle,
-  ),
-};
+/// Shared visual language for task, reminder, watch, and file statuses. Pass
+/// the current [palette] (`JarvisColors.of(context)`) so the colour reads in
+/// dark mode too; without it the light palette is used.
+StatusStyle statusStyle(String status, [JarvisColors? palette]) =>
+    _statusStyle(status, palette ?? JarvisColors.light);
+
+StatusStyle _statusStyle(String status, JarvisColors palette) =>
+    switch (status) {
+      'running' || 'processing' => (
+        label: status == 'running' ? 'In progress' : 'Processing',
+        color: palette.info,
+        icon: PhosphorIconsRegular.hourglassMedium,
+      ),
+      'needs_approval' => (
+        label: 'Needs approval',
+        color: palette.warning,
+        icon: PhosphorIconsRegular.shieldWarning,
+      ),
+      'completed' ||
+      'delivered' ||
+      'indexed' ||
+      'triggered' ||
+      'sent' ||
+      'ready' => (
+        label: status == 'ready' ? 'Ready' : _titleCase(status),
+        color: palette.success,
+        icon: PhosphorIconsRegular.checkCircle,
+      ),
+      'failed' || 'error' || 'rejected' => (
+        label: _titleCase(status),
+        color: palette.danger,
+        icon: PhosphorIconsRegular.warningCircle,
+      ),
+      'cancelled' || 'canceled' || 'stopped' || 'expired' => (
+        label: _titleCase(status),
+        color: palette.muted,
+        icon: PhosphorIconsRegular.prohibit,
+      ),
+      'active' || 'pending' || 'scheduled' => (
+        label: _titleCase(status),
+        color: palette.accent,
+        icon: PhosphorIconsRegular.clock,
+      ),
+      'waiting' => (
+        label: 'Waiting',
+        color: palette.violet,
+        icon: PhosphorIconsRegular.pauseCircle,
+      ),
+      'queued' => (
+        label: 'Queued',
+        color: palette.inkSoft,
+        icon: PhosphorIconsRegular.clock,
+      ),
+      _ => (
+        label: status.isEmpty ? 'Unknown' : _titleCase(status),
+        color: palette.inkSoft,
+        icon: PhosphorIconsRegular.circle,
+      ),
+    };
 
 String _titleCase(String value) {
   final text = value.replaceAll('_', ' ');
@@ -552,7 +567,7 @@ class ErrorState extends StatelessWidget {
     icon: PhosphorIconsRegular.cloudSlash,
     tone: JarvisColors.of(context).warning,
     title: 'Jarvis couldn’t load this',
-    message: message,
+    message: errorDetail(message),
     hint: onRetry == null
         ? null
         : 'Check your connection, or try again in a moment.',
@@ -565,6 +580,13 @@ class ErrorState extends StatelessWidget {
           ),
   );
 }
+
+/// The line under "Jarvis couldn’t load this": drops a repeated "Jarvis could
+/// not" so every error page reads "Could not load your files." the same way.
+String errorDetail(String message) => message.replaceFirstMapped(
+  RegExp(r"^Jarvis (could not|couldn’t|couldn't) "),
+  (_) => 'Could not ',
+);
 
 /// Loading, empty, full-page error, or a list that keeps rows visible when a refresh fails.
 ///
@@ -1109,7 +1131,15 @@ Future<bool> showJarvisConfirm(
           child: Text(cancelLabel),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
+          onPressed: () {
+            // A firmer tap for something that cannot be taken back.
+            if (destructive) {
+              HapticFeedback.mediumImpact();
+            } else {
+              HapticFeedback.lightImpact();
+            }
+            Navigator.pop(dialogContext, true);
+          },
           style: destructive
               ? FilledButton.styleFrom(
                   backgroundColor: JarvisColors.of(context).danger,
@@ -1392,12 +1422,14 @@ class HeaderAction extends StatelessWidget {
   // a primary one stays a filled circle so it still reads as the main action.
   Widget _iconOnly(Widget leading) => collapsesWhenNarrow
       ? IconButton(
+          // The tooltip names the button for screen readers.
           tooltip: label,
           onPressed: busy ? null : onPressed,
-          icon: Semantics(label: label, excludeSemantics: true, child: leading),
+          icon: ExcludeSemantics(child: leading),
         )
       : Tooltip(
           message: label,
+          excludeFromSemantics: true,
           child: _button(
             onPressed: busy ? null : onPressed,
             style: _style().copyWith(
@@ -1527,6 +1559,9 @@ class CircleIconButton extends StatelessWidget {
     );
     return Tooltip(
       message: tooltip,
+      // The Semantics below already names the button; without this a screen
+      // reader hears the name twice.
+      excludeFromSemantics: true,
       child: Semantics(
         button: true,
         enabled: onPressed != null,
@@ -1948,4 +1983,82 @@ class HeroGlow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// A character counter that stays out of the way: nothing while there is
+/// plenty of room, then "182/200" in the last fifth of the limit, in the
+/// warning colour once the limit is reached. Pass it as a text field's
+/// `buildCounter` so forms are not lined with "0/32000".
+Widget? quietCounter(
+  BuildContext context, {
+  required int currentLength,
+  required bool isFocused,
+  required int? maxLength,
+}) {
+  if (maxLength == null || maxLength <= 0) return null;
+  if (currentLength < maxLength * .8) return null;
+  final colors = JarvisColors.of(context);
+  final full = currentLength >= maxLength;
+  return Semantics(
+    liveRegion: full,
+    label: full
+        ? 'Character limit reached, $maxLength characters'
+        : '${maxLength - currentLength} characters left',
+    excludeSemantics: true,
+    child: Text(
+      '$currentLength/$maxLength',
+      style: TextStyle(
+        fontFamily: 'Geist',
+        fontSize: 12,
+        fontWeight: full ? FontWeight.w600 : FontWeight.w500,
+        color: full ? colors.warning : colors.muted,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    ),
+  );
+}
+
+/// The × at the end of a search field: shown only while there is text, it
+/// empties the field, keeps the keyboard where it is and calls [onCleared] so
+/// the results reset like they would after deleting by hand.
+class SearchClearButton extends StatelessWidget {
+  const SearchClearButton({
+    required this.controller,
+    required this.onCleared,
+    this.tooltip = 'Clear search',
+    this.buttonKey = const ValueKey('search-clear'),
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final VoidCallback onCleared;
+  final String tooltip;
+  final Key buttonKey;
+
+  @override
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) => AnimatedSwitcher(
+          duration: JarvisMotion.of(context, JarvisMotion.fast),
+          transitionBuilder: (child, animation) =>
+              ScaleTransition(scale: animation, child: child),
+          child: value.text.isEmpty
+              ? const SizedBox.shrink()
+              : IconButton(
+                  key: buttonKey,
+                  tooltip: tooltip,
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    controller.clear();
+                    onCleared();
+                  },
+                  icon: Icon(
+                    PhosphorIconsRegular.xCircle,
+                    size: 18,
+                    color: JarvisColors.of(context).muted,
+                  ),
+                ),
+        ),
+      );
 }

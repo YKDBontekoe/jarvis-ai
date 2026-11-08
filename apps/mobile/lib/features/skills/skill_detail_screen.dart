@@ -92,9 +92,11 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
       final text = asJsonString(response.data) ?? '';
       await Clipboard.setData(ClipboardData(text: text));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('SKILL.md copied to the clipboard.')),
-        );
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('SKILL.md copied to the clipboard.')),
+          );
       }
     } on DioException catch (error) {
       if (!mounted) return;
@@ -151,7 +153,8 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
         actions: [
           if (skill != null)
             PopupMenuButton<String>(
-              tooltip: 'More',
+              icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
+              tooltip: 'Skill actions',
               onSelected: (value) => switch (value) {
                 'export' => unawaited(_export()),
                 'delete' => unawaited(_delete()),
@@ -188,7 +191,10 @@ class _SkillDetailScreenState extends State<SkillDetailScreen> {
 
   Widget _header(Map<String, dynamic> skill) {
     final status = asJsonString(skill['status']) ?? 'active';
-    final source = skillSource(asJsonString(skill['source']) ?? 'user');
+    final source = skillSource(
+      asJsonString(skill['source']) ?? 'user',
+      JarvisColors.of(context),
+    );
     final locked = asJsonBool(skill['isLocked']);
     return SurfaceCard(
       child: Column(

@@ -180,35 +180,38 @@ class _WorkspacesScreenState extends State<WorkspacesScreen> {
           ? const SkeletonList()
           : _error != null
           ? ErrorState(message: _error!, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                ContentWidth(
-                  child: _items.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 24),
-                          child: EmptyState(
-                            icon: PhosphorIconsRegular.appWindow,
-                            title: 'Start a job the same way every time',
-                            message: 'Pick a profile and a project once. Starting it opens a chat with that profile and its limits.',
-                            action: PillAction(
-                              key: const Key('workspace-start'),
-                              primary: true,
-                              icon: PhosphorIconsRegular.plus,
-                              label: 'New workspace',
-                              onPressed: () => unawaited(_create()),
+          : OrbRefresh(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  ContentWidth(
+                    child: _items.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 24),
+                            child: EmptyState(
+                              icon: PhosphorIconsRegular.appWindow,
+                              title: 'Start a job the same way every time',
+                              message: 'Pick a profile and a project once. Starting it opens a chat with that profile and its limits.',
+                              action: PillAction(
+                                key: const Key('workspace-start'),
+                                primary: true,
+                                icon: PhosphorIconsRegular.plus,
+                                label: 'New workspace',
+                                onPressed: () => unawaited(_create()),
+                              ),
                             ),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final (i, view) in _items.indexed)
+                                _row(view, i, colors),
+                            ],
                           ),
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (final (i, view) in _items.indexed)
-                              _row(view, i, colors),
-                          ],
-                        ),
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
     );
   }
@@ -303,9 +306,11 @@ class _WorkspaceSheetState extends State<_WorkspaceSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.words,
             key: const Key('workspace-name'),
             controller: _name,
             maxLength: 60,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'Name',
               hintText: 'Weekly research',
@@ -352,9 +357,11 @@ class _WorkspaceSheetState extends State<_WorkspaceSheet> {
           ],
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('workspace-instruction'),
             controller: _instruction,
             maxLength: 400,
+            buildCounter: quietCounter,
             maxLines: 2,
             decoration: const InputDecoration(
               labelText: 'First message (optional)',

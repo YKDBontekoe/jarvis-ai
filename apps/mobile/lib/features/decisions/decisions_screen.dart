@@ -405,6 +405,7 @@ class _DecisionSheetState extends State<_DecisionSheet> {
                 key: const Key('decision-note'),
                 controller: _note,
                 maxLength: 1000,
+                buildCounter: quietCounter,
                 minLines: 1,
                 maxLines: 3,
                 textCapitalization: TextCapitalization.sentences,

@@ -123,6 +123,7 @@ class _TradeFormState extends State<_TradeForm> {
                 decoration: const InputDecoration(labelText: 'Ticker'),
               ),
               TextField(
+                textCapitalization: TextCapitalization.words,
                 key: const Key('trade-name'),
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'Name (optional)'),

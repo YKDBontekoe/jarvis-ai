@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../schedule_format.dart';
+
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/jarvis_ui.dart';
@@ -64,7 +66,8 @@ class _ModesScreenState extends State<ModesScreen> {
         setState(() => _error = message);
       } else {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -140,13 +143,16 @@ class _ModesScreenState extends State<ModesScreen> {
       await _loadCard();
     } on DioException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                firstProblemMessage(error.response?.data) ??
+                    'That did not work.',
+              ),
             ),
-          ),
-        );
+          );
       }
     }
   }
@@ -222,12 +228,14 @@ class _ModesScreenState extends State<ModesScreen> {
 
     final start = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: parse(state.sleepStart),
       helpText: 'Sleep mode starts',
     );
     if (start == null || !mounted) return;
     final end = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: parse(state.sleepEnd),
       helpText: 'Sleep mode ends',
     );

@@ -39,11 +39,13 @@ class _TraitDialogState extends State<_TraitDialog> {
           ),
         const SizedBox(height: 12),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('trait-statement'),
           controller: _statement,
           autofocus: true,
           maxLines: 3,
           maxLength: 280,
+          buildCounter: quietCounter,
           decoration: const InputDecoration(
             hintText: 'e.g. Keep answers under five sentences.',
           ),

@@ -421,6 +421,7 @@ class _MeetingScreenState extends State<MeetingScreen>
                     children: [
                       Expanded(
                         child: TextField(
+                          textCapitalization: TextCapitalization.sentences,
                           key: Key('meeting-agenda-line-$i'),
                           controller: _agenda[i],
                           decoration: const InputDecoration(
@@ -496,11 +497,13 @@ class _MeetingScreenState extends State<MeetingScreen>
                 style: TextStyle(fontSize: 13, color: colors.inkSoft),
               ),
               TextField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('meeting-notes'),
                 controller: _notes,
                 minLines: 2,
                 maxLines: 6,
                 maxLength: 4000,
+                buildCounter: quietCounter,
                 onEditingComplete: () => unawaited(_saveNotes()),
                 decoration: const InputDecoration(
                   hintText: 'Notes to yourself',
@@ -526,11 +529,13 @@ class _MeetingScreenState extends State<MeetingScreen>
                 style: TextStyle(fontSize: 13, color: colors.inkSoft),
               ),
               TextField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('meeting-debrief'),
                 controller: _debrief,
                 minLines: 3,
                 maxLines: 8,
                 maxLength: 8000,
+                buildCounter: quietCounter,
                 decoration: const InputDecoration(
                   hintText: 'We decided to… I’ll send… Rosa will…',
                 ),
@@ -806,6 +811,7 @@ class _AcceptSheetState extends State<_AcceptSheet> {
             key: const Key('accept-text'),
             controller: _text,
             maxLength: 300,
+            buildCounter: quietCounter,
             minLines: 1,
             maxLines: 4,
             decoration: InputDecoration(
@@ -814,6 +820,7 @@ class _AcceptSheetState extends State<_AcceptSheet> {
           ),
           if (!_decision) ...[
             TextField(
+              textCapitalization: TextCapitalization.words,
               key: const Key('accept-who'),
               controller: _who,
               decoration: const InputDecoration(labelText: 'With whom'),

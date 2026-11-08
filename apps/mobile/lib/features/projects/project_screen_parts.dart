@@ -418,6 +418,8 @@ class _PickerSheetState extends State<_PickerSheet> {
               else
                 Flexible(
                   child: ListView.builder(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     shrinkWrap: true,
                     padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
                     itemCount: visible.length,
@@ -494,6 +496,7 @@ class _NewProjectTaskDialogState extends State<_NewProjectTaskDialog> {
               controller: _title,
               autofocus: true,
               maxLength: 200,
+              buildCounter: quietCounter,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(labelText: 'Title'),
               validator: (value) => (value ?? '').trim().isEmpty
@@ -506,6 +509,7 @@ class _NewProjectTaskDialogState extends State<_NewProjectTaskDialog> {
               minLines: 3,
               maxLines: 8,
               maxLength: 32000,
+              buildCounter: quietCounter,
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(
                 labelText: 'What should Jarvis do?',

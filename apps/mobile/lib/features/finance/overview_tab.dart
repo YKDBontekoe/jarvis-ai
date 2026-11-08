@@ -273,6 +273,11 @@ class _OverviewTabState extends State<OverviewTab>
       (max, m) => [max, m.income, m.spending].reduce((a, b) => a > b ? a : b),
     );
     if (peak <= 0) return const SizedBox.shrink();
+    // Income is the accent; spending a neutral tone, so the two read apart
+    // without relying on hue alone (success is the accent by design).
+    final income = colors.accent;
+    final spending = colors.inkSoft.withValues(alpha: colors.isDark ? .55 : .4);
+    final grow = JarvisMotion.of(context, JarvisMotion.slow);
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 8),
       child: Column(
@@ -286,9 +291,9 @@ class _OverviewTabState extends State<OverviewTab>
                   style: TextStyle(color: colors.inkSoft),
                 ),
               ),
-              _legend(colors.success, 'Income'),
+              _legend(income, 'Income'),
               const SizedBox(width: 12),
-              _legend(colors.accent, 'Spending'),
+              _legend(spending, 'Spending'),
             ],
           ),
           const SizedBox(height: 12),
@@ -308,9 +313,9 @@ class _OverviewTabState extends State<OverviewTab>
                         crossAxisAlignment: CrossAxisAlignment.end,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _bar(m.income / peak, colors.success),
+                          _bar(m.income / peak, income, grow),
                           const SizedBox(width: 3),
-                          _bar(m.spending / peak, colors.accent),
+                          _bar(m.spending / peak, spending, grow),
                         ],
                       ),
                     ),
@@ -321,7 +326,7 @@ class _OverviewTabState extends State<OverviewTab>
           const SizedBox(height: 6),
           Row(
             children: [
-              for (final m in data.cashFlow)
+              for (final (index, m) in data.cashFlow.indexed)
                 Expanded(
                   child: Text(
                     monthLabel(
@@ -330,7 +335,15 @@ class _OverviewTabState extends State<OverviewTab>
                       now: widget.now,
                     ).substring(0, 3),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: colors.muted, fontSize: 12),
+                    maxLines: 1,
+                    // The month in progress stands out from the closed ones.
+                    style: index == data.cashFlow.length - 1
+                        ? TextStyle(
+                            color: colors.ink,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          )
+                        : TextStyle(color: colors.muted, fontSize: 12),
                   ),
                 ),
             ],
@@ -340,14 +353,21 @@ class _OverviewTabState extends State<OverviewTab>
     );
   }
 
-  Widget _bar(double fraction, Color color) => Container(
-    width: 12,
-    height: (fraction * 110).clamp(2, 110).toDouble(),
-    decoration: BoxDecoration(
-      color: color,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-    ),
-  );
+  /// One bar that grows to its height the first time the card shows.
+  Widget _bar(double fraction, Color color, Duration grow) =>
+      TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: fraction),
+        duration: grow,
+        curve: JarvisMotion.standard,
+        builder: (context, value, _) => Container(
+          width: 12,
+          height: (value * 110).clamp(2, 110).toDouble(),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          ),
+        ),
+      );
 
   Widget _legend(Color color, String label) => Row(
     children: [
@@ -356,8 +376,11 @@ class _OverviewTabState extends State<OverviewTab>
         height: 10,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
-      const SizedBox(width: 4),
-      Text(label, style: const TextStyle(fontSize: 12)),
+      const SizedBox(width: 5),
+      Text(
+        label,
+        style: TextStyle(fontSize: 12, color: JarvisColors.of(context).inkSoft),
+      ),
     ],
   );
 }

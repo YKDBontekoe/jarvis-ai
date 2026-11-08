@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/planner/day_planner_format.dart';
 import 'package:jarvis_mobile/features/planner/day_planner_screen.dart';
 import 'package:jarvis_mobile/schedule_format.dart';
+import 'package:jarvis_mobile/ui/jarvis_ui.dart';
 
 import 'support/fixture_http.dart';
 
@@ -78,7 +79,7 @@ void main() {
     expect(minutesOfDay('08:30:00'), 510);
     expect(minutesOfDay('nope'), isNull);
     expect(timeOfDayValue(1050), '17:30:00');
-    expect(longDayLabel(DateTime(2026, 10, 2)), 'Friday, October 2');
+    expect(longDayLabel(DateTime(2026, 10, 2)), 'Friday 2 October');
     expect(
       planResultMessage(0, const []),
       'Nothing to plan. Add a to-do first.',
@@ -206,6 +207,14 @@ void main() {
     await tester.tap(find.byTooltip('Remove Call plumber'));
     await tester.pumpAndSettle();
     expect(http.sent('DELETE', '$_base/items/b'), hasLength(1));
+
+    // Undo adds it back with its length.
+    http.on('POST', '$_base/items', _item('c', 'Call plumber'));
+    await tester.tap(find.text('Undo'));
+    await tester.pumpAndSettle();
+    final undo = http.sent('POST', '$_base/items').single.body as Map;
+    expect(undo['title'], 'Call plumber');
+    expect(undo['minutes'], isNotNull);
   });
 
   testWidgets('asks chat to connect a calendar or copy focus blocks to it', (
@@ -336,7 +345,7 @@ void main() {
     }
 
     expect(http.sent('GET', '/api/v1/planner/day').length, 7);
-    final button = tester.widget<IconButton>(
+    final button = tester.widget<CircleIconButton>(
       find.byKey(const Key('planner-prev-day')),
     );
     expect(button.onPressed, isNull);

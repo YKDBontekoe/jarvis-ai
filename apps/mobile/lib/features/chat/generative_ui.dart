@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
+import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';

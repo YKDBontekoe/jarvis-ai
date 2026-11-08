@@ -26,17 +26,55 @@ const weekdayNames = [
   (64, 'Sun'),
 ];
 
+/// "14:30". Jarvis shows times on the 24-hour clock everywhere, so a reminder
+/// list, a chat row and the Right now card never disagree about the format.
+String clockOf(BuildContext context, DateTime local) =>
+    MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay.fromDateTime(local),
+      alwaysUse24HourFormat: true,
+    );
+
+/// "14:30" for a picked time of day, on the same 24-hour clock as [clockOf].
+String timeOfDayLabel(BuildContext context, TimeOfDay time) =>
+    MaterialLocalizations.of(context)
+        .formatTimeOfDay(time, alwaysUse24HourFormat: true);
+
+/// Builder for `showTimePicker` so the dial and the typed entry use the
+/// 24-hour clock the rest of Jarvis shows.
+Widget use24HourClock(BuildContext context, Widget? child) => MediaQuery(
+  data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+  child: child ?? const SizedBox.shrink(),
+);
+
+/// "Tomorrow · Mon, Nov 9": a date to pick or confirm, short enough for one
+/// line, with the relative day when it is close.
+String friendlyDate(BuildContext context, DateTime date, {DateTime? now}) {
+  final medium = MaterialLocalizations.of(context).formatMediumDate(date);
+  final days = _day(date).difference(_day(now ?? DateTime.now())).inDays;
+  return switch (days) {
+    0 => 'Today · $medium',
+    1 => 'Tomorrow · $medium',
+    _ => medium,
+  };
+}
+
 /// "Today 14:30", "Tomorrow 08:00", "Wed 14:30" within a week, otherwise the
-/// medium date with the time.
-String friendlyWhen(BuildContext context, DateTime local, {DateTime? now}) {
+/// medium date with the time. [inSentence] lowercases today, tomorrow and
+/// yesterday for use after other words ("Reminded you yesterday 20:00").
+String friendlyWhen(
+  BuildContext context,
+  DateTime local, {
+  DateTime? now,
+  bool inSentence = false,
+}) {
   final localizations = MaterialLocalizations.of(context);
-  final time = localizations.formatTimeOfDay(TimeOfDay.fromDateTime(local));
+  final time = clockOf(context, local);
   final today = _day(now ?? DateTime.now());
   final days = _day(local).difference(today).inDays;
   final day = switch (days) {
-    0 => 'Today',
-    1 => 'Tomorrow',
-    -1 => 'Yesterday',
+    0 => inSentence ? 'today' : 'Today',
+    1 => inSentence ? 'tomorrow' : 'Tomorrow',
+    -1 => inSentence ? 'yesterday' : 'Yesterday',
     > 1 && < 7 => _weekdayName(local.weekday),
     _ => localizations.formatMediumDate(local),
   };
@@ -128,13 +166,14 @@ DateTime? wallClockInZone(DateTime instant, String? zoneId) {
 String zoneCity(String zoneId) => zoneId.split('/').last.replaceAll('_', ' ');
 
 /// How a scheduled [instant] reads on the clock of its own [zoneId], for example
-/// "Tomorrow 9:00 AM in Lisbon". Null when that is the same time the phone
+/// "Tomorrow 09:00 in Lisbon". Null when that is the same time the phone
 /// shows (so there is nothing to explain) or the zone is unknown.
 String? zoneEquivalentLine(
   BuildContext context,
   DateTime instant,
   String? zoneId, {
   DateTime? now,
+  bool inSentence = false,
 }) {
   final there = wallClockInZone(instant, zoneId);
   if (there == null || zoneId == null) return null;
@@ -147,20 +186,39 @@ String? zoneEquivalentLine(
       there.minute == here.minute;
   if (same) return null;
   final nowThere = wallClockInZone(now ?? DateTime.now(), zoneId);
-  return '${friendlyWhen(context, there, now: nowThere)} in ${zoneCity(zoneId)}';
+  return '${friendlyWhen(context, there, now: nowThere, inSentence: inSentence)} '
+      'in ${zoneCity(zoneId)}';
 }
 
 /// One scheduled [instant] described on both clocks when they differ: the
 /// reminder's own zone first, then the phone. When they read the same (or the
 /// zone is unknown) there is only the phone's reading and [other] is null.
+/// [inSentence] lowercases the day of [primary] for use after other words.
 ({String primary, String? other}) describeScheduledInstant(
   BuildContext context,
   DateTime instant,
   String? zoneId, {
   DateTime? now,
+  bool inSentence = false,
 }) {
-  final zoneLine = zoneEquivalentLine(context, instant, zoneId, now: now);
+  final zoneLine = zoneEquivalentLine(
+    context,
+    instant,
+    zoneId,
+    now: now,
+    inSentence: inSentence,
+  );
+  if (zoneLine == null) {
+    return (
+      primary: friendlyWhen(
+        context,
+        instant.toLocal(),
+        now: now,
+        inSentence: inSentence,
+      ),
+      other: null,
+    );
+  }
   final phone = friendlyWhen(context, instant.toLocal(), now: now);
-  if (zoneLine == null) return (primary: phone, other: null);
   return (primary: zoneLine, other: '$phone on your phone');
 }

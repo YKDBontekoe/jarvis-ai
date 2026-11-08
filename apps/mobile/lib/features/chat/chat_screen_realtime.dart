@@ -204,17 +204,19 @@ mixin _ChatScreenRealtime on _ChatScreenController {
           !_shownPushNotifications.add(notificationId)) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            asJsonString(event['body']) ?? 'Jarvis needs your approval.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              asJsonString(event['body']) ?? 'Jarvis needs your approval.',
+            ),
+            action: SnackBarAction(
+              label: 'Review',
+              onPressed: () => _openUtility('approvals'),
+            ),
           ),
-          action: SnackBarAction(
-            label: 'Review',
-            onPressed: () => _openUtility('approvals'),
-          ),
-        ),
-      );
+        );
     });
     _onHub(hub, 'agent.completed', (_) {
       if (_hubIsCurrent(hub, conversationId, expectedGeneration)) {

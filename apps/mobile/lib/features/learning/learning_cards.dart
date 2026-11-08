@@ -45,7 +45,7 @@ mixin _LearningCards on _LearningController {
                     const SizedBox(height: 2),
                     Text(
                       enabled
-                          ? 'Reflects and checks in every ${_interval(minutes)}.'
+                          ? 'Reflects and checks in every ${_every(minutes)}.'
                           : 'Off — Jarvis only learns during conversations.',
                       style: TextStyle(color: JarvisColors.of(context).inkSoft),
                     ),
@@ -460,6 +460,15 @@ mixin _LearningCards on _LearningController {
       : minutes == 1440
       ? 'day'
       : '$minutes min';
+
+  /// Spelled out for a sentence: "hour", "4 hours", "15 minutes", "day".
+  String _every(int minutes) => switch (minutes) {
+    60 => 'hour',
+    1440 => 'day',
+    < 60 => '$minutes minutes',
+    _ when minutes % 60 == 0 && minutes < 1440 => '${minutes ~/ 60} hours',
+    _ => '$minutes minutes',
+  };
 
   String _when(String? iso) {
     final time = jsonDate(iso, local: true);

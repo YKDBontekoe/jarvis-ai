@@ -18,24 +18,29 @@ part 'channel_link_sheet.dart';
 part 'channel_notifications_sheet.dart';
 part 'channel_thread_screen.dart';
 
-({String label, IconData icon, Color color}) channelKind(String kind) =>
-    switch (kind) {
-      'whatsapp' || 'whatsapp_linked' => (
-        label: 'WhatsApp',
-        icon: PhosphorIconsRegular.whatsappLogo,
-        color: const Color(0xff16a34a),
-      ),
-      'signal' => (
-        label: 'Signal',
-        icon: PhosphorIconsRegular.chatsCircle,
-        color: JarvisColors.light.info,
-      ),
-      _ => (
-        label: kind,
-        icon: PhosphorIconsRegular.broadcast,
-        color: JarvisColors.light.muted,
-      ),
-    };
+({String label, IconData icon, Color color}) channelKind(
+  String kind, [
+  JarvisColors? palette,
+]) {
+  final colors = palette ?? JarvisColors.light;
+  return switch (kind) {
+    'whatsapp' || 'whatsapp_linked' => (
+      label: 'WhatsApp',
+      icon: PhosphorIconsRegular.whatsappLogo,
+      color: const Color(0xff16a34a),
+    ),
+    'signal' => (
+      label: 'Signal',
+      icon: PhosphorIconsRegular.chatsCircle,
+      color: colors.info,
+    ),
+    _ => (
+      label: kind,
+      icon: PhosphorIconsRegular.broadcast,
+      color: colors.muted,
+    ),
+  };
+}
 
 /// Link WhatsApp or Signal by scanning a QR code (or connect the WhatsApp Cloud
 /// API), restrict who can talk to Jarvis, and review recent messages.
@@ -165,14 +170,16 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
     }
     final label = channelKind(kind).label;
     final phone = asJsonString(linked['phone']);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$label linked${phone == null ? '' : ' as $phone'}. '
-          'Message yourself in $label to chat with Jarvis.',
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            '$label linked${phone == null ? '' : ' as $phone'}. '
+            'Message yourself in $label to chat with Jarvis.',
+          ),
         ),
-      ),
-    );
+      );
   }
 
   @override
@@ -253,7 +260,10 @@ class _ChannelsScreenState extends State<ChannelsScreen> {
   }
 
   Widget _tile(Map<String, dynamic> channel) {
-    final kind = channelKind(asJsonString(channel['kind']) ?? '');
+    final kind = channelKind(
+      asJsonString(channel['kind']) ?? '',
+      JarvisColors.of(context),
+    );
     final enabled = asJsonBool(channel['enabled'], true);
     final error = asJsonString(channel['lastError']);
     final senders = jsonStrings(channel['allowedSenders']);

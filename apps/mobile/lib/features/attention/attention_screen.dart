@@ -142,74 +142,79 @@ class _AttentionScreenState extends State<AttentionScreen> {
           ? const SkeletonList()
           : _error != null
           ? ErrorState(message: _error!, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      HeroCard(
-                        key: const Key('attention-hero'),
-                        label: 'NEEDS YOU',
-                        title: items.isEmpty
-                            ? 'All clear'
-                            : '${items.length} thing${items.length == 1 ? '' : 's'}',
-                        subtitle: asJsonString(_queue?['summary']),
-                      ),
-                      const SizedBox(height: 12),
-                      for (final (i, item) in items.indexed)
-                        FeatureRow(
-                          key: Key('attention-${item['id']}'),
-                          index: i,
-                          icon: _icon(asJsonString(item['kind']) ?? ''),
-                          badgeColor:
-                              asJsonString(item['urgency']) == 'now' ||
-                                  asJsonString(item['urgency']) == 'late'
-                              ? colors.warning
-                              : null,
-                          caption: _caption(item),
-                          title: asJsonString(item['title']) ?? '',
-                          subtitle: asJsonString(item['detail']),
-                          actions: [
-                            PillAction(
-                              key: Key('attention-open-${item['id']}'),
-                              compact: true,
-                              primary: true,
-                              label: 'Open',
-                              onPressed: () => unawaited(
-                                _open(asJsonString(item['destination']) ?? ''),
-                              ),
-                            ),
-                            if (!asJsonBool(item['locked']))
+          : OrbRefresh(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  ContentWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        HeroCard(
+                          key: const Key('attention-hero'),
+                          label: 'NEEDS YOU',
+                          title: items.isEmpty
+                              ? 'All clear'
+                              : '${items.length} thing${items.length == 1 ? '' : 's'}',
+                          subtitle: asJsonString(_queue?['summary']),
+                        ),
+                        const SizedBox(height: 12),
+                        for (final (i, item) in items.indexed)
+                          FeatureRow(
+                            key: Key('attention-${item['id']}'),
+                            index: i,
+                            icon: _icon(asJsonString(item['kind']) ?? ''),
+                            badgeColor:
+                                asJsonString(item['urgency']) == 'now' ||
+                                    asJsonString(item['urgency']) == 'late'
+                                ? colors.warning
+                                : null,
+                            caption: _caption(item),
+                            title: asJsonString(item['title']) ?? '',
+                            subtitle: asJsonString(item['detail']),
+                            actions: [
                               PillAction(
-                                key: Key('attention-snooze-${item['id']}'),
+                                key: Key('attention-open-${item['id']}'),
                                 compact: true,
-                                label: 'Tomorrow',
-                                onPressed: _busy
-                                    ? null
-                                    : () => unawaited(
-                                        _snooze(
-                                          asJsonString(item['id']) ?? '',
-                                          1,
-                                        ),
-                                      ),
+                                primary: true,
+                                label: 'Open',
+                                onPressed: () => unawaited(
+                                  _open(
+                                    asJsonString(item['destination']) ?? '',
+                                  ),
+                                ),
                               ),
-                          ],
-                        ),
-                      if (snoozed > 0)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-                          child: Text(
-                            key: const Key('attention-snoozed'),
-                            '$snoozed put away for later. They come back by themselves.',
-                            style: TextStyle(color: colors.muted),
+                              if (!asJsonBool(item['locked']))
+                                PillAction(
+                                  key: Key('attention-snooze-${item['id']}'),
+                                  compact: true,
+                                  label: 'Tomorrow',
+                                  onPressed: _busy
+                                      ? null
+                                      : () => unawaited(
+                                          _snooze(
+                                            asJsonString(item['id']) ?? '',
+                                            1,
+                                          ),
+                                        ),
+                                ),
+                            ],
                           ),
-                        ),
-                    ],
+                        if (snoozed > 0)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                            child: Text(
+                              key: const Key('attention-snoozed'),
+                              '$snoozed put away for later. They come back by themselves.',
+                              style: TextStyle(color: colors.muted),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }

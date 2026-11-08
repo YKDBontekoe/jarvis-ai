@@ -111,7 +111,7 @@ class _UsageScreenState extends State<UsageScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Usage')),
+    appBar: AppBar(title: const PageTitle('Usage')),
     body: _loading && _usage == null
         ? const SkeletonList()
         : _error != null && _usage == null
@@ -251,15 +251,22 @@ class _UsageScreenState extends State<UsageScreen> {
                     ),
                     if (asJsonInt(persona['pinnedMemories']) > 0)
                       _chip('${asJsonInt(persona['pinnedMemories'])} pinned'),
-                    _chip(
-                      _plural(
-                        asJsonInt(persona['memoryKinds']),
-                        'kind',
-                        'kinds',
+                    if (asJsonInt(persona['memoryKinds']) > 0)
+                      _chip(
+                        _plural(
+                          asJsonInt(persona['memoryKinds']),
+                          'kind',
+                          'kinds',
+                        ),
                       ),
-                    ),
                     if (asJsonInt(persona['personaTraits']) > 0)
-                      _chip('${asJsonInt(persona['personaTraits'])} traits'),
+                      _chip(
+                        _plural(
+                          asJsonInt(persona['personaTraits']),
+                          'trait',
+                          'traits',
+                        ),
+                      ),
                     if (asJsonBool(persona['hasCustomInstructions']))
                       _chip('Custom instructions'),
                     if (asJsonBool(persona['hasPreferredName']))

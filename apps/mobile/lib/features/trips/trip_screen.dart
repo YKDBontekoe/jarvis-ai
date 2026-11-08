@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../schedule_format.dart';
+
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/feature_kit.dart';
@@ -176,111 +178,118 @@ class _TripScreenState extends State<TripScreen> {
           ? const SkeletonList()
           : _error != null
           ? ErrorState(message: _error!, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      FadeSlideIn(
-                        child: KeyedSubtree(
-                          key: const Key('trip-summary'),
-                          child: HeroCard(
-                            label:
-                                '${_countdown()} · ${asJsonString(_trip['start']) ?? ''} – ${asJsonString(_trip['end']) ?? ''}',
-                            title: asJsonString(_trip['destination']) ?? '',
-                            subtitle:
-                                'Chosen so far: $currency ${(budget['chosen'] as num? ?? 0).toStringAsFixed(2)}'
-                                '${total is num ? ' of $currency ${total.toStringAsFixed(2)}' : ''}. Nothing is booked.',
-                            footer: PillAction(
-                              key: const Key('trip-dates'),
-                              onDark: true,
-                              icon: PhosphorIconsRegular.calendarBlank,
-                              label: 'Change dates',
-                              onPressed: _busy
-                                  ? null
-                                  : () => unawaited(_changeDates()),
+          : OrbRefresh(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  ContentWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        FadeSlideIn(
+                          child: KeyedSubtree(
+                            key: const Key('trip-summary'),
+                            child: HeroCard(
+                              label:
+                                  '${_countdown()} · ${asJsonString(_trip['start']) ?? ''} – ${asJsonString(_trip['end']) ?? ''}',
+                              title: asJsonString(_trip['destination']) ?? '',
+                              subtitle:
+                                  'Chosen so far: $currency ${(budget['chosen'] as num? ?? 0).toStringAsFixed(2)}'
+                                  '${total is num ? ' of $currency ${total.toStringAsFixed(2)}' : ''}. Nothing is booked.',
+                              footer: PillAction(
+                                key: const Key('trip-dates'),
+                                onDark: true,
+                                icon: PhosphorIconsRegular.calendarBlank,
+                                label: 'Change dates',
+                                onPressed: _busy
+                                    ? null
+                                    : () => unawaited(_changeDates()),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      if (unknowns.isNotEmpty) ...[
-                        GroupLabel('Still unknown', count: unknowns.length),
-                        for (final (i, unknown) in unknowns.indexed)
-                          FeatureRow(
-                            key: Key('trip-unknown-$i'),
-                            index: i,
-                            icon: PhosphorIconsRegular.info,
-                            badgeColor: colors.warning,
-                            title: unknown,
-                          ),
-                      ],
-                      const GroupLabel('Options'),
-                      for (final (i, view) in options.indexed) _option(view, i),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: PillAction(
-                          key: const Key('trip-add-option'),
-                          icon: PhosphorIconsRegular.plus,
-                          label: 'Add an option',
-                          onPressed: _busy
-                              ? null
-                              : () => unawaited(_addOption()),
-                        ),
-                      ),
-                      const GroupLabel('Days'),
-                      for (final day in days) _day(day),
-                      if (checklist.isNotEmpty) ...[
-                        const GroupLabel('Checklist'),
-                        for (final (i, entry) in checklist.indexed)
-                          FeatureRow(
-                            key: Key('trip-check-${entry['id']}'),
-                            index: i,
-                            icon: entry['done'] == true
-                                ? PhosphorIconsRegular.checkCircle
-                                : PhosphorIconsRegular.circle,
-                            quiet: entry['done'] == true,
-                            caption: asJsonString(entry['group']),
-                            title: asJsonString(entry['text']) ?? '',
-                            subtitle: asJsonString(entry['note']),
-                            onTap: _busy
+                        if (unknowns.isNotEmpty) ...[
+                          GroupLabel('Still unknown', count: unknowns.length),
+                          for (final (i, unknown) in unknowns.indexed)
+                            FeatureRow(
+                              key: Key('trip-unknown-$i'),
+                              index: i,
+                              icon: PhosphorIconsRegular.info,
+                              badgeColor: colors.warning,
+                              title: unknown,
+                            ),
+                        ],
+                        const GroupLabel('Options'),
+                        for (final (i, view) in options.indexed)
+                          _option(view, i),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: PillAction(
+                            key: const Key('trip-add-option'),
+                            icon: PhosphorIconsRegular.plus,
+                            label: 'Add an option',
+                            onPressed: _busy
                                 ? null
-                                : () => unawaited(
-                                    _send(
-                                      () => widget.http.put<dynamic>(
-                                        '$_path/checklist/${entry['id']}',
-                                        data: {'done': entry['done'] != true},
+                                : () => unawaited(_addOption()),
+                          ),
+                        ),
+                        const GroupLabel('Days'),
+                        for (final day in days) _day(day),
+                        if (checklist.isNotEmpty) ...[
+                          const GroupLabel('Checklist'),
+                          for (final (i, entry) in checklist.indexed)
+                            FeatureRow(
+                              key: Key('trip-check-${entry['id']}'),
+                              index: i,
+                              icon: entry['done'] == true
+                                  ? PhosphorIconsRegular.checkCircle
+                                  : PhosphorIconsRegular.circle,
+                              quiet: entry['done'] == true,
+                              caption: asJsonString(entry['group']),
+                              title: asJsonString(entry['text']) ?? '',
+                              subtitle: asJsonString(entry['note']),
+                              onTap: _busy
+                                  ? null
+                                  : () => unawaited(
+                                      _send(
+                                        () => widget.http.put<dynamic>(
+                                          '$_path/checklist/${entry['id']}',
+                                          data: {'done': entry['done'] != true},
+                                        ),
                                       ),
                                     ),
-                                  ),
+                            ),
+                        ],
+                        if (holds.isNotEmpty) ...[
+                          const GroupLabel('Proposed holds'),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                            child: Text(
+                              'Ideas for your calendar and reminders. Nothing has been added.',
+                              key: const Key('trip-holds-note'),
+                              style: TextStyle(
+                                color: colors.muted,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
+                          for (final (i, hold) in holds.indexed)
+                            FeatureRow(
+                              key: Key('trip-hold-$i'),
+                              index: i,
+                              icon: PhosphorIconsRegular.alarm,
+                              caption: asJsonString(hold['why']),
+                              title: asJsonString(hold['title']) ?? '',
+                              subtitle:
+                                  '${asJsonString(hold['date']) ?? ''}${asJsonString(hold['at']) == null ? '' : ' · ${(asJsonString(hold['at']) ?? '').substring(0, 5)}'}',
+                            ),
+                        ],
                       ],
-                      if (holds.isNotEmpty) ...[
-                        const GroupLabel('Proposed holds'),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                          child: Text(
-                            'Ideas for your calendar and reminders. Nothing has been added.',
-                            key: const Key('trip-holds-note'),
-                            style: TextStyle(color: colors.muted, fontSize: 13),
-                          ),
-                        ),
-                        for (final (i, hold) in holds.indexed)
-                          FeatureRow(
-                            key: Key('trip-hold-$i'),
-                            index: i,
-                            icon: PhosphorIconsRegular.alarm,
-                            caption: asJsonString(hold['why']),
-                            title: asJsonString(hold['title']) ?? '',
-                            subtitle:
-                                '${asJsonString(hold['date']) ?? ''}${asJsonString(hold['at']) == null ? '' : ' · ${(asJsonString(hold['at']) ?? '').substring(0, 5)}'}',
-                          ),
-                      ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }
@@ -503,6 +512,7 @@ class _OptionSheetState extends State<_OptionSheet> {
           ),
           _label('What is it?'),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('option-title'),
             controller: _title,
             decoration: const InputDecoration(hintText: 'TAP flight 08:15'),
@@ -585,6 +595,7 @@ class _ItemSheetState extends State<_ItemSheet> {
   Future<void> _pick(bool from) async {
     final picked = await showTimePicker(
       context: context,
+      builder: use24HourClock,
       initialTime: from ? _from : _to,
     );
     if (picked != null) setState(() => from ? _from = picked : _to = picked);
@@ -608,12 +619,14 @@ class _ItemSheetState extends State<_ItemSheet> {
           ),
           const SizedBox(height: 8),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('item-title'),
             controller: _title,
             decoration: const InputDecoration(labelText: 'What will you do?'),
           ),
           const SizedBox(height: 8),
           TextField(
+            textCapitalization: TextCapitalization.words,
             key: const Key('item-place'),
             controller: _place,
             decoration: const InputDecoration(labelText: 'Where (optional)'),
@@ -626,13 +639,13 @@ class _ItemSheetState extends State<_ItemSheet> {
               PillAction(
                 key: const Key('item-from'),
                 icon: PhosphorIconsRegular.clock,
-                label: 'From ${_from.format(context)}',
+                label: 'From ${timeOfDayLabel(context, _from)}',
                 onPressed: () => unawaited(_pick(true)),
               ),
               PillAction(
                 key: const Key('item-to'),
                 icon: PhosphorIconsRegular.clock,
-                label: 'To ${_to.format(context)}',
+                label: 'To ${timeOfDayLabel(context, _to)}',
                 onPressed: () => unawaited(_pick(false)),
               ),
             ],

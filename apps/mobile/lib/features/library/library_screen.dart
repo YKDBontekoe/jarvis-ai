@@ -302,6 +302,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             'Everything is searchable from chat.',
       ),
       child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
         children: [
           TextField(
@@ -309,9 +310,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
             controller: _search,
             textInputAction: TextInputAction.search,
             onSubmitted: (_) => unawaited(_load()),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Search what you saved',
-              prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
+              prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
+              suffixIcon: SearchClearButton(
+                controller: _search,
+                onCleared: () => unawaited(_load()),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -389,6 +394,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     final card = _due.first;
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       children: [
         Text(
@@ -465,6 +471,7 @@ class _ItemSheet extends StatelessWidget {
           maxHeight: MediaQuery.sizeOf(context).height * .85,
         ),
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(20),
           shrinkWrap: true,
           children: [

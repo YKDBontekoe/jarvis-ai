@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../search/context_commands.dart';
@@ -103,6 +104,7 @@ class _GoalScreenState extends State<GoalScreen>
   Future<void> _plan() => _send(() => widget.http.post<dynamic>('$_path/plan'));
 
   Future<void> _act(String itemId, String action, {int? minutes}) async {
+    HapticFeedback.lightImpact();
     final zone = action == 'schedule' ? await deviceTimeZoneLookup() : null;
     await _send(
       () => widget.http.post<dynamic>(
@@ -232,6 +234,8 @@ class _GoalScreenState extends State<GoalScreen>
           if (_view != null)
             PopupMenuButton<String>(
               key: const Key('goal-menu'),
+              tooltip: 'Goal actions',
+              icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
               onSelected: (value) => unawaited(_menu(value)),
               itemBuilder: (_) => [
                 if (status == 'active')
@@ -256,31 +260,34 @@ class _GoalScreenState extends State<GoalScreen>
           ? const SkeletonList()
           : _error != null
           ? ErrorState(message: _error!, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _hero(status),
-                      const SizedBox(height: 12),
-                      if (status != 'active')
-                        InlineNotice(
-                          key: const Key('goal-status-notice'),
-                          tone: NoticeTone.info,
-                          message: status == 'paused'
-                              ? 'Paused. Nothing is planned or suggested until you resume.'
-                              : 'This goal is $status.',
-                        ),
-                      ..._progress(colors),
-                      ..._planSection(colors, status),
-                      ..._linked(colors),
-                      ..._experiments(colors, status),
-                    ],
+          : OrbRefresh(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  ContentWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _hero(status),
+                        const SizedBox(height: 12),
+                        if (status != 'active')
+                          InlineNotice(
+                            key: const Key('goal-status-notice'),
+                            tone: NoticeTone.info,
+                            message: status == 'paused'
+                                ? 'Paused. Nothing is planned or suggested until you resume.'
+                                : 'This goal is $status.',
+                          ),
+                        ..._progress(colors),
+                        ..._planSection(colors, status),
+                        ..._linked(colors),
+                        ..._experiments(colors, status),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }
@@ -663,26 +670,32 @@ class _CheckInSheetState extends State<_CheckInSheet> {
         children: [
           Text('Check in', style: Theme.of(context).textTheme.titleMedium),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('checkin-progress'),
             controller: _progress,
             maxLength: 300,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'What moved, even a little?',
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('checkin-friction'),
             controller: _friction,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'What got in the way? (optional)',
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('checkin-adjustment'),
             controller: _adjustment,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'What would you change? (optional)',
             ),
@@ -758,18 +771,22 @@ class _ExperimentSheetState extends State<_ExperimentSheet> {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('experiment-change'),
             controller: _change,
             maxLength: 200,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'What will you change?',
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('experiment-benefit'),
             controller: _benefit,
             maxLength: 200,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'What do you hope it does?',
@@ -848,6 +865,7 @@ class _PromptDialogState extends State<_PromptDialog> {
       controller: _controller,
       keyboardType: widget.numeric ? TextInputType.number : null,
       maxLength: widget.numeric ? null : 300,
+      buildCounter: quietCounter,
       decoration: InputDecoration(labelText: widget.label),
     ),
     actions: [

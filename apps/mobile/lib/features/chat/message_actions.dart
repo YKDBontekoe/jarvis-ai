@@ -146,6 +146,7 @@ class _SaveToLibrarySheetState extends State<_SaveToLibrarySheet>
             ),
             const SizedBox(height: 12),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('save-note-content'),
               controller: _body,
               minLines: 4,

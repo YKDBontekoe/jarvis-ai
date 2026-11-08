@@ -382,9 +382,13 @@ class _McpServerDetailScreenState extends State<McpServerDetailScreen> {
       tiles.pin(_tileId, TileSize.square);
     }
     setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(pinned ? 'Removed from Home.' : 'Added to Home.')),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(pinned ? 'Removed from Home.' : 'Added to Home.'),
+        ),
+      );
   }
 
   // -------------------------------------------------------------------- build
@@ -1013,6 +1017,7 @@ class _OverrideDialogState extends State<_OverrideDialog> {
         ),
         const SizedBox(height: 12),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('app-override-reason'),
           controller: _controller,
           maxLines: 3,

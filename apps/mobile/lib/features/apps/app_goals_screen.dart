@@ -158,6 +158,7 @@ class _AppGoalsScreenState extends State<AppGoalsScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 TextField(
+                  textCapitalization: TextCapitalization.sentences,
                   key: const Key('apps-query'),
                   controller: _query,
                   textInputAction: TextInputAction.search,

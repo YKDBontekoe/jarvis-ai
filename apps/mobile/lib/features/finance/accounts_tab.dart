@@ -78,14 +78,16 @@ class _AccountsTabState extends State<AccountsTab>
       await _load();
     } on DioException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ??
-                'Could not add the account.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ??
+                  'Could not add the account.',
+            ),
           ),
-        ),
-      );
+        );
     }
   }
 
@@ -247,6 +249,7 @@ class _AccountDialogState extends State<_AccountDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
+              textCapitalization: TextCapitalization.words,
               key: const Key('account-name'),
               controller: _name,
               autofocus: !editing,
@@ -267,6 +270,7 @@ class _AccountDialogState extends State<_AccountDialog> {
               onChanged: (value) => setState(() => _type = value ?? _type),
             ),
             TextField(
+              textCapitalization: TextCapitalization.words,
               key: const Key('account-bank'),
               controller: _bank,
               decoration: const InputDecoration(labelText: 'Bank (optional)'),

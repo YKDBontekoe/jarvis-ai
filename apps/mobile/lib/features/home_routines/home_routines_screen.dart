@@ -71,63 +71,68 @@ class _HomeRoutinesScreenState extends State<HomeRoutinesScreen> {
           ? const SkeletonList()
           : _error != null
           ? ErrorState(message: _error!, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      HeroCard(
-                        key: const Key('routines-hero'),
-                        label: 'EXAMPLE DEVICES',
-                        title: 'Preview before anything runs',
-                        subtitle:
-                            asJsonString(_overview?['notice']) ??
-                            'Nothing here changes a real home.',
-                      ),
-                      const GroupLabel('Routines'),
-                      for (final (i, routine) in routines.indexed)
-                        FeatureRow(
-                          key: Key('routine-${routine['id']}'),
-                          index: i,
-                          icon: routineIcon(asJsonString(routine['id']) ?? ''),
-                          title: asJsonString(routine['title']) ?? '',
-                          subtitle: asJsonString(routine['description']),
-                          caption:
-                              '${jsonMaps(routine['steps']).length} actions',
-                          onTap: () => unawaited(
-                            Navigator.of(context).push<void>(
-                              MaterialPageRoute(
-                                builder: (_) => RoutineScreen(
-                                  http: widget.http,
-                                  routineId: routine['id'] as String,
+          : OrbRefresh(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  ContentWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        HeroCard(
+                          key: const Key('routines-hero'),
+                          label: 'EXAMPLE DEVICES',
+                          title: 'Preview before anything runs',
+                          subtitle:
+                              asJsonString(_overview?['notice']) ??
+                              'Nothing here changes a real home.',
+                        ),
+                        const GroupLabel('Routines'),
+                        for (final (i, routine) in routines.indexed)
+                          FeatureRow(
+                            key: Key('routine-${routine['id']}'),
+                            index: i,
+                            icon: routineIcon(
+                              asJsonString(routine['id']) ?? '',
+                            ),
+                            title: asJsonString(routine['title']) ?? '',
+                            subtitle: asJsonString(routine['description']),
+                            caption:
+                                '${jsonMaps(routine['steps']).length} actions',
+                            onTap: () => unawaited(
+                              Navigator.of(context).push<void>(
+                                MaterialPageRoute(
+                                  builder: (_) => RoutineScreen(
+                                    http: widget.http,
+                                    routineId: routine['id'] as String,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      const GroupLabel('Devices'),
-                      for (final (i, device) in devices.indexed)
-                        FeatureRow(
-                          key: Key('device-${device['id']}'),
-                          index: i,
-                          icon: PhosphorIconsRegular.lightbulb,
-                          quiet: !asJsonBool(device['present']),
-                          caption: asJsonString(device['room']),
-                          title: asJsonString(device['name']) ?? '',
-                          subtitle: asJsonBool(device['present'])
-                              ? asJsonString(device['reading'])
-                              : 'Not reachable',
-                          trailing: StatusPill(
-                            label: 'Example',
-                            color: JarvisColors.of(context).muted,
+                        const GroupLabel('Devices'),
+                        for (final (i, device) in devices.indexed)
+                          FeatureRow(
+                            key: Key('device-${device['id']}'),
+                            index: i,
+                            icon: PhosphorIconsRegular.lightbulb,
+                            quiet: !asJsonBool(device['present']),
+                            caption: asJsonString(device['room']),
+                            title: asJsonString(device['name']) ?? '',
+                            subtitle: asJsonBool(device['present'])
+                                ? asJsonString(device['reading'])
+                                : 'Not reachable',
+                            trailing: StatusPill(
+                              label: 'Example',
+                              color: JarvisColors.of(context).muted,
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }

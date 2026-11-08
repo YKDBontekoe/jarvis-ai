@@ -264,6 +264,7 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
       body: AbsorbPointer(
         absorbing: _busy,
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
           children: [
             ContentWidth(
@@ -280,9 +281,15 @@ class _AppCatalogScreenState extends State<AppCatalogScreen> {
                       _debounce?.cancel();
                       _runSearch(value);
                     },
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(
+                        PhosphorIconsRegular.magnifyingGlass,
+                      ),
                       hintText: 'Search apps, like Notion or web search',
+                      suffixIcon: SearchClearButton(
+                        controller: _search,
+                        onCleared: () => _onChanged(''),
+                      ),
                     ),
                   ),
                   if (_busy) ...[
@@ -735,9 +742,11 @@ class _AppKeysDialogState extends State<AppKeysDialog> {
     if (!mounted) return;
     if (result.ok || result.errorKind == 'paused') {
       Navigator.of(context).pop(true);
-      messenger?.showSnackBar(
-        SnackBar(content: Text('${widget.appName}: ${result.message}')),
-      );
+      messenger
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('${widget.appName}: ${result.message}')),
+        );
       return;
     }
     setState(() {

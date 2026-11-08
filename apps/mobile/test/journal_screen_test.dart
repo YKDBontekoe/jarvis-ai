@@ -54,7 +54,7 @@ void main() {
     expect(formatJournalDate(DateTime(2026, 9, 29), now: now), 'Yesterday');
     expect(
       formatJournalDate(DateTime(2026, 9, 23), now: now),
-      'Wednesday, 23 September',
+      'Wednesday 23 September',
     );
     expect(
       parseJournalTags('#Work, family,, work , #  '),

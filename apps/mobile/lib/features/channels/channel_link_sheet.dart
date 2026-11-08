@@ -151,7 +151,7 @@ class _ChannelLinkSheetState extends State<ChannelLinkSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final kind = channelKind(widget.kind);
+    final kind = channelKind(widget.kind, JarvisColors.of(context));
     final colors = JarvisColors.of(context);
     return SafeArea(
       child: Padding(

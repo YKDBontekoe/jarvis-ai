@@ -41,7 +41,7 @@ String longDayLabel(DateTime day) {
     'November',
     'December',
   ];
-  return '${weekdays[day.weekday - 1]}, ${months[day.month - 1]} ${day.day}';
+  return '${weekdays[day.weekday - 1]} ${day.day} ${months[day.month - 1]}';
 }
 
 /// Parses "08:00:00" or "08:00" from the API into minutes since midnight.

@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
+import 'package:flutter/cupertino.dart'
+    show CupertinoPageTransitionsBuilder, CupertinoThemeData;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -88,6 +89,10 @@ class JarvisColors extends ThemeExtension<JarvisColors> {
         ],
         stops: const [0, .85],
       );
+
+  /// Text in the relationship lilac: [rose] itself is too light to read on
+  /// a light surface (2:1), so light mode uses a deeper lilac (4.9:1).
+  Color get roseText => isDark ? rose : const Color(0xff6d5bd0);
 
   /// Dims the screen behind sheets and dialogs without going black.
   Color get scrim => (isDark ? const Color(0xff000000) : ink).withValues(
@@ -444,7 +449,9 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
         brightness: brightness,
       ).copyWith(
         primary: colors.accent,
-        onPrimary: Colors.white,
+        // The dark accent is a light lilac: dark text on it reads at 5.8:1
+        // where white only reaches 3.3:1.
+        onPrimary: colors.isDark ? colors.canvas : Colors.white,
         primaryContainer: colors.accentSoft,
         onPrimaryContainer: colors.accentDeep,
         secondary: colors.violet,
@@ -530,6 +537,7 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       style: IconButton.styleFrom(
         iconSize: 20,
         foregroundColor: colors.inkSoft,
+        disabledForegroundColor: colors.muted.withValues(alpha: .5),
         highlightColor: colors.ink.withValues(alpha: .05),
       ),
     ),
@@ -585,8 +593,10 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: colors.ink,
+        disabledForegroundColor: colors.muted,
         textStyle: buttonText,
         shape: buttonShape,
+        minimumSize: const Size(44, 44),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
     ),
@@ -675,15 +685,26 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       linearTrackColor: colors.surfaceRaised,
       circularTrackColor: Colors.transparent,
       borderRadius: const BorderRadius.all(Radius.circular(4)),
+      strokeCap: StrokeCap.round,
+      linearMinHeight: 4,
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.all(colors.surface),
+      // In dark mode an off thumb in the surface colour vanished into the
+      // dark track; it takes the soft ink there instead.
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) || !colors.isDark
+            ? colors.surface
+            : colors.inkSoft,
+      ),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
             ? colors.ink
             : colors.outlineStrong,
       ),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+      overlayColor: WidgetStateProperty.all(
+        colors.accent.withValues(alpha: .08),
+      ),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: colors.surface,
@@ -696,13 +717,19 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       titleTextStyle: JarvisType.display(colors.ink).copyWith(fontSize: 26),
       contentTextStyle: text.bodyMedium?.copyWith(color: colors.inkSoft),
       actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: colors.surface,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
       dragHandleColor: colors.outlineStrong,
+      dragHandleSize: const Size(36, 4),
       modalBarrierColor: colors.scrim,
+      // Sheets stay phone-shaped on tablets and desktop instead of
+      // stretching across the whole window.
+      constraints: const BoxConstraints(maxWidth: 640),
+      clipBehavior: Clip.antiAlias,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(JarvisRadii.xl),
@@ -721,12 +748,16 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
         side: BorderSide(color: colors.outline),
       ),
       textStyle: text.bodyMedium,
+      position: PopupMenuPosition.under,
+      menuPadding: const EdgeInsets.symmetric(vertical: 6),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: colors.ink,
       contentTextStyle: text.bodyMedium?.copyWith(color: colors.onInk),
       actionTextColor: colors.onInk,
+      closeIconColor: colors.onInk.withValues(alpha: .7),
+      insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(JarvisRadii.md),
@@ -744,6 +775,7 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
         fontWeight: FontWeight.w500,
       ),
       waitDuration: const Duration(milliseconds: 400),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -782,6 +814,246 @@ ThemeData buildJarvisTheme({Brightness brightness = Brightness.light}) {
       cursorColor: colors.accent,
       selectionColor: colors.accent.withValues(alpha: .18),
       selectionHandleColor: colors.accent,
+    ),
+    // Rounded checks in the accent, matching the habit and list ticks.
+    checkboxTheme: CheckboxThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      side: WidgetStateBorderSide.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? BorderSide(color: colors.accent, width: 1.5)
+            : BorderSide(color: colors.outlineStrong, width: 1.5),
+      ),
+      fillColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.disabled)
+            ? (states.contains(WidgetState.selected)
+                  ? colors.outlineStrong
+                  : Colors.transparent)
+            : states.contains(WidgetState.selected)
+            ? colors.accent
+            : Colors.transparent,
+      ),
+      checkColor: WidgetStateProperty.all(
+        colors.isDark ? colors.canvas : Colors.white,
+      ),
+      overlayColor: WidgetStateProperty.all(
+        colors.accent.withValues(alpha: .08),
+      ),
+      splashRadius: 20,
+    ),
+    radioTheme: RadioThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? colors.accent
+            : colors.outlineStrong,
+      ),
+      overlayColor: WidgetStateProperty.all(
+        colors.accent.withValues(alpha: .08),
+      ),
+      splashRadius: 20,
+    ),
+    sliderTheme: SliderThemeData(
+      activeTrackColor: colors.accent,
+      inactiveTrackColor: colors.surfaceRaised,
+      thumbColor: colors.accent,
+      overlayColor: colors.accent.withValues(alpha: .12),
+      valueIndicatorColor: colors.ink,
+      valueIndicatorTextStyle: TextStyle(
+        fontFamily: _fontFamily,
+        color: colors.onInk,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+      activeTickMarkColor: colors.onInk.withValues(alpha: .6),
+      inactiveTickMarkColor: colors.outlineStrong,
+      trackHeight: 4,
+      showValueIndicator: ShowValueIndicator.onDrag,
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        backgroundColor: colors.surfaceMuted,
+        foregroundColor: colors.inkSoft,
+        selectedBackgroundColor: colors.ink,
+        selectedForegroundColor: colors.onInk,
+        side: BorderSide(color: colors.outline),
+        textStyle: buttonText,
+        minimumSize: const Size(0, 44),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(JarvisRadii.md),
+        ),
+      ),
+    ),
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: colors.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(JarvisRadii.xl),
+      ),
+      headerForegroundColor: colors.ink,
+      headerHeadlineStyle: JarvisType.display(colors.ink)
+          .copyWith(fontSize: 28),
+      dividerColor: colors.outline,
+      todayForegroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? colors.onInk
+            : colors.accent,
+      ),
+      todayBackgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) ? colors.ink : null,
+      ),
+      todayBorder: BorderSide(color: colors.accent),
+      dayForegroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? colors.onInk
+            : states.contains(WidgetState.disabled)
+            ? colors.muted.withValues(alpha: .5)
+            : colors.ink,
+      ),
+      dayBackgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) ? colors.ink : null,
+      ),
+      yearForegroundColor: WidgetStateProperty.resolveWith(
+        (states) =>
+            states.contains(WidgetState.selected) ? colors.onInk : colors.ink,
+      ),
+      yearBackgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected) ? colors.ink : null,
+      ),
+      rangeSelectionBackgroundColor: colors.accentSoft,
+      cancelButtonStyle: TextButton.styleFrom(
+        foregroundColor: colors.inkSoft,
+        textStyle: buttonText,
+      ),
+      confirmButtonStyle: TextButton.styleFrom(
+        foregroundColor: colors.accent,
+        textStyle: buttonText.copyWith(fontWeight: FontWeight.w600),
+      ),
+    ),
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: colors.surface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(JarvisRadii.xl),
+      ),
+      hourMinuteColor: WidgetStateColor.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? colors.accentSoft
+            : colors.surfaceMuted,
+      ),
+      hourMinuteTextColor: WidgetStateColor.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? colors.accentDeep
+            : colors.ink,
+      ),
+      hourMinuteTextStyle: JarvisType.display(colors.ink).copyWith(
+        fontSize: 48,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+      dayPeriodColor: colors.accentSoft,
+      dayPeriodTextColor: WidgetStateColor.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? colors.accentDeep
+            : colors.inkSoft,
+      ),
+      dayPeriodBorderSide: BorderSide(color: colors.outline),
+      dialBackgroundColor: colors.surfaceMuted,
+      dialHandColor: colors.accent,
+      dialTextColor: WidgetStateColor.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? (colors.isDark ? colors.canvas : Colors.white)
+            : colors.ink,
+      ),
+      entryModeIconColor: colors.inkSoft,
+      helpTextStyle: TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1,
+        color: colors.muted,
+      ),
+      cancelButtonStyle: TextButton.styleFrom(
+        foregroundColor: colors.inkSoft,
+        textStyle: buttonText,
+      ),
+      confirmButtonStyle: TextButton.styleFrom(
+        foregroundColor: colors.accent,
+        textStyle: buttonText.copyWith(fontWeight: FontWeight.w600),
+      ),
+    ),
+    scrollbarTheme: ScrollbarThemeData(
+      thumbColor: WidgetStateProperty.all(
+        colors.ink.withValues(alpha: colors.isDark ? .28 : .22),
+      ),
+      radius: const Radius.circular(4),
+      thickness: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.dragged) ? 6 : 4,
+      ),
+      crossAxisMargin: 2,
+    ),
+    dropdownMenuTheme: DropdownMenuThemeData(
+      textStyle: text.bodyMedium,
+      menuStyle: MenuStyle(
+        backgroundColor: WidgetStateProperty.all(colors.surface),
+        surfaceTintColor: WidgetStateProperty.all(Colors.transparent),
+        shape: WidgetStateProperty.all(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(JarvisRadii.md),
+            side: BorderSide(color: colors.outline),
+          ),
+        ),
+      ),
+    ),
+    menuTheme: MenuThemeData(
+      style: MenuStyle(
+        backgroundColor: WidgetStateProperty.all(colors.surface),
+        surfaceTintColor: WidgetStateProperty.all(Colors.transparent),
+        shape: WidgetStateProperty.all(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(JarvisRadii.md),
+            side: BorderSide(color: colors.outline),
+          ),
+        ),
+      ),
+    ),
+    expansionTileTheme: ExpansionTileThemeData(
+      iconColor: colors.inkSoft,
+      collapsedIconColor: colors.muted,
+      textColor: colors.ink,
+      collapsedTextColor: colors.ink,
+      shape: const Border(),
+      collapsedShape: const Border(),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      expansionAnimationStyle: AnimationStyle(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      ),
+    ),
+    badgeTheme: BadgeThemeData(
+      backgroundColor: colors.danger,
+      textColor: Colors.white,
+      textStyle: const TextStyle(
+        fontFamily: _fontFamily,
+        fontSize: 10.5,
+        fontWeight: FontWeight.w700,
+        fontFeatures: [FontFeature.tabularFigures()],
+      ),
+    ),
+    searchBarTheme: SearchBarThemeData(
+      elevation: WidgetStateProperty.all(0),
+      backgroundColor: WidgetStateProperty.all(colors.surfaceMuted),
+      surfaceTintColor: WidgetStateProperty.all(Colors.transparent),
+      textStyle: WidgetStateProperty.all(text.bodyMedium),
+      hintStyle: WidgetStateProperty.all(
+        text.bodyMedium?.copyWith(color: colors.muted),
+      ),
+    ),
+    cupertinoOverrideTheme: CupertinoThemeData(
+      brightness: brightness,
+      primaryColor: colors.accent,
+      scaffoldBackgroundColor: colors.canvas,
+      barBackgroundColor: colors.surface,
     ),
   );
 }

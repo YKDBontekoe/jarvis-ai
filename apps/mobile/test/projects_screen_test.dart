@@ -87,7 +87,7 @@ void main() {
   test('counts read naturally and leave out empty parts', () {
     expect(projectCountsLabel(_project()), '1 chat · 1 file · 1 task');
     expect(projectCountsLabel(_project(chats: 3, files: 0)), '3 chats · 1 task');
-    expect(projectCountsLabel(_project(chats: 0, files: 0, tasks: 0)), 'Empty');
+    expect(projectCountsLabel(_project(chats: 0, files: 0, tasks: 0)), 'Nothing added yet');
   });
 
   testWidgets('projects list invites a first project, then shows them', (

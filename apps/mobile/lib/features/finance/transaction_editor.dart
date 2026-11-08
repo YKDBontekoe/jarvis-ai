@@ -220,6 +220,7 @@ class _TransactionFormState extends State<_TransactionForm> {
                 optional: false,
               ),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('transaction-note'),
               controller: _note,
               decoration: const InputDecoration(labelText: 'Note'),

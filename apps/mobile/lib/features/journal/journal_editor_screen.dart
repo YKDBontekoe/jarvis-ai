@@ -281,6 +281,7 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
                   minLines: 6,
                   maxLines: 14,
                   maxLength: 6000,
+                  buildCounter: quietCounter,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'How was your day?',
@@ -294,6 +295,7 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
                   minLines: 1,
                   maxLines: 3,
                   maxLength: 1000,
+                  buildCounter: quietCounter,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Highlights',
@@ -307,6 +309,7 @@ class _JournalEditorScreenState extends State<JournalEditorScreen> {
                   minLines: 1,
                   maxLines: 3,
                   maxLength: 1000,
+                  buildCounter: quietCounter,
                   textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     labelText: 'Grateful for',

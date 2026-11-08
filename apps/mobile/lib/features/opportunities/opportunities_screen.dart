@@ -82,22 +82,26 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
       if (mounted) await _load();
     } on DioException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ?? 'That did not work.',
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+            ),
           ),
-        ),
-      );
+        );
     }
   }
 
   Future<void> _open(String destination) async {
     final page = widget.pageFor(destination);
     if (page == null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(content: Text('That page is not available here.')),
-      );
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('That page is not available here.')),
+        );
       return;
     }
     await Navigator.of(context)
@@ -133,63 +137,67 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
           ? const SkeletonList()
           : _error != null
           ? ErrorState(message: _error!, onRetry: _load)
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-              children: [
-                ContentWidth(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (_items.isEmpty)
-                        const EmptyState(
-                          icon: PhosphorIconsRegular.checkCircle,
-                          title: 'Nothing needs you right now',
-                          message: 'When something is worth doing while there is still time, it shows up here with the reason.',
-                        ),
-                      if (_items.isNotEmpty) _lead(_items.first),
-                      if (_items.length > 1)
-                        GroupLabel(
-                          'Also worth a look',
-                          count: _items.length - 1,
-                        ),
-                      for (var i = 1; i < _items.length; i++)
-                        _card(_items[i], i),
-                      if (_muted.isNotEmpty) ...[
-                        const GroupLabel('Quieted'),
-                        for (final kind in _muted)
-                          FeatureRow(
-                            key: Key('opportunity-muted-$kind'),
-                            icon: PhosphorIconsRegular.bellSlash,
-                            quiet: true,
-                            title: 'Fewer ${_kindLabels[kind] ?? kind} for now',
-                            trailing: PillAction(
-                              key: Key('opportunity-unmute-$kind'),
-                              label: 'Bring back',
-                              onPressed: () => unawaited(_unmute(kind)),
+          : OrbRefresh(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                children: [
+                  ContentWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_items.isEmpty)
+                          const EmptyState(
+                            icon: PhosphorIconsRegular.checkCircle,
+                            title: 'Nothing needs you right now',
+                            message: 'When something is worth doing while there is still time, it shows up here with the reason.',
+                          ),
+                        if (_items.isNotEmpty) _lead(_items.first),
+                        if (_items.length > 1)
+                          GroupLabel(
+                            'Also worth a look',
+                            count: _items.length - 1,
+                          ),
+                        for (var i = 1; i < _items.length; i++)
+                          _card(_items[i], i),
+                        if (_muted.isNotEmpty) ...[
+                          const GroupLabel('Quieted'),
+                          for (final kind in _muted)
+                            FeatureRow(
+                              key: Key('opportunity-muted-$kind'),
+                              icon: PhosphorIconsRegular.bellSlash,
+                              quiet: true,
+                              title:
+                                  'Fewer ${_kindLabels[kind] ?? kind} for now',
+                              trailing: PillAction(
+                                key: Key('opportunity-unmute-$kind'),
+                                label: 'Bring back',
+                                onPressed: () => unawaited(_unmute(kind)),
+                              ),
                             ),
+                        ],
+                        if (_items.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          OutcomeFeedbackRow(
+                            http: widget.http,
+                            artifactKind: 'opportunity',
                           ),
+                        ],
+                        if (_history.isNotEmpty) ...[
+                          const GroupLabel('You found these useful'),
+                          for (final (i, entry) in _history.take(5).indexed)
+                            FeatureRow(
+                              key: Key('opportunity-history-$i'),
+                              icon: PhosphorIconsRegular.thumbsUp,
+                              quiet: true,
+                              title: asJsonString(entry['title']) ?? '',
+                            ),
+                        ],
                       ],
-                      if (_items.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        OutcomeFeedbackRow(
-                          http: widget.http,
-                          artifactKind: 'opportunity',
-                        ),
-                      ],
-                      if (_history.isNotEmpty) ...[
-                        const GroupLabel('You found these useful'),
-                        for (final (i, entry) in _history.take(5).indexed)
-                          FeatureRow(
-                            key: Key('opportunity-history-$i'),
-                            icon: PhosphorIconsRegular.thumbsUp,
-                            quiet: true,
-                            title: asJsonString(entry['title']) ?? '',
-                          ),
-                      ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }

@@ -151,9 +151,11 @@ class _WorkingStylesScreenState extends State<WorkingStylesScreen> {
                       ),
                       const SizedBox(height: 16),
                       TextField(
+                        textCapitalization: TextCapitalization.sentences,
                         key: const Key('styles-task'),
                         controller: _task,
                         maxLength: 500,
+                        buildCounter: quietCounter,
                         decoration: const InputDecoration(
                           labelText: 'What are you about to do?',
                           hintText: 'Rewrite an email, plan my week, study for an exam',

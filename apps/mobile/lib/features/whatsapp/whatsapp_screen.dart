@@ -173,7 +173,7 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('WhatsApp')),
+      appBar: AppBar(title: const PageTitle('WhatsApp')),
       body: ListScreenBody(
         loading: _loading,
         error: _error,

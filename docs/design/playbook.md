@@ -31,7 +31,8 @@ All colours come from `JarvisColors.of(context)` (`apps/mobile/lib/theme.dart`).
 | `accent` | `#5b4ef0` | `#8f86ff` | Links, counts, selection, Jarvis |
 | `accentDeep` | `#4338ca` | `#c4c0ff` | Text on `accentSoft` |
 | `accentSoft` | `#eeedfe` | `#221f45` | Selected rows, quick-reply chips |
-| `rose` | `#b8a9f5` | `#c9bdfb` | Relationship tags (a lilac, despite the name) |
+| `rose` | `#b8a9f5` | `#c9bdfb` | Relationship tag fills and icons (a lilac, despite the name) |
+| `roseText` | `#6d5bd0` | `#c9bdfb` | Relationship tag text; `rose` is too light to read as text on light surfaces |
 | `warning` / `warningSoft` | `#b45309` / `#fcf3e6` | `#fbbf24` / `#3a2a12` | Overdue, due now, battery |
 | `danger` / `dangerSoft` | `#dc2626` / `#fcebeb` | `#f87171` / `#3a1c1c` | Destructive, errors |
 | `info` / `infoSoft` | `#2563eb` / `#e7eefd` | `#7aa2ff` / `#1a2347` | Tasks, neutral info |
@@ -41,6 +42,8 @@ All colours come from `JarvisColors.of(context)` (`apps/mobile/lib/theme.dart`).
 **Radii.** `JarvisRadii` gives sm 8, md 14, lg 20 and xl 26. `tileRadius` (`features/tiles/tile_card.dart`) is 24 for Home cards. Chat rows and chips use 18 and 999 (a pill). Hero cards use 28.
 
 **Shadows.** `JarvisShadows.soft(brightness)` for cards on canvas. Avoid borders and shadows on the same element.
+
+**Material controls.** Checkboxes, radios, sliders, switches, segmented buttons, date and time pickers, menus, dropdowns, scrollbars, badges, expansion tiles and snackbars are themed once in `buildJarvisTheme`; use them as they are rather than restyling per screen. `IconButton.filled` takes its on-colour from the icon-button theme, so give a filled icon button an explicit ink/onInk style. Status colours come from `statusStyle(status, JarvisColors.of(context))` so they follow dark mode.
 
 ## 3. Type
 
@@ -58,6 +61,8 @@ Geist for everything (`JarvisType`, `theme.dart`).
 | Big numerals | `JarvisType.clock`, or 30–34 w700 with `FontFeature.tabularFigures()` |
 
 - Times and counts always use tabular figures.
+- **Times are on the 24-hour clock everywhere** ("18:05"). Format through `clockOf(context, dt)` / `timeOfDayLabel(context, t)` in `schedule_format.dart`, never by hand or with `TimeOfDay.format`; time pickers pass `builder: use24HourClock`. `friendlyWhen` gives "Today 18:00" and takes `inSentence: true` after other words ("next tomorrow 09:00"). Pickable dates read `friendlyDate` ("Tomorrow · Mon, Nov 9").
+- Long day headings are day-first: "Sunday 8 November" (Home, Today, Journal), short ones "Wed 5 Nov".
 - Give every `TextButton` / `FilledButton` `textStyle` an explicit `fontFamily: 'Geist'`. Without it, screenshots render black boxes.
 - Long titles wrap at word boundaries. If one word cannot fit, shrink with `FittedBox(fit: BoxFit.scaleDown)` rather than break it.
 
@@ -96,7 +101,7 @@ Rules:
 - Loops (typing dots, the breathing orb) run only while Jarvis is actually busy.
 - `JarvisMotion.of(context, d)` returns zero when the system asks for reduced motion. Every custom animation checks `JarvisMotion.reduced(context)` and becomes instant or a 150 ms fade.
 - A resolved row slides out (`exit`, 150) before its space closes (`MotionSize`, 220).
-- Light haptics on actions (`HapticFeedback.lightImpact` / `selectionClick`), medium on long-press.
+- Light haptics on actions (`HapticFeedback.lightImpact` / `selectionClick`), medium on long-press. Completing something (done, talked, decided) is `lightImpact`; toggles, pins and pickers are `selectionClick`.
 - In tests, use reduced motion or `settle()` loops; never `pumpAndSettle` on screens with live loops.
 
 ## 6. Components
@@ -122,6 +127,9 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 | `HeroCard`, `FeatureRow`, `PillAction`, `GroupLabel`, `SoftButton`, `InkButton` | `ui/feature_kit.dart` | The vocabulary for feature screens. One `HeroCard` (ink card, caps label, headline, optional segmented progress, footer) leads the screen; everything under it is `FeatureRow`s (icon badge, caps caption, title, detail, trailing, pill actions; entrance stagger; stacks under the text at large sizes) grouped by a `GroupLabel` (caps, optional count). Actions are `PillAction` (ink when primary, tonal otherwise, `compact` for several per row, `onDark` on a hero). Never bare `TextButton`s in cards. |
 | `PersonPanel` | `features/whatsapp/person_panel.dart` | About a person, beside a chat on wide screens |
 | `SourceRow`, `SourcesPanel` | `ui/source_row.dart`, `features/entities/sources_panel.dart` | One row for supporting evidence: source name, kind, date and Open; a deleted source reads "Source no longer available" with no link. Used by memories, decisions and generated documents |
+| `quietCounter` | `ui/jarvis_ui.dart` | Every `maxLength` field's `buildCounter`: no counter until the last fifth of the limit, warning colour at the limit |
+| `SearchClearButton` | `ui/jarvis_ui.dart` | The × in a search field's `suffixIcon`; shows only with text and resets the results |
+| `PhotoViewerPage` | `features/chat/chat_photos.dart` | Full-screen photo: pinch or double-tap to zoom, double-tap again to fit |
 | `UnsavedChangesGuard`, `SubmitState` | `ui/unsaved_changes_guard.dart`, `ui/submit_state.dart` | Editors ask Keep editing / Discard only when values changed, and run their save inside the editor so a failure keeps the input and shows beside it |
 | `UiSurfaceCard`, `DockedSurfaceBar` | `features/chat/generative_ui.dart` | Cards Jarvis renders with RenderUi. An open question docks in the composer's place (`pinned`); `DockedSurfaceBar` keeps it in view while the owner types instead |
 | `SurfaceBlocks`, `SurfaceTag`, `SurfaceChoiceChip` | `features/chat/generative_ui_blocks.dart` | Custom cards Jarvis composes from blocks (stats, progress, bars, steps, pairs, chips, callout, heading, text, divider, columns); item tags; chip answers for short choice fields |
@@ -166,12 +174,26 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
   - tapping the tab you are on scrolls it to the top; every tab reopens where it was left, with its Chats filter and searches (`TabMemory`);
   - Chats shows the unread dot. Hold-the-orb-to-talk and the Home amber dot are still to do.
 
+## 7b. Forms and lists
+
+- Prose fields set `textCapitalization: sentences` (names: `words`); search fields set `textInputAction: search` and a `SearchClearButton`; scroll views under a search field use `keyboardDismissBehavior: onDrag`.
+- Quick-entry fields (list items) keep the keyboard up after each add (`onEditingComplete: () {}` and refocus).
+- Removing something with a swipe offers Undo in the snackbar. Snackbars replace the current one (`..hideCurrentSnackBar()..showSnackBar(...)`) rather than queueing.
+- List screens refresh with `OrbRefresh`; keep the content on screen while the reload runs.
+- Copying to the clipboard always confirms: a snackbar ("Draft copied"), or for something shown once, the Copy button turns into "Copied" with a check.
+- Overflow menus (`PopupMenuButton`) use the Phosphor `dotsThree` icon and a tooltip naming what they act on ("Goal actions"), never the default "Show menu".
+- App bar titles are always `PageTitle`, so a long name shrinks rather than being cut.
+- `showJarvisConfirm` gives a medium haptic on a destructive confirm and a light one otherwise.
+- Counts use the singular for one ("1 file", "1 step done"); hide a chip whose count is zero.
+- Two-series charts never tell series apart by hue alone: the second series is a neutral tone, and success is the accent, so never pair `success` with `accent`.
+
 ## 8. Copy
 
 - Write from the owner's side: "Rosa is waiting · 14 h", not "unanswered inbound".
 - Buttons say what happens: Reply, Set it up, Done, +10 min, Not now. Toasts confirm it: "Saved as a draft routine. Turn it on in Routines."
 - Reason lines are plain facts: "From your calendar", "Seen 4 of your last 5 Fridays".
-- No apologies and no exclamation marks in UI text. Errors say what failed and what to do: "Could not save the brief time".
+- No apologies and no exclamation marks in UI text. Use typographic quotes (“ ”) in UI strings.
+- Never show raw exception text; say what failed and what to do. `ErrorState` already says "Jarvis couldn’t load this", so its message reads "Could not load your files." (`errorDetail` strips a repeated "Jarvis could not"). Errors say what failed and what to do: "Could not save the brief time".
 - Short hints that fit beside buttons: "You reply in ~18 min".
 
 ## 9. Accessibility

@@ -132,7 +132,8 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _condition(Map<String, dynamic> watch) {
@@ -195,7 +196,7 @@ class _ConditionWatchesScreenState extends State<ConditionWatchesScreen> {
     final status = asJsonString(watch['status']) ?? '';
     final active = status == 'active';
     final lastValue = watch['lastValue'];
-    final style = statusStyle(status);
+    final style = statusStyle(status, JarvisColors.of(context));
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 14, 6, 14),

@@ -72,7 +72,7 @@ void main() {
     expect(body['dreamingEnabled'], true);
     expect(body['quietHoursStart'], 22);
     expect(
-      find.textContaining('Reflects and checks in every 1 h'),
+      find.textContaining('Reflects and checks in every hour'),
       findsOneWidget,
     );
   });

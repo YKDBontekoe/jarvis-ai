@@ -359,7 +359,7 @@ class _HabitSettingsSheetState extends State<_HabitSettingsSheet> {
           const SizedBox(height: 6),
           Text(
             'Jarvis asks how your habits went when some are still open. '
-            'Reply in chat ("I went for a run") or tap to check them off.',
+            'Reply in chat (“I went for a run”) or tap to check them off.',
             style: TextStyle(color: colors.muted, height: 1.4),
           ),
           const SizedBox(height: 12),

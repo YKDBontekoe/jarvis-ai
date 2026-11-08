@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../ui/phosphor_icons.dart';
 
@@ -241,6 +242,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Future<void> _togglePinned(Map<String, dynamic> memory) async {
+    HapticFeedback.selectionClick();
     final id = jsonId(memory);
     if (id == null) return;
     final pinned = !asJsonBool(memory['isPinned']);
@@ -266,7 +268,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -335,13 +338,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
                   ),
                 ),
                 prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-                suffixIcon: IconButton(
-                  tooltip: 'Clear search',
-                  onPressed: () {
-                    _query.clear();
-                    _load();
-                  },
-                  icon: const Icon(PhosphorIconsRegular.x, size: 20),
+                suffixIcon: SearchClearButton(
+                  controller: _query,
+                  onCleared: () => _load(),
                 ),
               ),
             ),
@@ -402,6 +401,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
                       : 'No memories yet. Add one to get started.',
                 )
               : ListView.builder(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: EdgeInsets.fromLTRB(
                     16,
                     10,

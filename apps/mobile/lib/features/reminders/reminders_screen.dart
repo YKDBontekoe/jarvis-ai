@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../ui/phosphor_icons.dart';
@@ -294,7 +295,8 @@ abstract class _RemindersController extends State<RemindersScreen>
           'title': created.title,
           'dueAt': localDueAt.toUtc().toIso8601String(),
           if (created.recurrence != 'once') 'recurrence': created.recurrence,
-          if (created.recurrence == 'weekly' || created.recurrence == 'biweekly')
+          if (created.recurrence == 'weekly' ||
+              created.recurrence == 'biweekly')
             'weekdays': created.weekdays,
           'timeZoneId': timeZoneId,
           'localTime': localTime,
@@ -401,6 +403,7 @@ abstract class _RemindersController extends State<RemindersScreen>
   }
 
   Future<void> _snooze(String? id, Duration by, {DateTime? until}) async {
+    HapticFeedback.selectionClick();
     if (id == null) return;
     try {
       final response = await widget.http.post<dynamic>(
@@ -433,6 +436,7 @@ abstract class _RemindersController extends State<RemindersScreen>
   }
 
   Future<void> _markDone(Map<String, dynamic> reminder) async {
+    HapticFeedback.lightImpact();
     final id = jsonId(reminder);
     if (id == null) return;
     try {
@@ -529,6 +533,7 @@ abstract class _RemindersController extends State<RemindersScreen>
   }
 
   Future<void> _decideApproval(String approvalId, bool approved) async {
+    HapticFeedback.lightImpact();
     setState(() => _decidingApprovals.add(approvalId));
     try {
       // Resuming the paused agent run can take a while, so wait for it.
@@ -626,6 +631,7 @@ abstract class _RemindersController extends State<RemindersScreen>
   );
 
   Future<void> _markAllRead() async {
+    HapticFeedback.selectionClick();
     final unread = _notifications.where((item) => item['readAt'] == null);
     final ids = [for (final item in unread) ?jsonId(item)];
     if (ids.isEmpty) return;
@@ -775,7 +781,8 @@ abstract class _RemindersController extends State<RemindersScreen>
 
   void _showError(String message) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showMessage(String message) => _showError(message);

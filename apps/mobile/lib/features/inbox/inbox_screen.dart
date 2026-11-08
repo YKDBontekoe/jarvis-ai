@@ -94,13 +94,15 @@ class _InboxScreenState extends State<InboxScreen> {
       return true;
     } on DioException catch (error) {
       if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ?? 'That did not work.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ?? 'That did not work.',
+            ),
           ),
-        ),
-      );
+        );
       return false;
     } finally {
       if (mounted) setState(() => _busy.remove(id));
@@ -141,6 +143,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
   /// Puts the promise on today's plan; it stays open until the owner finishes it.
   Future<void> _planToday(CommitmentData item) async {
+    HapticFeedback.lightImpact();
     final zone = await deviceTimeZoneLookup();
     final added = await _run(
       item.id,
@@ -151,21 +154,26 @@ class _InboxScreenState extends State<InboxScreen> {
       ),
     );
     if (!added || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Added to today. Plan your day to place it.'),
-      ),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Added to today. Plan your day to place it.'),
+        ),
+      );
   }
 
   Future<void> _copyDraft(Map<String, dynamic> nudge) async {
+    HapticFeedback.selectionClick();
     await Clipboard.setData(
       ClipboardData(text: asJsonString(nudge['draft']) ?? ''),
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Draft copied. Nothing was sent.')),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('Draft copied. Nothing was sent.')),
+      );
   }
 
   Future<void> _quietNudge(
@@ -343,11 +351,18 @@ class _InboxScreenState extends State<InboxScreen> {
                   IconButton(
                     tooltip: 'Copy draft',
                     icon: const Icon(PhosphorIconsRegular.copy, size: 18),
-                    onPressed: () => unawaited(
-                      Clipboard.setData(
+                    onPressed: () => unawaited(() async {
+                      await Clipboard.setData(
                         ClipboardData(text: thread.suggestedReply!),
-                      ),
-                    ),
+                      );
+                      HapticFeedback.selectionClick();
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(
+                          const SnackBar(content: Text('Draft copied')),
+                        );
+                    }()),
                   ),
                 ],
               ),
@@ -587,11 +602,13 @@ class _CommitmentDialogState extends State<_CommitmentDialog> {
         ),
         const SizedBox(height: 12),
         TextField(
+          textCapitalization: TextCapitalization.words,
           key: const Key('commitment-who'),
           controller: _who,
           decoration: const InputDecoration(labelText: 'Who'),
         ),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('commitment-what'),
           controller: _what,
           decoration: const InputDecoration(labelText: 'What was promised'),

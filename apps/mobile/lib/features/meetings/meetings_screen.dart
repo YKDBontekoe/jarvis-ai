@@ -346,13 +346,16 @@ class _NewMeetingSheetState extends State<_NewMeetingSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('meeting-title-field'),
             controller: _title,
             maxLength: 120,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(labelText: 'Meeting'),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('meeting-people-field'),
             controller: _people,
             decoration: const InputDecoration(
@@ -361,9 +364,11 @@ class _NewMeetingSheetState extends State<_NewMeetingSheet> {
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('meeting-purpose-field'),
             controller: _purpose,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'What is it for?'),
           ),
           Wrap(

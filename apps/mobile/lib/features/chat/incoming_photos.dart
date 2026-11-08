@@ -78,7 +78,9 @@ IncomingPhotoResult prepareIncomingPhotos({
 
   String? notice;
   if (truncated) {
-    notice = 'Only the first $remainingSlots photos were added.';
+    notice = remainingSlots == 1
+        ? 'Only the first photo was added.'
+        : 'Only the first $remainingSlots photos were added.';
   } else if (skippedLarge) {
     notice = 'A photo is larger than 8 MB and was skipped.';
   } else if (skippedType) {

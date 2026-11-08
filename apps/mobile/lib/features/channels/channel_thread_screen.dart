@@ -59,7 +59,7 @@ class _ChannelThreadScreenState extends State<ChannelThreadScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(widget.peer)),
+    appBar: AppBar(title: PageTitle(widget.peer)),
     body: ListScreenBody(
       loading: _loading,
       error: _error,

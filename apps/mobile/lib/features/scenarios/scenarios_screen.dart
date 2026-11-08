@@ -169,24 +169,28 @@ class _ScenariosScreenState extends State<ScenariosScreen> {
         },
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _asDecision
-                ? 'Saved to your Library and logged as a decision.'
-                : 'Saved to your Library. Nothing else was changed.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              _asDecision
+                  ? 'Saved to your Library and logged as a decision.'
+                  : 'Saved to your Library. Nothing else was changed.',
+            ),
           ),
-        ),
-      );
+        );
     } on DioException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            firstProblemMessage(error.response?.data) ?? 'Could not save it.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              firstProblemMessage(error.response?.data) ?? 'Could not save it.',
+            ),
           ),
-        ),
-      );
+        );
     } finally {
       if (mounted) setState(() => _saving = false);
     }

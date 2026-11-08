@@ -135,7 +135,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
       title: asJsonString(goal['title']) ?? 'Goal',
       subtitle: [
         if (goal['feeling'] != null) goalFeelingLabels[goal['feeling']] ?? '',
-        if (open > 0) '$open steps this week',
+        if (open > 0) open == 1 ? '1 step this week' : '$open steps this week',
         if (review != null) asJsonString(review['reason']) ?? '',
       ].where((x) => x.isNotEmpty).join('\n'),
       trailing: due
@@ -246,9 +246,11 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
           Text('New goal', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('goal-title-field'),
             controller: _title,
             maxLength: 200,
+            buildCounter: quietCounter,
             onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'What do you want?',
@@ -256,9 +258,11 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
             ),
           ),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('goal-why-field'),
             controller: _why,
             maxLength: 300,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(labelText: 'Why does it matter?'),
           ),
           TextField(

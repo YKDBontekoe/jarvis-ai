@@ -296,9 +296,11 @@ class _FocusSheetState extends State<_FocusSheet> {
             ),
             const SizedBox(height: 14),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('project-outcome-field'),
               controller: _outcome,
               maxLength: 300,
+              buildCounter: quietCounter,
               maxLines: 3,
               minLines: 2,
               decoration: const InputDecoration(
@@ -322,9 +324,11 @@ class _FocusSheetState extends State<_FocusSheet> {
             ),
             const SizedBox(height: 18),
             TextField(
+              textCapitalization: TextCapitalization.sentences,
               key: const Key('project-next-note-field'),
               controller: _note,
               maxLength: 200,
+              buildCounter: quietCounter,
               decoration: const InputDecoration(
                 labelText: 'Next step',
                 hintText: 'The one thing to do next',

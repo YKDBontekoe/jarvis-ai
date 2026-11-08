@@ -51,6 +51,7 @@ void main() {
         foldedStepsSummary([done('A'), done('B'), done('C')]),
         '3 steps done',
       );
+      expect(foldedStepsSummary([done('A')]), '1 step done');
       expect(
         foldedStepsSummary([
           done('A', refs: ['reminder:1']),

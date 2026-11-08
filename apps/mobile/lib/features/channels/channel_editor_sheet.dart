@@ -96,7 +96,7 @@ class _ChannelEditorSheetState extends State<ChannelEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final kind = channelKind(widget.kind);
+    final kind = channelKind(widget.kind, JarvisColors.of(context));
     final inset = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + inset),

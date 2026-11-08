@@ -83,7 +83,9 @@ class _PersonPanelState extends State<PersonPanel> {
       else if (person.baselinePerWeek case final rate? when rate > 0)
         (
           PhosphorIconsRegular.chatCircle,
-          'About ${rate.round()} messages a week',
+          rate.round() <= 1
+              ? 'About one message a week'
+              : 'About ${rate.round()} messages a week',
         ),
     ];
     return Container(
@@ -110,7 +112,7 @@ class _PersonPanelState extends State<PersonPanel> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: colors.rose,
+                color: colors.roseText,
               ),
             ),
           ],

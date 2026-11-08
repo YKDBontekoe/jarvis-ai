@@ -248,6 +248,8 @@ class _GraphEntityScreenState extends State<GraphEntityScreen> {
         actions: [
           if (details != null)
             PopupMenuButton<String>(
+              icon: const Icon(PhosphorIconsRegular.dotsThree, size: 20),
+              tooltip: 'Entity actions',
               onSelected: (value) {
                 switch (value) {
                   case 'edit':
@@ -435,6 +437,7 @@ class _EntityEditDialogState extends State<_EntityEditDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
+            textCapitalization: TextCapitalization.words,
             controller: _name,
             decoration: const InputDecoration(labelText: 'Name'),
           ),
@@ -451,6 +454,7 @@ class _EntityEditDialogState extends State<_EntityEditDialog> {
           ),
           const SizedBox(height: 8),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             controller: _summary,
             maxLines: 3,
             decoration: const InputDecoration(labelText: 'Summary'),
@@ -526,6 +530,7 @@ class _AddFactDialogState extends State<_AddFactDialog> {
           ),
           const SizedBox(height: 8),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             controller: _object,
             decoration: const InputDecoration(
               labelText: 'Object or value',

@@ -227,7 +227,9 @@ class _PersonaScreenState extends State<PersonaScreen> {
                       SectionHeader(
                         'What Jarvis has learned',
                         trailing: Text(
-                          '${_traits.length} rules',
+                          _traits.length == 1
+                              ? '1 rule'
+                              : '${_traits.length} rules',
                           style: TextStyle(
                             color: JarvisColors.of(context).muted,
                           ),
@@ -304,6 +306,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
           children: [
             Expanded(
               child: TextField(
+                textCapitalization: TextCapitalization.words,
                 key: const Key('persona-name'),
                 controller: _name,
                 decoration: const InputDecoration(labelText: 'Call me'),
@@ -312,6 +315,7 @@ class _PersonaScreenState extends State<PersonaScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: TextField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('persona-language'),
                 controller: _language,
                 decoration: const InputDecoration(
@@ -324,11 +328,13 @@ class _PersonaScreenState extends State<PersonaScreen> {
         ),
         const SizedBox(height: 12),
         TextField(
+          textCapitalization: TextCapitalization.sentences,
           key: const Key('persona-instructions'),
           controller: _instructions,
           minLines: 3,
           maxLines: 8,
           maxLength: 4000,
+          buildCounter: quietCounter,
           decoration: const InputDecoration(
             labelText: 'Your instructions for Jarvis',
             hintText: 'Anything Jarvis should always keep in mind — your role, priorities, pet peeves…',

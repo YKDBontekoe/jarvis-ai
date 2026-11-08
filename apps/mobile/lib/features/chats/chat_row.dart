@@ -166,7 +166,7 @@ class ChatRow extends StatelessWidget {
                                         background: colors.rose.withValues(
                                           alpha: colors.isDark ? .18 : .1,
                                         ),
-                                        foreground: colors.rose,
+                                        foreground: colors.roseText,
                                       ),
                                     ),
                                   ],

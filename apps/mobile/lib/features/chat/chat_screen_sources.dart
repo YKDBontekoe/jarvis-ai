@@ -143,9 +143,11 @@ mixin _ChatScreenSources on _ChatScreenController {
   Future<void> _openCitation(MessageCitation citation) async {
     if (citation.sourceStatus == 'deleted') {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This source file was deleted.')),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('This source file was deleted.')),
+        );
       return;
     }
     try {
@@ -157,7 +159,8 @@ mixin _ChatScreenSources on _ChatScreenController {
       final status = data['sourceStatus'] ?? data['SourceStatus'];
       if (status is String && status != 'available') {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Source is $status.')));
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text('Source is $status.')));
         return;
       }
       await file_download.downloadAndOpen(
@@ -168,12 +171,15 @@ mixin _ChatScreenSources on _ChatScreenController {
     } on DioException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(describeApiError(error))));
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(describeApiError(error))));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open this citation.')),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Could not open this citation.')),
+        );
     }
   }
 }

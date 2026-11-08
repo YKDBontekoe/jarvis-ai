@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../schedule_format.dart';
+
 import '../../ui/phosphor_icons.dart';
 
 import '../../theme.dart';
@@ -139,7 +141,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Morning briefing')),
+      appBar: AppBar(title: const PageTitle('Morning briefing')),
       body: _loading
           ? const SkeletonList(shape: SkeletonShape.detail)
           : !_loaded
@@ -176,7 +178,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                             ),
                             const SizedBox(height: 18),
                             Text(
-                              _time.format(context),
+                              timeOfDayLabel(context, _time),
                               style: theme.textTheme.displaySmall,
                             ),
                             const SizedBox(height: 6),
@@ -213,7 +215,7 @@ class _DailyBriefingScreenState extends State<DailyBriefingScreen> {
                             const Divider(indent: 16, endIndent: 16),
                             ListTile(
                               title: const Text('Delivery time'),
-                              subtitle: Text(_time.format(context)),
+                              subtitle: Text(timeOfDayLabel(context, _time)),
                               trailing: const Icon(PhosphorIconsRegular.clock),
                               onTap: _chooseTime,
                             ),

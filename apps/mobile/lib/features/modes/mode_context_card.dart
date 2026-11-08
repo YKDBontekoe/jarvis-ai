@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../../ui/jarvis_ui.dart';
+
 import '../../json_maps.dart';
 import '../../theme.dart';
 import '../../ui/feature_kit.dart';
@@ -223,9 +225,11 @@ class _FocusSheetState extends State<_FocusSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('focus-intention'),
             controller: _intention,
             maxLength: 200,
+            buildCounter: quietCounter,
             decoration: const InputDecoration(
               labelText: 'What will you work on?',
               hintText: 'Finish the report outline',
@@ -302,9 +306,11 @@ class _ReflectionSheetState extends State<_ReflectionSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('focus-note'),
             controller: _note,
             maxLength: 500,
+            buildCounter: quietCounter,
             maxLines: 3,
             decoration: const InputDecoration(
               hintText: 'What got done, what got in the way',

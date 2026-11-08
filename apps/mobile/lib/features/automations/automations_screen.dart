@@ -481,7 +481,7 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       upcoming = 'Switch it on to let it run.';
     } else if (next != null && next.isAfter(DateTime.now())) {
       upcoming =
-          'Next run ${friendlyWhen(context, next)} · ${relativeFromNow(next)}';
+          'Next run ${friendlyWhen(context, next, inSentence: true)} · ${relativeFromNow(next)}';
     } else if (kind == 'schedule') {
       upcoming = 'Scheduling the next run…';
     } else if (kind == 'manual') {
@@ -688,7 +688,9 @@ Color runStatusColor(BuildContext context, String? status) {
 /// not met", "Waiting for your approval since …".
 String describeLastRun(BuildContext context, Map<String, dynamic> run) {
   final started = jsonDate(run['startedAt'], local: true);
-  final when = started == null ? '' : ' ${friendlyWhen(context, started)}';
+  final when = started == null
+      ? ''
+      : ' ${friendlyWhen(context, started, inSentence: true)}';
   final test = run['testRun'] == true ? 'Test run' : 'Last run';
   final summary = asJsonString(run['failureSummary']);
   return switch (asJsonString(run['status'])) {
@@ -876,9 +878,11 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
   void _save() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_weekdays == 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Choose at least one day.')));
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Choose at least one day.')),
+        );
       return;
     }
     final name = _name.text.trim();
@@ -910,10 +914,12 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextFormField(
+                textCapitalization: TextCapitalization.words,
                 key: const Key('automation-name'),
                 controller: _name,
                 autofocus: true,
                 maxLength: 120,
+                buildCounter: quietCounter,
                 decoration: const InputDecoration(labelText: 'Name'),
                 validator: (value) => value == null || value.trim().isEmpty
                     ? 'Give it a name.'
@@ -950,10 +956,11 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
                 ),
                 leading: const Icon(PhosphorIconsRegular.clock),
                 trailing: const Icon(PhosphorIconsRegular.caretDown),
-                title: Text(_time.format(context)),
+                title: Text(timeOfDayLabel(context, _time)),
                 onTap: () async {
                   final value = await showTimePicker(
                     context: context,
+                    builder: use24HourClock,
                     initialTime: _time,
                   );
                   if (value != null && mounted) setState(() => _time = value);
@@ -972,18 +979,22 @@ class _NewAutomationDialogState extends State<_NewAutomationDialog> {
                 style: text.labelMedium?.copyWith(color: colors.muted),
               ),
               TextFormField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('automation-title'),
                 controller: _title,
                 maxLength: 120,
+                buildCounter: quietCounter,
                 decoration: const InputDecoration(
                   labelText: 'Title',
                   hintText: 'Defaults to the name',
                 ),
               ),
               TextFormField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('automation-body'),
                 controller: _body,
                 maxLength: 500,
+                buildCounter: quietCounter,
                 minLines: 1,
                 maxLines: 3,
                 decoration: const InputDecoration(labelText: 'Message'),

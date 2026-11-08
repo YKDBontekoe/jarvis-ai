@@ -27,7 +27,7 @@ const List<(String, List<SettingsDestination>)> settingsGroups = [
       (
         title: 'Widgets',
         subtitle: 'What the home screen widgets show',
-        icon: PhosphorIconsRegular.eyeSlash,
+        icon: PhosphorIconsRegular.squaresFour,
         destination: 'widget-privacy',
       ),
       (
@@ -413,6 +413,7 @@ class _SettingsViewState extends State<SettingsView> {
     final colors = JarvisColors.of(context);
     return SafeArea(
       child: ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         controller: _list,
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
@@ -488,18 +489,12 @@ class _SettingsViewState extends State<SettingsView> {
             size: 18,
             color: colors.muted,
           ),
-          suffixIcon: _query.text.isEmpty
-              ? null
-              : IconButton(
-                  key: const Key('settings-clear-search'),
-                  tooltip: 'Clear settings search',
-                  onPressed: () => setState(_query.clear),
-                  icon: Icon(
-                    PhosphorIconsRegular.x,
-                    size: 16,
-                    color: colors.inkSoft,
-                  ),
-                ),
+          suffixIcon: SearchClearButton(
+            controller: _query,
+            buttonKey: const Key('settings-clear-search'),
+            tooltip: 'Clear settings search',
+            onCleared: () => setState(() {}),
+          ),
         ),
       ),
     ),

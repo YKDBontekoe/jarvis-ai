@@ -182,7 +182,8 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
   void _toast(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

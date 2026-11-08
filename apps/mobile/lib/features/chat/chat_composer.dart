@@ -560,6 +560,12 @@ class _ExpandedComposer extends StatelessWidget {
             IconButton.filled(
               key: const Key('composer-expanded-send'),
               tooltip: 'Send',
+              style: IconButton.styleFrom(
+                backgroundColor: JarvisColors.of(context).ink,
+                foregroundColor: JarvisColors.of(context).onInk,
+                disabledBackgroundColor: JarvisColors.of(context).surfaceMuted,
+                disabledForegroundColor: JarvisColors.of(context).muted,
+              ),
               onPressed: canSend()
                   ? () => Navigator.of(context).pop(true)
                   : null,

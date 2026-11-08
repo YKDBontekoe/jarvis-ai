@@ -1346,6 +1346,7 @@ class _DraftSheetState extends State<_DraftSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
+            textCapitalization: TextCapitalization.sentences,
             key: const Key('whatsapp-draft-instruction'),
             controller: _instruction,
             minLines: 1,
@@ -1491,6 +1492,7 @@ class _AskSheetState extends State<_AskSheet> {
               ),
               const SizedBox(height: 12),
               TextField(
+                textCapitalization: TextCapitalization.sentences,
                 key: const Key('whatsapp-ask-question'),
                 controller: _question,
                 minLines: 1,
@@ -1499,7 +1501,7 @@ class _AskSheetState extends State<_AskSheet> {
                 enabled: !_busy,
                 textInputAction: TextInputAction.send,
                 decoration: InputDecoration(
-                  hintText: 'Ask anything, for example "when is the party?"',
+                  hintText: 'Ask anything, for example “when is the party?”',
                   counterText: '',
                   suffixIcon: IconButton(
                     key: const Key('whatsapp-ask-submit'),

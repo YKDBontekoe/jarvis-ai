@@ -107,16 +107,18 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
       if (!mounted) return;
       final body = jsonObject(response.data);
       final sent = asJsonBool(body?['sent']);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            sent
-                ? 'Test message sent.'
-                : asJsonString(body?['error']) ??
-                      'Could not send a test message.',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              sent
+                  ? 'Test message sent.'
+                  : asJsonString(body?['error']) ??
+                        'Could not send a test message.',
+            ),
           ),
-        ),
-      );
+        );
       unawaited(_load());
     } on DioException catch (error) {
       if (!mounted) return;
@@ -157,9 +159,9 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     );
     if (updated == null || !mounted) return;
     setState(() => _channel = updated);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Allowed senders updated.')));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Allowed senders updated.')));
   }
 
   Future<void> _editNotifications() async {
@@ -174,7 +176,8 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
     if (updated == null || !mounted) return;
     setState(() => _channel = updated);
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Notifications updated.')));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Notifications updated.')));
   }
 
   String _forwardingSummary(Map<String, dynamic> channel) {
@@ -233,20 +236,26 @@ class _ChannelDetailScreenState extends State<ChannelDetailScreen> {
       await Clipboard.setData(ClipboardData(text: url));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not copy the webhook URL.')),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Could not copy the webhook URL.')),
+        );
       return;
     }
     if (!mounted) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Webhook URL copied.')));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Webhook URL copied.')));
   }
 
   @override
   Widget build(BuildContext context) {
     final channel = _channel;
-    final kind = channelKind(asJsonString(channel?['kind']) ?? '');
+    final kind = channelKind(
+      asJsonString(channel?['kind']) ?? '',
+      JarvisColors.of(context),
+    );
     return Scaffold(
       appBar: AppBar(
         title: PageTitle(asJsonString(channel?['displayName']) ?? 'Channel'),

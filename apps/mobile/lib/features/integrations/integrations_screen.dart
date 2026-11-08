@@ -169,6 +169,7 @@ class _IntegrationsScreenState extends _IntegrationsController
         : OrbRefresh(
             onRefresh: _load,
             child: ListView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
               children: [
                 ContentWidth(
@@ -302,7 +303,8 @@ class _IntegrationsScreenState extends _IntegrationsController
       _ => 'Added ${outcome.name}.',
     };
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
     if (outcome.nextStep == 'sign_in') {
       await _connectOAuth(server: outcome.serverId, endpoint: outcome.endpoint);
     }

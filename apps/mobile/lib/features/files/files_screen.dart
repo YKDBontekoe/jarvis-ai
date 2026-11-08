@@ -315,8 +315,13 @@ class _FilesScreenState extends State<FilesScreen> {
       } else if (mounted) {
         _showError('Download cancelled.');
       }
-    } catch (error) {
-      if (mounted) _showError('Could not open this file: $error');
+    } catch (_) {
+      if (mounted) {
+        _showError(
+          'Could not open this file. Try again, or download it to open it '
+          'in another app.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _downloads.remove(id));
     }
@@ -453,7 +458,8 @@ class _FilesScreenState extends State<FilesScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _formatSize(dynamic value) => formatFileSize(asJsonInt(value));
@@ -514,6 +520,7 @@ class _FilesScreenState extends State<FilesScreen> {
         message: 'Your files will be stored privately with Jarvis. PDFs and text are indexed so Jarvis can search them.',
       ),
       child: ListView.builder(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         itemCount:
             (_files.isEmpty ? 0 : 1) +
@@ -554,7 +561,7 @@ class _FilesScreenState extends State<FilesScreen> {
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           Text(
-                            '$count files',
+                            count == 1 ? '1 file' : '$count files',
                             style: TextStyle(
                               color: JarvisColors.of(context).muted,
                               fontSize: 13,
@@ -658,6 +665,7 @@ class _FilesScreenState extends State<FilesScreen> {
                     )
                   else
                     PopupMenuButton<String>(
+                      tooltip: 'File actions',
                       enabled: download == null,
                       icon: const Icon(PhosphorIconsRegular.dotsThree),
                       onSelected: (action) {
@@ -753,14 +761,12 @@ class _FilesScreenState extends State<FilesScreen> {
                 size: 18,
                 color: colors.muted,
               ),
-              suffixIcon: _search.text.isEmpty
-                  ? null
-                  : IconButton(
-                      key: const Key('files-search-clear'),
-                      tooltip: 'Clear search',
-                      onPressed: () => setState(_search.clear),
-                      icon: const Icon(PhosphorIconsRegular.x, size: 16),
-                    ),
+              suffixIcon: SearchClearButton(
+                controller: _search,
+                buttonKey: const Key('files-search-clear'),
+                tooltip: 'Clear search',
+                onCleared: () => setState(() {}),
+              ),
             ),
           ),
           SingleChildScrollView(
@@ -957,8 +963,7 @@ String uploadContentTypeFor(String fileName) {
     'yaml' || 'yml' => 'application/yaml',
     'docx' =>
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'pptx' =>
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     'jpg' || 'jpeg' => 'image/jpeg',
     'png' => 'image/png',
     'webp' => 'image/webp',
@@ -993,9 +998,11 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('New collection'),
     content: TextField(
+      textCapitalization: TextCapitalization.words,
       controller: _controller,
       autofocus: true,
       maxLength: 80,
+      buildCounter: quietCounter,
       textInputAction: TextInputAction.done,
       onChanged: (_) => setState(() {}),
       onSubmitted: (_) => _create(),

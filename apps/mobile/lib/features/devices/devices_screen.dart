@@ -109,89 +109,96 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('This device')),
+    appBar: AppBar(title: const PageTitle('This device')),
     body: _loading
         ? const SkeletonList()
-        : ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            children: [
-              if (_error != null)
-                InlineNotice(
-                  message: _error!,
-                  tone: NoticeTone.danger,
-                  margin: const EdgeInsets.only(bottom: 12),
-                ),
-              ContentWidth(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Jarvis can use this phone or computer as a node: location, clipboard, opening links, and local notifications. Turn off anything you do not want it to request.',
-                    ),
-                    const SizedBox(height: 12),
-                    SurfaceCard(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Column(
-                        children: [
-                          _toggle(
-                            'Location',
-                            'Share this device’s location when asked',
-                            PhosphorIconsRegular.mapPin,
-                            'location',
-                          ),
-                          _toggle(
-                            'Battery',
-                            'Report charge level',
-                            PhosphorIconsRegular.batteryFull,
-                            'battery',
-                          ),
-                          _toggle(
-                            'Clipboard',
-                            'Read text you copied, only after you approve',
-                            PhosphorIconsRegular.clipboardText,
-                            'clipboard',
-                          ),
-                          _toggle(
-                            'Open links',
-                            'Open a URL in the default browser',
-                            PhosphorIconsRegular.globe,
-                            'openUrl',
-                          ),
-                          _toggle(
-                            'Notifications',
-                            'Show a local alert on this device',
-                            PhosphorIconsRegular.bell,
-                            'notify',
-                          ),
-                        ],
+        : OrbRefresh(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              children: [
+                if (_error != null)
+                  InlineNotice(
+                    message: _error!,
+                    tone: NoticeTone.danger,
+                    margin: const EdgeInsets.only(bottom: 12),
+                  ),
+                ContentWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Jarvis can use this phone or computer as a node: location, clipboard, opening links, and local notifications. Turn off anything you do not want it to request.',
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'ONLINE NOW',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: JarvisColors.of(context).muted,
-                        letterSpacing: .8,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_online.isEmpty)
-                      const Text('Open Jarvis on a device to bring it online.')
-                    else
-                      for (final device in _online)
-                        ListTile(
-                          leading: const Icon(
-                            PhosphorIconsRegular.deviceMobile,
-                          ),
-                          title: Text(asJsonString(device['name']) ?? 'Device'),
-                          subtitle: Text(
-                            jsonStrings(device['capabilities']).join(', '),
-                          ),
+                      const SizedBox(height: 12),
+                      SurfaceCard(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          children: [
+                            _toggle(
+                              'Location',
+                              'Share this device’s location when asked',
+                              PhosphorIconsRegular.mapPin,
+                              'location',
+                            ),
+                            _toggle(
+                              'Battery',
+                              'Report charge level',
+                              PhosphorIconsRegular.batteryFull,
+                              'battery',
+                            ),
+                            _toggle(
+                              'Clipboard',
+                              'Read text you copied, only after you approve',
+                              PhosphorIconsRegular.clipboardText,
+                              'clipboard',
+                            ),
+                            _toggle(
+                              'Open links',
+                              'Open a URL in the default browser',
+                              PhosphorIconsRegular.globe,
+                              'openUrl',
+                            ),
+                            _toggle(
+                              'Notifications',
+                              'Show a local alert on this device',
+                              PhosphorIconsRegular.bell,
+                              'notify',
+                            ),
+                          ],
                         ),
-                  ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'ONLINE NOW',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: JarvisColors.of(context).muted,
+                          letterSpacing: .8,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_online.isEmpty)
+                        const Text(
+                          'Open Jarvis on a device to bring it online.',
+                        )
+                      else
+                        for (final device in _online)
+                          ListTile(
+                            leading: const Icon(
+                              PhosphorIconsRegular.deviceMobile,
+                            ),
+                            title: Text(
+                              asJsonString(device['name']) ?? 'Device',
+                            ),
+                            subtitle: Text(
+                              jsonStrings(device['capabilities']).join(', '),
+                            ),
+                          ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
   );
 

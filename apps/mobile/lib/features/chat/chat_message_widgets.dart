@@ -517,11 +517,13 @@ Future<String?> showFeedbackNoteDialog(BuildContext context) async {
     builder: (dialogContext) => AlertDialog(
       title: const Text('What should Jarvis do differently?'),
       content: TextField(
+        textCapitalization: TextCapitalization.sentences,
         key: const Key('feedback-note'),
         controller: controller,
         autofocus: true,
         maxLines: 3,
         maxLength: 1000,
+        buildCounter: quietCounter,
         decoration: const InputDecoration(
           hintText: 'e.g. Shorter answers, use metric units, skip the intro',
         ),

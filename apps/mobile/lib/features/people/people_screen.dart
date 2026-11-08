@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../json_maps.dart';
 import '../../theme.dart';
@@ -265,6 +266,7 @@ class _PeopleScreenState extends State<PeopleScreen>
   }
 
   Future<void> _logContact(PersonData person) async {
+    HapticFeedback.lightImpact();
     setState(() => _busy.add(person.id));
     try {
       final response = await widget.http.post<dynamic>(
@@ -291,7 +293,8 @@ class _PeopleScreenState extends State<PeopleScreen>
   void _toast(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -338,6 +341,7 @@ class _PeopleScreenState extends State<PeopleScreen>
         onRefresh: _load,
         empty: _empty(),
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(
             16,
             8,
@@ -717,6 +721,8 @@ class _BirthdayStrip extends StatelessWidget {
           final person = people[index];
           final today = person.birthdayToday;
           final age = person.turningAge;
+          // Within a week the countdown takes the birthday lilac.
+          final soon = !today && (person.daysUntilBirthday ?? 99) <= 7;
           return SizedBox(
             width: 148 * scale,
             child: SurfaceCard(
@@ -750,7 +756,7 @@ class _BirthdayStrip extends StatelessWidget {
                             ? PhosphorIconsRegular.cake
                             : PhosphorIconsRegular.gift,
                         size: 18,
-                        color: today ? colors.rose : colors.muted,
+                        color: today || soon ? colors.roseText : colors.muted,
                       ),
                     ],
                   ),
@@ -769,8 +775,14 @@ class _BirthdayStrip extends StatelessWidget {
                     birthdayCountdown(person),
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: today ? FontWeight.w600 : FontWeight.w500,
-                      color: today ? colors.ink : colors.inkSoft,
+                      fontWeight: today || soon
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: today
+                          ? colors.ink
+                          : soon
+                          ? colors.roseText
+                          : colors.inkSoft,
                     ),
                   ),
                   Text(

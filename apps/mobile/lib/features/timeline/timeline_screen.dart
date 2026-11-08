@@ -127,7 +127,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
     final data = _data;
     final colors = JarvisColors.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Timeline')),
+      appBar: AppBar(title: const PageTitle('Timeline')),
       body: ContentWidth(
         child: ListScreenBody(
           loading: _loading,
@@ -136,6 +136,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
           onRetry: _load,
           emptyScrolls: true,
           empty: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
               _controls(colors),
@@ -150,6 +151,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
             ],
           ),
           child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: [
               _controls(colors),
@@ -192,16 +194,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
         decoration: InputDecoration(
           hintText: 'Search your timeline',
           prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass),
-          suffixIcon: _search.text.isEmpty
-              ? null
-              : IconButton(
-                  tooltip: 'Clear',
-                  icon: const Icon(PhosphorIconsRegular.x),
-                  onPressed: () {
-                    _search.clear();
-                    unawaited(_load());
-                  },
-                ),
+          suffixIcon: SearchClearButton(
+            controller: _search,
+            onCleared: () => unawaited(_load()),
+          ),
         ),
       ),
       const SizedBox(height: 10),
