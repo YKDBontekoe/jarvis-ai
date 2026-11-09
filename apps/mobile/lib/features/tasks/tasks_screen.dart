@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../ui/phosphor_icons.dart';
 import 'task_details_screen.dart';
@@ -10,6 +11,7 @@ import '../approvals/approvals_screen.dart';
 import '../../schedule_format.dart';
 import '../../theme.dart';
 import '../../json_maps.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/plain_text.dart';
 import '../../ui/submit_state.dart';
@@ -42,6 +44,9 @@ class _TasksScreenState extends State<TasksScreen> {
   bool _loading = true;
   String? _error;
   int _requestRevision = 0;
+
+  /// Which summary tile narrows the list: 'active', 'review' or 'done'; null shows everything.
+  String? _filter;
 
   @override
   void initState() {
@@ -268,8 +273,36 @@ class _TasksScreenState extends State<TasksScreen> {
                 children: [
                   _summary(),
                   const SizedBox(height: 18),
-                  for (final (index, task) in _tasks.indexed)
-                    FadeSlideIn(index: index + 1, child: _taskCard(task)),
+                  for (final (index, task) in _visibleTasks.indexed)
+                    FadeSlideIn(
+                      key: ValueKey(jsonId(task)),
+                      index: index + 1,
+                      child: _taskCard(task),
+                    ),
+                  if (_filter != null && _visibleTasks.isEmpty)
+                    Padding(
+                      key: const Key('tasks-filter-empty'),
+                      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                      child: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 8,
+                        children: [
+                          Text(
+                            _filterEmptyMessage,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: JarvisColors.of(context).inkSoft,
+                                ),
+                          ),
+                          PillAction(
+                            label: 'Show all tasks',
+                            compact: true,
+                            onPressed: () => setState(() => _filter = null),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -279,49 +312,111 @@ class _TasksScreenState extends State<TasksScreen> {
     ),
   );
 
+  static bool _matches(String? filter, String status) => switch (filter) {
+    'active' => _activeStatuses.contains(status),
+    'review' => status == 'needs_approval',
+    'done' => status == 'completed',
+    _ => true,
+  };
+
+  List<Map<String, dynamic>> get _visibleTasks => [
+    for (final task in _tasks)
+      if (_matches(_filter, asJsonString(task['status']) ?? 'queued')) task,
+  ];
+
+  String get _filterEmptyMessage => switch (_filter) {
+    'active' => 'Nothing is running right now.',
+    'review' => 'Nothing needs your review.',
+    _ => 'Nothing finished yet.',
+  };
+
+  /// Three counts that double as filters: tap one to narrow the list, tap it again to show everything.
   Widget _summary() {
-    int count(bool Function(String status) test) => _tasks
-        .where((task) => test(asJsonString(task['status']) ?? 'queued'))
+    final colors = JarvisColors.of(context);
+    int count(String filter) => _tasks
+        .where(
+          (task) => _matches(filter, asJsonString(task['status']) ?? 'queued'),
+        )
         .length;
-    final stats = [
-      ('Active', count(_activeStatuses.contains)),
-      ('Needs review', count((status) => status == 'needs_approval')),
-      ('Done', count((status) => status == 'completed')),
+    const stats = [
+      ('active', 'Active'),
+      ('review', 'Needs review'),
+      ('done', 'Done'),
     ];
     return SurfaceCard(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+      padding: const EdgeInsets.all(4),
       child: IntrinsicHeight(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final (index, (label, value)) in stats.indexed) ...[
-              if (index > 0) const VerticalDivider(width: 1),
+            for (final (id, label) in stats)
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      RollingNumber(
-                        '$value',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
+                child: Semantics(
+                  button: true,
+                  selected: _filter == id,
+                  label: '$label, ${count(id)}',
+                  hint: _filter == id ? 'Show all tasks' : 'Show only these',
+                  excludeSemantics: true,
+                  child: PressFeedback(
+                    scale: .97,
+                    builder: (context, onHighlight) => InkWell(
+                      key: Key('tasks-filter-$id'),
+                      onHighlightChanged: onHighlight,
+                      borderRadius: BorderRadius.circular(JarvisRadii.md),
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _filter = _filter == id ? null : id);
+                      },
+                      child: AnimatedContainer(
+                        duration: JarvisMotion.of(context, JarvisMotion.fast),
+                        constraints: const BoxConstraints(minHeight: 48),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _filter == id
+                              ? colors.accentSoft
+                              : colors.accentSoft.withValues(alpha: 0),
+                          borderRadius: BorderRadius.circular(JarvisRadii.md),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            RollingNumber(
+                              '${count(id)}',
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: _filter == id
+                                        ? colors.accentDeep
+                                        : null,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
                             ),
+                            const SizedBox(height: 2),
+                            Text(
+                              label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: _filter == id
+                                        ? colors.accentDeep
+                                        : null,
+                                    fontWeight: _filter == id
+                                        ? FontWeight.w600
+                                        : null,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        label,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ],
           ],
         ),
       ),
@@ -394,6 +489,18 @@ class _TasksScreenState extends State<TasksScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium
                         ?.copyWith(color: colors.inkSoft, fontSize: 13.5),
+                  ),
+                ],
+                // What it is waiting for is one tap away, not behind the menu.
+                if (needsYou) ...[
+                  const SizedBox(height: 10),
+                  PillAction(
+                    key: Key('task-review-${jsonId(task)}'),
+                    label: 'Review',
+                    icon: PhosphorIconsRegular.shieldCheck,
+                    primary: true,
+                    compact: true,
+                    onPressed: _openApprovals,
                   ),
                 ],
               ],

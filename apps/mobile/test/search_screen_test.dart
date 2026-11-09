@@ -108,7 +108,14 @@ void main() {
   testWidgets('the new kinds have filter chips', (tester) async {
     await show(tester);
 
-    for (final label in ['Journal', 'Projects', 'Missions', 'Goals', 'Trips', 'Lists']) {
+    for (final label in [
+      'Journal',
+      'Projects',
+      'Missions',
+      'Goals',
+      'Trips',
+      'Lists',
+    ]) {
       expect(find.text(label), findsOneWidget);
     }
   });
@@ -226,5 +233,48 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('No matches yet.'), findsOneWidget);
     expect(find.byKey(const Key('search-incomplete')), findsNothing);
+  });
+
+  testWidgets('an empty filtered search offers to search everything', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/search', {
+      'results': <Object>[],
+      'providers': <Object>[],
+    });
+    await show(tester);
+
+    await tester.enterText(find.byType(TextField), 'canal');
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('search-clear-filters')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('search-window-7')));
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('search-clear-filters')));
+    await tester.pumpAndSettle();
+
+    expect(
+      http.sent('GET', '/api/v1/search').last.query.containsKey('from'),
+      isFalse,
+    );
+    expect(find.byKey(const Key('search-clear-filters')), findsNothing);
+  });
+
+  test('highlightMatches emphasises each query word and keeps the text', () {
+    const bold = TextStyle(fontWeight: FontWeight.w800);
+    final span = highlightMatches(
+      'Weekend in Lisbon (lisbon.pt)',
+      'LISBON w',
+      bold,
+    );
+    expect(span.toPlainText(), 'Weekend in Lisbon (lisbon.pt)');
+    final marked = [
+      for (final child in span.children!)
+        if (child.style == bold) (child as TextSpan).text,
+    ];
+    expect(marked, ['Lisbon', 'lisbon']);
+    expect(highlightMatches('a.b', '.', bold).children, isNull);
   });
 }

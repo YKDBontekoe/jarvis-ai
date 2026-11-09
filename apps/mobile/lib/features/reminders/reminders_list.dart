@@ -356,6 +356,13 @@ class _RemindersScreenState extends _RemindersController {
     final relative = pending && due != null && place == null
         ? relativeFromNow(due)
         : null;
+    final overdue =
+        pending && due != null && place == null && due.isBefore(DateTime.now());
+    final title = asJsonString(reminder['title']) ?? '';
+    // One-off timed reminders finish with one tap; repeating and place ones
+    // have no "done", so they keep only the menu.
+    final canFinish =
+        pending && repeat == null && place == null && jsonId(reminder) != null;
 
     return SurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
@@ -383,7 +390,7 @@ class _RemindersScreenState extends _RemindersController {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  asJsonString(reminder['title']) ?? '',
+                  title,
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontSize: 15,
                     color: pending ? null : colors.inkSoft,
@@ -397,7 +404,10 @@ class _RemindersScreenState extends _RemindersController {
                       if (relative != null)
                         TextSpan(
                           text: ' · $relative',
-                          style: TextStyle(color: colors.muted),
+                          style: TextStyle(
+                            color: overdue ? colors.warning : colors.muted,
+                            fontWeight: overdue ? FontWeight.w600 : null,
+                          ),
                         ),
                     ],
                   ),
@@ -417,6 +427,17 @@ class _RemindersScreenState extends _RemindersController {
               ],
             ),
           ),
+          if (canFinish)
+            IconButton(
+              key: Key('reminder-done-${jsonId(reminder)}'),
+              tooltip: 'Mark “$title” as done',
+              onPressed: () => _markDone(reminder),
+              icon: Icon(
+                PhosphorIconsRegular.checkCircle,
+                size: 24,
+                color: overdue ? colors.accent : colors.inkSoft,
+              ),
+            ),
           _reminderMenu(
             reminder,
             pending: pending,

@@ -412,7 +412,10 @@ void main() {
       return local.isAfter(today) ? 'Tomorrow' : 'Yesterday';
     }
 
-    expect(find.textContaining('Reminded you ${dayOf(fired).toLowerCase()}'), findsOneWidget);
+    expect(
+      find.textContaining('Reminded you ${dayOf(fired).toLowerCase()}'),
+      findsOneWidget,
+    );
     await tester.tap(find.byTooltip('Reminder actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remind me again…'));
@@ -455,6 +458,46 @@ void main() {
     await tester.tap(find.byTooltip('Reminder actions'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Mark as done'));
+    await tester.pumpAndSettle();
+
+    expect(http.sent('POST', '/api/v1/reminders/r1/complete'), hasLength(1));
+  });
+
+  testWidgets('a one-off reminder finishes with one visible tap', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/reminders', [
+      {
+        'id': 'r1',
+        'title': 'Pay rent',
+        'dueAt': DateTime.now()
+            .subtract(const Duration(hours: 2))
+            .toUtc()
+            .toIso8601String(),
+        'status': 'pending',
+        'recurrence': 'none',
+      },
+      {
+        'id': 'r2',
+        'title': 'Water the basil',
+        'dueAt': DateTime.now()
+            .add(const Duration(hours: 3))
+            .toUtc()
+            .toIso8601String(),
+        'status': 'pending',
+        'recurrence': 'daily',
+      },
+    ]);
+    http.on('GET', '/api/v1/notifications', <Object>[]);
+    http.on('POST', '/api/v1/reminders/r1/complete', {
+      'id': 'r1',
+      'status': 'completed',
+    });
+    await show(tester);
+
+    // A repeating reminder has no "done", so it gets no button.
+    expect(find.byKey(const Key('reminder-done-r2')), findsNothing);
+    await tester.tap(find.byTooltip('Mark “Pay rent” as done'));
     await tester.pumpAndSettle();
 
     expect(http.sent('POST', '/api/v1/reminders/r1/complete'), hasLength(1));

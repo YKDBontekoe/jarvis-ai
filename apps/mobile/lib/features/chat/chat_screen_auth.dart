@@ -80,17 +80,31 @@ mixin _ChatScreenAuth on _ChatScreenController {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'Use 8 or more characters with upper and lower case letters and a number.',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: JarvisColors.of(context).muted,
-                            ),
-                          ),
+                        // The password rules only matter when choosing one.
+                        MotionSize(
+                          child: _creatingAccount
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'Use 8 or more characters with upper and lower case letters and a number.',
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        color: JarvisColors.of(context).muted,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox(width: double.infinity),
                         ),
+                        // The reason sign-in failed sits beside the fields it is about.
+                        if (_error != null)
+                          InlineNotice(
+                            message: _error!,
+                            tone: NoticeTone.danger,
+                            margin: const EdgeInsets.only(top: 16),
+                          ),
                         const SizedBox(height: 20),
                         SizedBox(
                           width: double.infinity,
@@ -144,12 +158,6 @@ mixin _ChatScreenAuth on _ChatScreenController {
                             color: JarvisColors.of(context).muted,
                           ),
                         ),
-                        if (_error != null)
-                          InlineNotice(
-                            message: _error!,
-                            tone: NoticeTone.danger,
-                            margin: const EdgeInsets.only(top: 24),
-                          ),
                       ],
                     ),
                   ),

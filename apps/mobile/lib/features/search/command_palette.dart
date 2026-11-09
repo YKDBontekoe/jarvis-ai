@@ -343,6 +343,7 @@ class _CommandPaletteDialogState extends State<_CommandPaletteDialog> {
                                   loading: _loading,
                                   results: _results,
                                   providers: _providers,
+                                  query: _query.text,
                                   onRetry: () => unawaited(_runSearch()),
                                   onOpen: (hit) => unawaited(_openHit(hit)),
                                 ),

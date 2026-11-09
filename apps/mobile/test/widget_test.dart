@@ -49,6 +49,8 @@ void main() {
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
+    // Password rules are for choosing a password, not for typing an existing one.
+    expect(find.textContaining('Use 8 or more characters'), findsNothing);
 
     await tester.ensureVisible(find.text('Need an account? Create one'));
     await tester.pumpAndSettle();
@@ -56,6 +58,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Create your account'), findsOneWidget);
     expect(find.text('Create account'), findsOneWidget);
+    expect(find.textContaining('Use 8 or more characters'), findsOneWidget);
   });
 
   testWidgets('on a wide screen tasks open beside the rail', (tester) async {

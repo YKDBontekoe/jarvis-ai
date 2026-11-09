@@ -4,7 +4,9 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 import '../../api/api_errors.dart';
+import '../../schedule_format.dart';
 import '../../theme.dart';
+import '../../ui/feature_kit.dart';
 import '../../ui/jarvis_ui.dart';
 import '../../ui/phosphor_icons.dart';
 import 'recent_searches_store.dart';
@@ -275,6 +277,17 @@ class _SearchScreenState extends State<SearchScreen> {
                           loading: _loading,
                           results: _results,
                           providers: _providers,
+                          query: _query.text,
+                          onClearFilters:
+                              _kindFilter.isEmpty && _windowDays == null
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _kindFilter = {};
+                                    _windowDays = null;
+                                  });
+                                  unawaited(_runSearch());
+                                },
                           onRetry: () => unawaited(_runSearch()),
                           onOpen: (hit) => unawaited(_openHit(hit)),
                         ),
@@ -288,6 +301,46 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 }
 
+/// The icon that stands for a kind of search hit.
+IconData searchKindIcon(String kind) => switch (kind) {
+  'conversation' => PhosphorIconsRegular.chatsCircle,
+  'message' || 'channel_thread' => PhosphorIconsRegular.chatText,
+  'person' => PhosphorIconsRegular.user,
+  'commitment' || 'task' || 'list' => PhosphorIconsRegular.listChecks,
+  'memory' || 'journal' => PhosphorIconsRegular.notebook,
+  'file' => PhosphorIconsRegular.fileText,
+  'reminder' => PhosphorIconsRegular.bell,
+  'automation' => PhosphorIconsRegular.lightning,
+  'graph_entity' => PhosphorIconsRegular.graph,
+  'coding_run' => PhosphorIconsRegular.code,
+  'mission' || 'project' => PhosphorIconsRegular.flowArrow,
+  'goal' => PhosphorIconsRegular.target,
+  'trip' => PhosphorIconsRegular.airplaneTilt,
+  _ => PhosphorIconsRegular.sparkle,
+};
+
+/// [text] with every word of [query] (two letters or more) in [emphasis], so
+/// the eye lands on why a hit matched. Case is ignored; the text is unchanged.
+TextSpan highlightMatches(String text, String query, TextStyle emphasis) {
+  final words = {
+    for (final word in query.toLowerCase().split(RegExp(r'\s+')))
+      if (word.length >= 2) RegExp.escape(word),
+  };
+  if (words.isEmpty) return TextSpan(text: text);
+  final pattern = RegExp(words.join('|'), caseSensitive: false);
+  final spans = <TextSpan>[];
+  var cursor = 0;
+  for (final match in pattern.allMatches(text)) {
+    if (match.start > cursor) {
+      spans.add(TextSpan(text: text.substring(cursor, match.start)));
+    }
+    spans.add(TextSpan(text: match.group(0), style: emphasis));
+    cursor = match.end;
+  }
+  if (cursor < text.length) spans.add(TextSpan(text: text.substring(cursor)));
+  return TextSpan(children: spans);
+}
+
 class SearchResultsBody extends StatelessWidget {
   const SearchResultsBody({
     required this.loading,
@@ -295,8 +348,17 @@ class SearchResultsBody extends StatelessWidget {
     required this.onOpen,
     this.providers = const [],
     this.onRetry,
+    this.query = '',
+    this.onClearFilters,
     super.key,
   });
+
+  /// What was searched for; its words are emphasised in each hit.
+  final String query;
+
+  /// Set while a scope or time filter is narrowing the search, so an empty
+  /// result can offer to search everything instead.
+  final VoidCallback? onClearFilters;
 
   final bool loading;
   final List<FederatedSearchHit> results;
@@ -329,7 +391,38 @@ class SearchResultsBody extends StatelessWidget {
           );
     if (results.isEmpty) {
       if (notice == null) {
-        return const Center(child: Text('No matches yet.'));
+        final colors = JarvisColors.of(context);
+        return Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'No matches yet.',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  onClearFilters == null
+                      ? 'Try fewer or different words.'
+                      : 'Your filters may be hiding it.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colors.inkSoft),
+                ),
+                if (onClearFilters != null) ...[
+                  const SizedBox(height: 14),
+                  PillAction(
+                    key: const Key('search-clear-filters'),
+                    label: 'Search everything',
+                    compact: true,
+                    onPressed: onClearFilters,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
       }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -343,50 +436,95 @@ class SearchResultsBody extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 6),
       itemBuilder: (context, index) {
         final hit = results[index];
+        final colors = JarvisColors.of(context);
+        final kind = searchKindLabels[hit.kind] ?? hit.kind;
+        final when = hit.timestamp == null
+            ? null
+            : friendlyDate(context, hit.timestamp!).split(' · ').first;
         return Material(
-          color: JarvisColors.of(context).surfaceMuted,
+          color: colors.surfaceMuted,
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
             onTap: () => onOpen(hit),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              child: Column(
+              padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          hit.title,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (hit.isPinned)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 8),
-                          child: Icon(PhosphorIconsRegular.pushPin, size: 16),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    searchKindLabels[hit.kind] ?? hit.kind,
-                    style: Theme.of(context).textTheme.labelSmall
-                        ?.copyWith(color: JarvisColors.of(context).inkSoft),
-                  ),
-                  if (hit.summary != null && hit.summary!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      hit.summary!,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: JarvisColors.of(context).inkSoft,
-                        height: 1.35,
+                  // The kind's icon lets a mixed list be scanned by shape.
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: ExcludeSemantics(
+                      child: Icon(
+                        searchKindIcon(hit.kind),
+                        size: 18,
+                        color: colors.accent,
                       ),
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text.rich(
+                                highlightMatches(
+                                  hit.title,
+                                  query,
+                                  TextStyle(color: colors.accentDeep),
+                                ),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (hit.isPinned)
+                              const Padding(
+                                padding: EdgeInsets.only(left: 8),
+                                child: Icon(
+                                  PhosphorIconsRegular.pushPin,
+                                  size: 16,
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          when == null ? kind : '$kind · $when',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: colors.inkSoft),
+                        ),
+                        if (hit.summary != null && hit.summary!.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text.rich(
+                            highlightMatches(
+                              hit.summary!,
+                              query,
+                              TextStyle(
+                                color: colors.ink,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.inkSoft,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -386,6 +386,11 @@ void main() {
       await start(tester);
       await openFeature(tester, label);
       await capture(tester, '${index.toString().padLeft(2, '0')}-$label');
+      if (label == 'tasks') {
+        await tester.tap(find.byKey(const Key('tasks-filter-review')));
+        await settle(tester);
+        await capture(tester, '09b-tasks-filtered');
+      }
     });
   }
 
@@ -645,6 +650,9 @@ void main() {
     await tester.enterText(find.byType(TextField).first, 'herin');
     await settle(tester);
     await capture(tester, '30-search-typing');
+    await tester.enterText(find.byType(TextField).first, 'Lisbon reserve');
+    await settle(tester);
+    await capture(tester, '30b-search-results');
   });
 
   screenshotTest('sign in', (tester) async {
@@ -654,6 +662,10 @@ void main() {
     );
     await settle(tester);
     await capture(tester, '16-sign-in');
+    await tester.ensureVisible(find.text('Need an account? Create one'));
+    await tester.tap(find.text('Need an account? Create one'));
+    await settle(tester);
+    await capture(tester, '16b-create-account');
   });
 
   screenshotTest('settings', (tester) async {

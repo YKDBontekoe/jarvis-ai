@@ -178,6 +178,10 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 
 - Prose fields set `textCapitalization: sentences` (names: `words`); search fields set `textInputAction: search` and a `SearchClearButton`; scroll views under a search field use `keyboardDismissBehavior: onDrag`.
 - Quick-entry fields (list items) keep the keyboard up after each add (`onEditingComplete: () {}` and refocus).
+- **The usual next step is a visible button, not a menu item.** A one-off reminder has a check button on its row (repeating and place reminders have no "done", so they keep only the ⋯ menu); a task waiting for approval has a Review pill. Menus and swipes hold the rarer actions and shortcuts.
+- **Counts that summarise a list filter it.** The Tasks summary tiles (Active, Needs review, Done) narrow the list when tapped and show everything when tapped again; the open one is `accentSoft` with `accentDeep` text. An empty filter says so and offers "Show all tasks".
+- **Search results** (`SearchResultsBody`) lead with the kind's icon (`searchKindIcon`), then title, "Kind · date" and a two-line summary. `highlightMatches` marks the words that were searched for: `accentDeep` in the title, ink w600 in the summary. When a scope or time filter leaves nothing, the empty state offers "Search everything".
+- An error from a form shows beside the fields and above the submit button (sign-in), never below the footer links. Rules for choosing a value (password rules) show only when choosing one.
 - Removing something with a swipe offers Undo in the snackbar. Snackbars replace the current one (`..hideCurrentSnackBar()..showSnackBar(...)`) rather than queueing.
 - List screens refresh with `OrbRefresh`; keep the content on screen while the reload runs.
 - Copying to the clipboard always confirms: a snackbar ("Draft copied"), or for something shown once, the Copy button turns into "Copied" with a check.
