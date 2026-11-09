@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:flutter/services.dart';
 
 import '../../theme.dart';
@@ -837,6 +838,26 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     }
   }
 
+  final _needsYouKey = GlobalKey();
+  final _noticedKey = GlobalKey();
+  final _tilesKey = GlobalKey();
+
+  /// Glides Home to a section, leaving room for the sticky header above it.
+  void _jumpTo(GlobalKey target) {
+    final box = target.currentContext?.findRenderObject();
+    if (box is! RenderBox || !_scroll.hasClients) return;
+    final viewport = RenderAbstractViewport.of(box);
+    final offset = viewport.getOffsetToReveal(box, 0).offset - 64;
+    unawaited(HapticFeedback.selectionClick());
+    unawaited(
+      _scroll.animateTo(
+        offset.clamp(0.0, _scroll.position.maxScrollExtent),
+        duration: JarvisMotion.of(context, JarvisMotion.slow),
+        curve: JarvisMotion.emphasized,
+      ),
+    );
+  }
+
   void _beginEdit() {
     widget.layout.beginEdit();
     setState(() => _editing = true);
@@ -871,6 +892,9 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     ];
     final dayOne = homeContext == null ? null : _dayOneSteps();
     final showDayOne = dayOne != null && DayOneCard.shows(dayOne);
+    final needsYou = _briefing == null
+        ? const <NeedsYouItem>[]
+        : needsYouItems(now: now, briefing: _briefing, chats: widget.chats);
     final list = OrbRefresh(
       onRefresh: _refresh,
       child: ListView(
@@ -879,302 +903,344 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
         children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  HeroGlow(
-                    parallax: _scroll,
-                    child: ClockHeader(
-                      scroll: _scroll,
-                      now: now,
-                      next: upcoming.isEmpty ? null : upcoming.first,
-                      preferredName: _preferredName,
-                      dayLine: homeContext?.dayLine,
-                      lead: hero == null
-                          ? null
-                          : RightNowCard(
-                              hero: hero,
-                              now: now,
-                              onAction: (action) =>
-                                  unawaited(_heroAction(hero, action)),
-                              onDismiss: ({required mute}) =>
-                                  _dismissCard(hero.id, hero.kind, mute: mute),
-                            ),
-                      onOpen: () => widget.onOpen('today'),
-                      emptyHint:
-                          calendarOff &&
-                              !showDayOne &&
-                              widget.onSuggestion != null
-                          ? 'Connect a calendar'
-                          : null,
-                      onEmptyHint: () =>
-                          widget.onSuggestion?.call(mcpCalendarPrompt),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  if (!_editing) ...[
-                    FadeSlideIn(
-                      index: 1,
-                      child: AskBar(
-                        controller: _ask,
-                        busy: widget.jarvisBusy,
-                        suggestions: homeSuggestions(
+          LayoutBuilder(
+            builder: (context, box) {
+              final header = HeroGlow(
+                parallax: _scroll,
+                child: ClockHeader(
+                  scroll: _scroll,
+                  now: now,
+                  next: upcoming.isEmpty ? null : upcoming.first,
+                  preferredName: _preferredName,
+                  dayLine: homeContext?.dayLine,
+                  lead: hero == null
+                      ? null
+                      : RightNowCard(
+                          hero: hero,
                           now: now,
-                          briefing: _briefing,
-                          chats: widget.chats,
+                          onAction: (action) =>
+                              unawaited(_heroAction(hero, action)),
+                          onDismiss: ({required mute}) =>
+                              _dismissCard(hero.id, hero.kind, mute: mute),
                         ),
-                        onSubmit: widget.onSuggestion,
-                        onVoice: () => widget.onOpen('voice'),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    if (widget.ready)
-                      ProactiveHomeCard(
-                        http: widget.source.http,
-                        onOpen: widget.onOpen,
-                        revision: widget.refreshRevision,
-                      ),
-                    if (_briefing != null)
-                      FadeSlideIn(
-                        index: 2,
-                        child: NeedsYouCard(
-                          items: needsYouItems(
-                            now: now,
-                            briefing: _briefing,
-                            chats: widget.chats,
-                          ),
-                          http: widget.source.http,
-                          pending: _pending,
-                          failed: _failed,
-                          onReplyWith: widget.onReplyWith == null
-                              ? null
-                              : (item, draft) =>
-                                    widget.onReplyWith!(item.id, draft),
-                          onSeeAll: () => widget.onOpen('attention'),
-                          onAction: (item, action) =>
-                              unawaited(_needsYou(item, action)),
-                        ),
-                      ),
-                    const SizedBox(height: 20),
-                    if (noticed.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 24),
-                        child: FadeSlideIn(
-                          index: 3,
-                          child: NoticedCard(
-                            insights: noticed,
-                            onAction: (item) => unawaited(_noticed(item)),
-                            onDismiss: (item) =>
-                                _dismissCard(item.id, item.kind),
-                          ),
-                        ),
-                      ),
-                    if (evening &&
-                        homeContext != null &&
-                        EveningCard.shows(homeContext.recap, tomorrow))
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: FadeSlideIn(
-                          index: 4,
-                          child: EveningCard(
-                            recap: homeContext.recap,
-                            tomorrow: tomorrow,
-                            onWrite: widget.onSuggestion == null
-                                ? null
-                                : () => widget.onSuggestion!(
-                                    'Help me write a short journal entry about today. Ask me one question at a time.',
-                                  ),
-                            onPlan: widget.onSuggestion == null
-                                ? null
-                                : () => widget.onSuggestion!(
-                                    'Help me plan tomorrow.',
-                                  ),
-                          ),
-                        ),
-                      )
-                    else if (_briefNote case final note?
-                        when hero?.kind != 'brief')
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: FadeSlideIn(
-                          index: 3,
-                          child: BriefCard(
-                            note: note,
-                            onDismiss: () => unawaited(
-                              _dismissBrief(asJsonString(note['id']) ?? ''),
-                            ),
-                            onFollowUp: widget.onSuggestion == null
-                                ? null
-                                : () => _ask.text = 'About my morning brief: ',
-                          ),
-                        ),
-                      ),
-                    if (LearningChange.fromBriefing(
-                          _briefing,
-                          seenAt: _learningSeenAt,
-                        )
-                        case final changes when changes.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: FadeSlideIn(
-                          index: 5,
-                          child: LearningCard(
-                            changes: changes,
-                            // Once some were marked seen, the server's weekly count would include those.
-                            total: _learningSeenAt != null
-                                ? changes.length
-                                : asJsonInt(
-                                    jsonObject(
-                                      _briefing?['learning'],
-                                    )?['changesThisWeek'],
-                                    changes.length,
-                                  ),
-                            pending: _learningPending,
-                            onAction: (change) =>
-                                unawaited(_learningAction(change)),
-                            onSeen: _learningSeen,
-                            onOpenLearning: () {
-                              _learningSeen();
-                              widget.onOpen('learning');
-                            },
-                          ),
-                        ),
-                      ),
-                  ],
-                  if (widget.ready && _briefing != null) ...[
-                    CodexSignInCard(http: widget.source.http),
-                    if (showDayOne && !_editing)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: DayOneCard(
-                          steps: dayOne,
-                          http: widget.source.http,
-                        ),
-                      )
-                    else
-                      GetStartedCard(
-                        http: widget.source.http,
+                  onOpen: () => widget.onOpen('today'),
+                  emptyHint:
+                      calendarOff && !showDayOne && widget.onSuggestion != null
+                      ? 'Connect a calendar'
+                      : null,
+                  onEmptyHint: () =>
+                      widget.onSuggestion?.call(mcpCalendarPrompt),
+                ),
+              );
+              // What needs the owner comes straight after the Ask bar; work
+              // Jarvis is moving along by itself follows it.
+              final primary = <Widget>[
+                if (!_editing) ...[
+                  FadeSlideIn(
+                    index: 1,
+                    child: AskBar(
+                      controller: _ask,
+                      busy: widget.jarvisBusy,
+                      suggestions: homeSuggestions(
+                        now: now,
                         briefing: _briefing,
-                        onSuggestion: widget.onSuggestion,
-                        refreshRevision: widget.refreshRevision,
+                        chats: widget.chats,
                       ),
-                  ],
-                  if (_editing)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Hold and drag to move. Use the corner button to change size.',
-                              key: const Key('home-edit-hint'),
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: JarvisColors.of(context).inkSoft,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ListenableBuilder(
-                            listenable: widget.layout,
-                            builder: (context, _) => TextButton(
-                              key: const Key('home-edit-undo'),
-                              onPressed: widget.layout.canUndo
-                                  ? widget.layout.undo
-                                  : null,
-                              child: const Text('Undo'),
-                            ),
-                          ),
-                          TextButton(
-                            key: const Key('home-edit-cancel'),
-                            onPressed: () => _endEdit(save: false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            key: const Key('home-edit-done'),
-                            onPressed: () => _endEdit(save: true),
-                            child: const Text('Done'),
-                          ),
-                        ],
+                      onSubmit: widget.onSuggestion,
+                      onVoice: () => widget.onOpen('voice'),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  if (_briefing != null)
+                    FadeSlideIn(
+                      index: 2,
+                      child: NeedsYouCard(
+                        key: _needsYouKey,
+                        items: needsYou,
+                        http: widget.source.http,
+                        pending: _pending,
+                        failed: _failed,
+                        onReplyWith: widget.onReplyWith == null
+                            ? null
+                            : (item, draft) =>
+                                  widget.onReplyWith!(item.id, draft),
+                        onSeeAll: () => widget.onOpen('attention'),
+                        onAction: (item, action) =>
+                            unawaited(_needsYou(item, action)),
                       ),
                     ),
-                  ListenableBuilder(
-                    listenable: widget.layout,
-                    builder: (context, _) => !widget.layout.ready
-                        ? const SizedBox(height: 240)
-                        : TileGrid(
-                            layout: widget.layout.layout,
-                            data: _tileData,
-                            editing: _editing,
-                            onOpen: (spec) => widget.onOpen(spec.destination),
-                            onRowTap: (spec, row) {
-                              final target = row.target;
-                              if (target != null &&
-                                  target.startsWith('chat:')) {
-                                widget.onOpenChat(target.substring(5));
-                              } else if (target != null &&
-                                  (target.startsWith(entityDestinationPrefix) ||
-                                      target.startsWith(
-                                        appDestinationPrefix,
-                                      ))) {
-                                widget.onOpen(target);
-                              } else {
-                                widget.onOpen(spec.destination);
-                              }
-                            },
-                            onEdit: _beginEdit,
-                            now: now,
-                            isLoading: _isLoading,
-                            pending: _pending,
-                            onAction: _runAction,
-                            onMenu: _showMenu,
-                            onRemove: (item) => widget.layout.unpin(item.id),
-                            onResize: (item) =>
-                                widget.layout.cycleSize(item.id),
-                            onReorder: widget.layout.move,
-                          ),
-                  ),
-                  if (!_editing)
+                  const SizedBox(height: 20),
+                  if (widget.ready)
+                    ProactiveHomeCard(
+                      http: widget.source.http,
+                      onOpen: widget.onOpen,
+                      revision: widget.refreshRevision,
+                    ),
+                ],
+              ];
+              final secondary = <Widget>[
+                if (!_editing) ...[
+                  if (noticed.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 20),
-                      child: Center(
-                        child: TextButton.icon(
-                          key: const Key('home-edit'),
-                          onPressed: _beginEdit,
-                          style: TextButton.styleFrom(
-                            foregroundColor: JarvisColors.of(context).inkSoft,
-                            minimumSize: const Size(44, 44),
-                          ),
-                          icon: const Icon(
-                            PhosphorIconsRegular.sliders,
-                            size: 16,
-                          ),
-                          label: const Text('Customize Home'),
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: FadeSlideIn(
+                        index: 3,
+                        child: NoticedCard(
+                          key: _noticedKey,
+                          insights: noticed,
+                          onAction: (item) => unawaited(_noticed(item)),
+                          onDismiss: (item) => _dismissCard(item.id, item.kind),
                         ),
                       ),
                     ),
-                  if (_editing)
+                  if (evening &&
+                      homeContext != null &&
+                      EveningCard.shows(homeContext.recap, tomorrow))
                     Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: OutlinedButton.icon(
-                        key: const Key('home-add-tile'),
-                        onPressed: widget.onAddTile,
-                        icon: const Icon(PhosphorIconsRegular.plus, size: 18),
-                        label: const Text('Add tile'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(tileRadius),
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: FadeSlideIn(
+                        index: 4,
+                        child: EveningCard(
+                          recap: homeContext.recap,
+                          tomorrow: tomorrow,
+                          onWrite: widget.onSuggestion == null
+                              ? null
+                              : () => widget.onSuggestion!(
+                                  'Help me write a short journal entry about today. Ask me one question at a time.',
+                                ),
+                          onPlan: widget.onSuggestion == null
+                              ? null
+                              : () => widget.onSuggestion!(
+                                  'Help me plan tomorrow.',
+                                ),
+                        ),
+                      ),
+                    )
+                  else if (_briefNote case final note?
+                      when hero?.kind != 'brief')
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: FadeSlideIn(
+                        index: 3,
+                        child: BriefCard(
+                          note: note,
+                          onDismiss: () => unawaited(
+                            _dismissBrief(asJsonString(note['id']) ?? ''),
                           ),
+                          onFollowUp: widget.onSuggestion == null
+                              ? null
+                              : () => _ask.text = 'About my morning brief: ',
+                        ),
+                      ),
+                    ),
+                  if (LearningChange.fromBriefing(
+                        _briefing,
+                        seenAt: _learningSeenAt,
+                      )
+                      case final changes when changes.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: FadeSlideIn(
+                        index: 5,
+                        child: LearningCard(
+                          changes: changes,
+                          // Once some were marked seen, the server's weekly count would include those.
+                          total: _learningSeenAt != null
+                              ? changes.length
+                              : asJsonInt(
+                                  jsonObject(
+                                    _briefing?['learning'],
+                                  )?['changesThisWeek'],
+                                  changes.length,
+                                ),
+                          pending: _learningPending,
+                          onAction: (change) =>
+                              unawaited(_learningAction(change)),
+                          onSeen: _learningSeen,
+                          onOpenLearning: () {
+                            _learningSeen();
+                            widget.onOpen('learning');
+                          },
                         ),
                       ),
                     ),
                 ],
-              ),
-            ),
+                if (widget.ready && _briefing != null) ...[
+                  CodexSignInCard(http: widget.source.http),
+                  if (showDayOne && !_editing)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: DayOneCard(
+                        steps: dayOne,
+                        http: widget.source.http,
+                      ),
+                    )
+                  else
+                    GetStartedCard(
+                      http: widget.source.http,
+                      briefing: _briefing,
+                      onSuggestion: widget.onSuggestion,
+                      refreshRevision: widget.refreshRevision,
+                    ),
+                ],
+                if (_editing)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Hold and drag to move. Use the corner button to change size.',
+                            key: const Key('home-edit-hint'),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: JarvisColors.of(context).inkSoft,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ListenableBuilder(
+                          listenable: widget.layout,
+                          builder: (context, _) => TextButton(
+                            key: const Key('home-edit-undo'),
+                            onPressed: widget.layout.canUndo
+                                ? widget.layout.undo
+                                : null,
+                            child: const Text('Undo'),
+                          ),
+                        ),
+                        TextButton(
+                          key: const Key('home-edit-cancel'),
+                          onPressed: () => _endEdit(save: false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          key: const Key('home-edit-done'),
+                          onPressed: () => _endEdit(save: true),
+                          child: const Text('Done'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ListenableBuilder(
+                  key: _tilesKey,
+                  listenable: widget.layout,
+                  builder: (context, _) => !widget.layout.ready
+                      ? const SizedBox(height: 240)
+                      : TileGrid(
+                          layout: widget.layout.layout,
+                          data: _tileData,
+                          editing: _editing,
+                          onOpen: (spec) => widget.onOpen(spec.destination),
+                          onRowTap: (spec, row) {
+                            final target = row.target;
+                            if (target != null && target.startsWith('chat:')) {
+                              widget.onOpenChat(target.substring(5));
+                            } else if (target != null &&
+                                (target.startsWith(entityDestinationPrefix) ||
+                                    target.startsWith(appDestinationPrefix))) {
+                              widget.onOpen(target);
+                            } else {
+                              widget.onOpen(spec.destination);
+                            }
+                          },
+                          onEdit: _beginEdit,
+                          now: now,
+                          isLoading: _isLoading,
+                          pending: _pending,
+                          onAction: _runAction,
+                          onMenu: _showMenu,
+                          onRemove: (item) => widget.layout.unpin(item.id),
+                          onResize: (item) => widget.layout.cycleSize(item.id),
+                          onReorder: widget.layout.move,
+                        ),
+                ),
+                if (!_editing)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: Center(
+                      child: TextButton.icon(
+                        key: const Key('home-edit'),
+                        onPressed: _beginEdit,
+                        style: TextButton.styleFrom(
+                          foregroundColor: JarvisColors.of(context).inkSoft,
+                          minimumSize: const Size(44, 44),
+                        ),
+                        icon: const Icon(
+                          PhosphorIconsRegular.sliders,
+                          size: 16,
+                        ),
+                        label: const Text('Customize Home'),
+                      ),
+                    ),
+                  ),
+                if (_editing)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: OutlinedButton.icon(
+                      key: const Key('home-add-tile'),
+                      onPressed: widget.onAddTile,
+                      icon: const Icon(PhosphorIconsRegular.plus, size: 18),
+                      label: const Text('Add tile'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(tileRadius),
+                        ),
+                      ),
+                    ),
+                  ),
+              ];
+              // A wide window shows what needs you and the rest side by side
+              // instead of one narrow column with empty margins.
+              if (box.maxWidth >= homeTwoColumnWidth && !_editing) {
+                return Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1160),
+                    child: Row(
+                      key: const Key('home-two-columns'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              header,
+                              const SizedBox(height: 20),
+                              ...primary,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 28),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: secondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      header,
+                      const SizedBox(height: 20),
+                      ...primary,
+                      ...secondary,
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -1189,6 +1255,31 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
             if (_preferredName?.trim() case final name? when name.isNotEmpty)
               name,
           ].join(', '),
+          jumps: _editing
+              ? const []
+              : [
+                  if (needsYou.isNotEmpty)
+                    (
+                      id: 'needs-you',
+                      label: 'Needs you',
+                      count: needsYou.length,
+                      target: _needsYouKey,
+                    ),
+                  if (noticed.isNotEmpty)
+                    (
+                      id: 'noticed',
+                      label: 'Noticed',
+                      count: 0,
+                      target: _noticedKey,
+                    ),
+                  (
+                    id: 'shortcuts',
+                    label: 'Shortcuts',
+                    count: 0,
+                    target: _tilesKey,
+                  ),
+                ],
+          onJump: _jumpTo,
         ),
       ],
     );
@@ -1198,14 +1289,28 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
 /// Once the greeting has scrolled away, a slim frosted bar takes its place
 /// at the top; tapping it glides back up.
 class _CompactHeader extends StatelessWidget {
-  const _CompactHeader({required this.scroll, required this.title});
+  const _CompactHeader({
+    required this.scroll,
+    required this.title,
+    this.jumps = const [],
+    this.onJump,
+  });
 
   final ScrollController scroll;
   final String title;
 
+  /// Sections further down Home, offered as chips so a long page is one tap away.
+  final List<HomeJump> jumps;
+  final ValueChanged<GlobalKey>? onJump;
+
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
+    void toTop() => scroll.animateTo(
+      0,
+      duration: JarvisMotion.of(context, const Duration(milliseconds: 520)),
+      curve: JarvisMotion.emphasized,
+    );
     return Positioned(
       top: 0,
       left: 0,
@@ -1232,48 +1337,166 @@ class _CompactHeader extends StatelessWidget {
             filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
             child: Material(
               color: colors.canvas.withValues(alpha: .78),
-              child: InkWell(
-                key: const Key('home-compact-header'),
-                onTap: () => scroll.animateTo(
-                  0,
-                  duration: JarvisMotion.of(
-                    context,
-                    const Duration(milliseconds: 520),
-                  ),
-                  curve: JarvisMotion.emphasized,
-                ),
-                child: Container(
-                  height: 48,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: colors.outline.withValues(alpha: .6),
-                      ),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 48),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: colors.outline.withValues(alpha: .6),
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const JarvisOrb(size: 18, glow: false),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontFamily: 'Geist',
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -.2,
-                            color: colors.ink,
+                ),
+                child: jumps.isEmpty
+                    ? InkWell(
+                        key: const Key('home-compact-header'),
+                        onTap: toTop,
+                        child: Container(
+                          height: 48,
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const JarvisOrb(size: 18, glow: false),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: 'Geist',
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -.2,
+                                    color: colors.ink,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 672),
+                          child: Row(
+                            children: [
+                              // The orb goes back to the top, as the greeting did.
+                              Semantics(
+                                button: true,
+                                label: 'Back to top',
+                                excludeSemantics: true,
+                                child: InkResponse(
+                                  key: const Key('home-compact-header'),
+                                  onTap: toTop,
+                                  radius: 24,
+                                  child: const SizedBox(
+                                    width: 52,
+                                    height: 48,
+                                    child: Center(
+                                      child: JarvisOrb(size: 22, glow: false),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: EdgeFade(
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: const EdgeInsets.only(right: 16),
+                                    child: Row(
+                                      children: [
+                                        for (final jump in jumps)
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              right: 8,
+                                            ),
+                                            child: _JumpChip(
+                                              jump: jump,
+                                              onTap: () =>
+                                                  onJump?.call(jump.target),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A section of Home the sticky header can jump to.
+typedef HomeJump = ({String id, String label, int count, GlobalKey target});
+
+/// Home turns into two columns from this content width.
+const homeTwoColumnWidth = 980.0;
+
+class _JumpChip extends StatelessWidget {
+  const _JumpChip({required this.jump, required this.onTap});
+
+  final HomeJump jump;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = JarvisColors.of(context);
+    return Semantics(
+      button: true,
+      label: jump.count > 0
+          ? 'Jump to ${jump.label}, ${jump.count}'
+          : 'Jump to ${jump.label}',
+      excludeSemantics: true,
+      child: Material(
+        color: colors.surface,
+        shape: StadiumBorder(side: BorderSide(color: colors.outline)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: Key('home-jump-${jump.id}'),
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 36, minWidth: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    jump.label,
+                    textScaler: MediaQuery.textScalerOf(context)
+                        .clamp(maxScaleFactor: 1.4),
+                    style: TextStyle(
+                      fontFamily: 'Geist',
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.ink,
+                    ),
                   ),
-                ),
+                  if (jump.count > 0) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      '${jump.count}',
+                      textScaler: MediaQuery.textScalerOf(context)
+                          .clamp(maxScaleFactor: 1.4),
+                      style: TextStyle(
+                        fontFamily: 'Geist',
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: colors.accent,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),

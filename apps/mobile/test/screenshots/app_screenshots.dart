@@ -165,6 +165,22 @@ void main() {
       await capture(tester, '02-home-scrolled-$mode');
     });
 
+    screenshotTest('home jump $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -700));
+      await settle(tester);
+      await tester.tap(find.byKey(const Key('home-jump-shortcuts')));
+      await settle(tester);
+      await capture(tester, '02b-home-jumped-$mode');
+    });
+
+    screenshotTest('desktop home $mode', (tester) async {
+      useDesktop(tester);
+      await start(tester, dark: dark);
+      await capture(tester, '20b-desktop-home-$mode');
+    });
+
     screenshotTest('chat $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);

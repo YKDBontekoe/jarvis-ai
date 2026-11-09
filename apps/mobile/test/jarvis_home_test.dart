@@ -1035,6 +1035,37 @@ void main() {
     expect(find.byKey(const Key('home-compact-header')), findsNothing);
   });
 
+  testWidgets('the sticky header jumps to a section further down', (
+    tester,
+  ) async {
+    await show(tester);
+    tester.view.physicalSize = const Size(400, 640);
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const Key('home-list')),
+      const Offset(0, -400),
+    );
+    await tester.pumpAndSettle();
+
+    final chip = find.byKey(const Key('home-jump-shortcuts'));
+    expect(chip, findsOneWidget);
+    final list = tester.widget<ListView>(find.byKey(const Key('home-list')));
+    final before = list.controller!.offset;
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    expect(list.controller!.offset, isNot(before));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a wide window lays Home out in two columns', (tester) async {
+    await show(tester);
+    expect(find.byKey(const Key('home-two-columns')), findsNothing);
+    tester.view.physicalSize = const Size(1300, 900);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-two-columns')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('coming straight back to the app does not reload Home', (
     tester,
   ) async {

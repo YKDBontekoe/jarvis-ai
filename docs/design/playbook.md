@@ -136,6 +136,10 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 
 ## 7. Patterns
 
+- **Home order and getting around it.**
+  - Order: greeting, Right now, Ask bar, Needs you, Ongoing work, then what Jarvis noticed, the evening or brief card, Jarvis is learning, and the owner's tiles. What needs the owner always sits above what Jarvis is doing by itself.
+  - Once the greeting scrolls away, the sticky header shows the orb (back to top) and jump chips for the sections further down: "Needs you 8", "Noticed", "Shortcuts" (the tiles). A chip glides to its section and leaves room for the header. With nothing to jump to (while customizing) the header keeps the greeting.
+  - From 980pt of content width (`homeTwoColumnWidth`) Home is two columns, at most 1160 wide: greeting, Right now, Ask, Needs you and Ongoing work on the left; noticed, evening or brief, learning and the tiles on the right. Customizing always uses one column.
 - **Right now card.** One slot at the top of Home that morphs between `soon` (countdown), `brief`, `battery` and `wind_down` (tomorrow). It has colours per moment, at most two actions, a reason line, and a Why sheet with the facts plus Not now / Fewer cards like this. It replaces Next up only when the server sends a hero (`/home/context`).
 - **Needs you.**
   - Order: approvals, then due reminders, then people waiting, then tasks, then suggestions from Jarvis's own improvement loop, then catch-ups.
