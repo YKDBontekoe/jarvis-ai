@@ -157,6 +157,22 @@ void main() {
     expect(find.text('Café Loetje'), findsOneWidget);
   });
 
+  testWidgets('the greeting is one compact heading with the name beside it', (
+    tester,
+  ) async {
+    http.on('GET', '/api/v1/persona', {'preferredName': 'Youri'});
+    await show(tester, at: DateTime(2026, 10, 3, 21));
+    final greeting = find.byKey(const Key('home-greeting'));
+    expect(tester.widget<Text>(greeting).style?.fontSize, 30);
+    // Greeting and name are siblings of one Wrap, so they share a line whenever both fit.
+    final wrap = find.ancestor(of: greeting, matching: find.byType(Wrap)).first;
+    expect(
+      find.descendant(of: wrap, matching: find.byKey(const Key('home-name'))),
+      findsOneWidget,
+    );
+    expect(find.text(','), findsOneWidget);
+  });
+
   testWidgets('the greeting follows the local time and omits an unset name', (
     tester,
   ) async {

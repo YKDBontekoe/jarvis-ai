@@ -118,6 +118,50 @@ void main() {
     expect(find.bySemanticsLabel('Chats, unread'), findsOneWidget);
   });
 
+  testWidgets('Home shows an amber dot when something cannot wait', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        JarvisTabBar(
+          selected: JarvisTab.chats,
+          onSelect: (_) {},
+          onJarvis: () {},
+          homeAttention: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tab-urgent')), findsOneWidget);
+    expect(find.bySemanticsLabel('Home, something needs you'), findsOneWidget);
+  });
+
+  testWidgets('holding the orb talks, tapping it still opens the chat', (
+    tester,
+  ) async {
+    var taps = 0;
+    var holds = 0;
+    await tester.pumpWidget(
+      _host(
+        JarvisTabBar(
+          selected: JarvisTab.home,
+          onSelect: (_) {},
+          onJarvis: () => taps++,
+          onJarvisHold: () => holds++,
+        ),
+      ),
+    );
+    await tester.longPress(find.byKey(const Key('tab-jarvis')));
+    await tester.pumpAndSettle();
+    expect((taps, holds), (0, 1));
+    // The hold must not also raise the tooltip over the dock.
+    expect(find.textContaining('hold to talk'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('tab-jarvis')));
+    await tester.pumpAndSettle();
+    expect((taps, holds), (1, 1));
+  });
+
   testWidgets('the selected tab is exposed to accessibility', (tester) async {
     final handle = tester.ensureSemantics();
     await tester.pumpWidget(
@@ -158,6 +202,8 @@ void main() {
     );
     for (final tab in JarvisTab.values) {
       expect(find.byKey(Key('tab-${tab.name}')), findsOneWidget);
+      // With room to spare, the rail names every place.
+      expect(find.text(tab.label), findsOneWidget);
     }
     await tester.tap(find.byKey(const Key('tab-you')));
     expect(chosen, [JarvisTab.you]);

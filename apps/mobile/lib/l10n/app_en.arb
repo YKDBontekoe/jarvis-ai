@@ -13,6 +13,15 @@
       }
     }
   },
+  "tabNeedsYou": "{label}, something needs you",
+  "@tabNeedsYou": {
+    "description": "Screen reader label of a tab with unread items.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
   "greetingMorning": "Good morning",
   "greetingAfternoon": "Good afternoon",
   "greetingEvening": "Good evening",

@@ -52,7 +52,7 @@ Geist for everything (`JarvisType`, `theme.dart`).
 | Role | Style |
 |------|-------|
 | Page title | `JarvisType.displayOf` 34 w700, letter spacing −1.2 (Chats, Settings) |
-| Home greeting | 30 w700, letter spacing −1 (26 below 360pt wide). Clamped to 1.3× text scale |
+| Home greeting | 30 w700, letter spacing −1 (26 below 330pt wide), greeting and name on one line (“Good evening, Youri”; the name drops under it only when both cannot fit). Clamped to 1.3× text scale; the day line clamps at 1.6× and three lines |
 | Card title / section | 20 w600, letter spacing −0.5 ("Needs you", "Jarvis noticed") |
 | Row title | 15.5–16 w600, letter spacing −0.25 |
 | Body | 15 / 1.4; 14.5 in previews |
@@ -172,12 +172,15 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
   - scrolling a list down folds the capsule to the open tab (`dockCompactAfterScroll`); scrolling up, reaching the top or tapping the folded tab unfolds it;
   - one contextual strip above the dock (`dock_strip.dart`), priority: Jarvis writing, then a reply that finished while away, then the top Needs you item (an approval, or the first chat waiting on you). Home shows Needs you itself, so the strip skips it there. × hides a strip until something newer replaces it; opening its destination or resolving it removes it;
   - tapping the tab you are on scrolls it to the top; every tab reopens where it was left, with its Chats filter and searches (`TabMemory`);
-  - Chats shows the unread dot. Hold-the-orb-to-talk and the Home amber dot are still to do.
+  - Chats shows the unread dot (accent). Home shows a larger amber dot (`tab-urgent`, `warning`) while you are on another tab and an approval is waiting; its spoken label is "Home, something needs you";
+  - tap the orb for the chat, hold it to open the chat already listening (`onJarvisHold`). With no conversation yet, or while Jarvis is busy, a hold opens the chat as a tap would. The mockup's stretching "Listening" strip with slide-to-cancel is not built;
+  - the wide-screen rail (`JarvisNavRail`) names each place under its icon (labels scale at most 1.2×).
 
 ## 7b. Forms and lists
 
 - Prose fields set `textCapitalization: sentences` (names: `words`); search fields set `textInputAction: search` and a `SearchClearButton`; scroll views under a search field use `keyboardDismissBehavior: onDrag`.
 - Quick-entry fields (list items) keep the keyboard up after each add (`onEditingComplete: () {}` and refocus).
+- A row that ends in trailing icons gives its leading content `Expanded`, never `Flexible` plus `Spacer`: the two split the width and the icons drift off the edge (Memory cards). A scrollable `TabBar` takes 12pt horizontal padding so its first tab meets the page gutter.
 - **The usual next step is a visible button, not a menu item.** A one-off reminder has a check button on its row (repeating and place reminders have no "done", so they keep only the ⋯ menu); a task waiting for approval has a Review pill. Menus and swipes hold the rarer actions and shortcuts.
 - **Counts that summarise a list filter it.** The Tasks summary tiles (Active, Needs review, Done) narrow the list when tapped and show everything when tapped again; the open one is `accentSoft` with `accentDeep` text. An empty filter says so and offers "Show all tasks".
 - **Search results** (`SearchResultsBody`) lead with the kind's icon (`searchKindIcon`), then title, "Kind · date" and a two-line summary. `highlightMatches` marks the words that were searched for: `accentDeep` in the title, ink w600 in the summary. When a scope or time filter leaves nothing, the empty state offers "Search everything".
@@ -237,6 +240,6 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 
 ## 12. Open items
 
-- The compact Home header is approved as a mockup and not built yet. Hold the orb to talk and the amber Home dot from the navigation mockup are not built.
+- From the navigation mockup, still to do: the stretching Listening strip with slide-to-cancel while holding the orb, a count of people waiting on the Chats tab, and the amber Home dot for a reminder that is due now (it covers approvals only).
 - A "Leave now" travel estimate needs locations on calendar events and reminders.
 - The iOS widget's Swift (`apps/mobile/ios/JarvisWidget/`) has not been compiled yet. See its README.

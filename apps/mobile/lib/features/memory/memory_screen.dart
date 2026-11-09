@@ -439,17 +439,23 @@ class _MemoryScreenState extends State<MemoryScreen> {
         children: [
           Row(
             children: [
-              Flexible(
-                child: _KindTag(label: kind, icon: _kindIcon(kind)),
-              ),
-              if (isSuperseded) ...[
-                const SizedBox(width: 6),
-                StatusPill(
-                  label: 'Superseded',
-                  color: JarvisColors.of(context).muted,
+              // Takes all the room left, so the pin and the menu sit at the
+              // card's edge on every row.
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _KindTag(label: kind, icon: _kindIcon(kind)),
+                    if (isSuperseded)
+                      StatusPill(
+                        label: 'Superseded',
+                        color: JarvisColors.of(context).muted,
+                      ),
+                  ],
                 ),
-              ],
-              const Spacer(),
+              ),
               if (isPinned)
                 Padding(
                   padding: const EdgeInsets.only(right: 2),

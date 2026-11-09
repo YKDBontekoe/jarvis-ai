@@ -259,13 +259,17 @@ class _ChatScreenState extends _ChatScreenController
               : KeyedSubtree(key: const ValueKey('chat'), child: chat),
         );
         final chatsAttention = _chatList.unreadCount > 0;
+        // Home calls you back while you are elsewhere and an approval is waiting.
+        final homeAttention = _tab != JarvisTab.home && _hasPendingApproval;
         final shell = Scaffold(
           bottomNavigationBar: !wide && showTabs
               ? JarvisTabBar(
                   selected: _tab,
                   onSelect: _selectTab,
                   onJarvis: _openJarvis,
+                  onJarvisHold: _talkToJarvis,
                   chatsAttention: chatsAttention,
+                  homeAttention: homeAttention,
                   jarvisBusy: _busy,
                   orbKey: _tabOrbKey,
                   compact: _dockCompact,
@@ -283,7 +287,9 @@ class _ChatScreenState extends _ChatScreenController
                       selected: _utilityPane == null && showTabs ? _tab : null,
                       onSelect: _selectTab,
                       onJarvis: _openJarvis,
+                      onJarvisHold: _talkToJarvis,
                       chatsAttention: chatsAttention,
+                      homeAttention: homeAttention,
                       jarvisBusy: _busy,
                     ),
                     Expanded(

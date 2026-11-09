@@ -58,6 +58,8 @@ class JarvisTabBar extends StatelessWidget {
     required this.onSelect,
     required this.onJarvis,
     this.chatsAttention = false,
+    this.homeAttention = false,
+    this.onJarvisHold,
     this.jarvisBusy = false,
     this.compact = false,
     this.onUnfold,
@@ -72,7 +74,13 @@ class JarvisTabBar extends StatelessWidget {
   final JarvisTab selected;
   final ValueChanged<JarvisTab> onSelect;
   final VoidCallback onJarvis;
+
+  /// Holding the orb goes straight to voice; null leaves it a plain button.
+  final VoidCallback? onJarvisHold;
   final bool chatsAttention;
+
+  /// Something on Home cannot wait (an approval); shown as an amber dot.
+  final bool homeAttention;
   final bool jarvisBusy;
 
   /// Show only the open tab; a tap on it calls [onUnfold].
@@ -143,6 +151,7 @@ class JarvisTabBar extends StatelessWidget {
                     child: JarvisOrbButton(
                       key: orbKey,
                       onPressed: onJarvis,
+                      onLongPress: onJarvisHold,
                       busy: jarvisBusy,
                       size: 34,
                     ),
@@ -162,6 +171,7 @@ class JarvisTabBar extends StatelessWidget {
     selected: true,
     named: true,
     attention: selected == JarvisTab.chats && chatsAttention,
+    urgent: selected == JarvisTab.home && homeAttention,
     onTap: onUnfold ?? () {},
     semanticsHint: 'Show all tabs',
   );
@@ -177,6 +187,7 @@ class JarvisTabBar extends StatelessWidget {
             selected: tab == selected,
             named: tab == selected && named,
             attention: tab == JarvisTab.chats && chatsAttention,
+            urgent: tab == JarvisTab.home && homeAttention,
             onTap: () => onSelect(tab),
           ),
       ],
@@ -242,8 +253,12 @@ class _DockTab extends StatelessWidget {
     required this.named,
     required this.attention,
     required this.onTap,
+    this.urgent = false,
     this.semanticsHint,
   });
+
+  /// Something here cannot wait: an amber dot instead of the accent one.
+  final bool urgent;
 
   final JarvisTab tab;
   final bool selected;
@@ -283,18 +298,20 @@ class _DockTab extends StatelessWidget {
           color: selected ? colors.accent : colors.inkSoft,
           selected: selected,
         ),
-        if (attention)
+        if (attention || urgent)
           Positioned(
             top: -2,
             right: -4,
-            child: Container(
-              key: const Key('tab-attention'),
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: colors.accent,
-                shape: BoxShape.circle,
-                border: Border.all(color: colors.surface, width: 1.5),
+            child: PopIn(
+              child: Container(
+                key: Key(urgent ? 'tab-urgent' : 'tab-attention'),
+                width: urgent ? 9 : 7,
+                height: urgent ? 9 : 7,
+                decoration: BoxDecoration(
+                  color: urgent ? colors.warning : colors.accent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.surface, width: 1.5),
+                ),
               ),
             ),
           ),
@@ -303,7 +320,11 @@ class _DockTab extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: attention ? context.l10n.tabUnread(name) : name,
+      label: urgent
+          ? context.l10n.tabNeedsYou(name)
+          : attention
+          ? context.l10n.tabUnread(name)
+          : name,
       hint: semanticsHint,
       onTap: activate,
       excludeSemantics: true,
@@ -374,12 +395,16 @@ class _DockTab extends StatelessWidget {
 class JarvisOrbButton extends StatefulWidget {
   const JarvisOrbButton({
     required this.onPressed,
+    this.onLongPress,
     this.size = 40,
     this.busy = false,
     super.key,
   });
 
   final VoidCallback onPressed;
+
+  /// Hold to talk: opens the chat already listening.
+  final VoidCallback? onLongPress;
   final double size;
   final bool busy;
 
@@ -407,20 +432,32 @@ class _JarvisOrbButtonState extends State<JarvisOrbButton> {
       widget.onPressed();
     }
 
+    final hold = widget.onLongPress;
+    void talk() {
+      unawaited(HapticFeedback.mediumImpact());
+      setState(() => _taps++);
+      hold?.call();
+    }
+
     final label = widget.busy ? 'Jarvis is replying. Open chat' : 'Ask Jarvis';
     return Semantics(
       button: true,
       label: label,
+      hint: hold == null ? null : 'Hold to talk',
       onTap: activate,
+      onLongPress: hold == null ? null : talk,
       excludeSemantics: true,
       child: Tooltip(
-        message: label,
+        message: hold == null ? label : '$label · hold to talk',
         excludeFromSemantics: true,
+        // A hold talks to Jarvis, so the tooltip is left to hover.
+        triggerMode: hold == null ? null : TooltipTriggerMode.manual,
         child: PressFeedback(
           scale: .88,
           builder: (context, highlight) => InkResponse(
             key: const Key('tab-jarvis'),
             onTap: activate,
+            onLongPress: hold == null ? null : talk,
             onHighlightChanged: highlight,
             radius: 26,
             child: SizedBox(
@@ -452,11 +489,13 @@ class _TabButton extends StatelessWidget {
     required this.selected,
     required this.attention,
     required this.onTap,
+    this.urgent = false,
   });
 
   final JarvisTab tab;
   final bool selected;
   final bool attention;
+  final bool urgent;
   final VoidCallback onTap;
 
   @override
@@ -470,7 +509,9 @@ class _TabButton extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: attention
+      label: urgent
+          ? context.l10n.tabNeedsYou(tab.localizedLabel(context.l10n))
+          : attention
           ? context.l10n.tabUnread(tab.localizedLabel(context.l10n))
           : tab.localizedLabel(context.l10n),
       onTap: activate,
@@ -485,77 +526,102 @@ class _TabButton extends StatelessWidget {
             onTap: activate,
             onHighlightChanged: highlight,
             radius: 26,
-            child: Center(
-              child: AnimatedContainer(
-                duration: JarvisMotion.of(context, JarvisMotion.fast),
-                curve: JarvisMotion.standard,
-                width: 48,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? (colors.isDark
-                            ? colors.surfaceRaised
-                            : colors.surfaceMuted)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Center(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      AnimatedSwitcher(
-                        duration: JarvisMotion.of(
-                          context,
-                          const Duration(milliseconds: 460),
-                        ),
-                        reverseDuration: JarvisMotion.of(
-                          context,
-                          JarvisMotion.fast,
-                        ),
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: ScaleTransition(
-                            scale: Tween(begin: .55, end: 1.0).animate(
-                              CurvedAnimation(
-                                parent: animation,
-                                curve: JarvisSprings.pop,
-                                reverseCurve: Curves.easeIn,
+            // On a wide screen there is room to name each place under its icon.
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: JarvisMotion.of(context, JarvisMotion.fast),
+                  curve: JarvisMotion.standard,
+                  width: 52,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? (colors.isDark
+                              ? colors.surfaceRaised
+                              : colors.surfaceMuted)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Center(
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        AnimatedSwitcher(
+                          duration: JarvisMotion.of(
+                            context,
+                            const Duration(milliseconds: 460),
+                          ),
+                          reverseDuration: JarvisMotion.of(
+                            context,
+                            JarvisMotion.fast,
+                          ),
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  scale: Tween(begin: .55, end: 1.0).animate(
+                                    CurvedAnimation(
+                                      parent: animation,
+                                      curve: JarvisSprings.pop,
+                                      reverseCurve: Curves.easeIn,
+                                    ),
+                                  ),
+                                  child: child,
+                                ),
                               ),
-                            ),
-                            child: child,
+                          child: TabIcon(
+                            key: ValueKey((tab.glyph, selected)),
+                            glyph: tab.glyph,
+                            color: selected ? colors.accent : colors.inkSoft,
+                            selected: selected,
                           ),
                         ),
-                        child: TabIcon(
-                          key: ValueKey((tab.glyph, selected)),
-                          glyph: tab.glyph,
-                          color: selected ? colors.accent : colors.inkSoft,
-                          selected: selected,
-                        ),
-                      ),
-                      if (attention)
-                        Positioned(
-                          top: -2,
-                          right: -4,
-                          child: PopIn(
-                            child: Container(
-                              key: const Key('tab-attention'),
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: colors.accent,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: colors.surface,
-                                  width: 1.5,
+                        if (attention || urgent)
+                          Positioned(
+                            top: -2,
+                            right: -4,
+                            child: PopIn(
+                              child: Container(
+                                key: Key(
+                                  urgent ? 'tab-urgent' : 'tab-attention',
+                                ),
+                                width: urgent ? 9 : 7,
+                                height: urgent ? 9 : 7,
+                                decoration: BoxDecoration(
+                                  color: urgent
+                                      ? colors.warning
+                                      : colors.accent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: colors.surface,
+                                    width: 1.5,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 3),
+                Text(
+                  tab.localizedLabel(context.l10n),
+                  key: Key('rail-label-${tab.name}'),
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.fade,
+                  textScaler: MediaQuery.textScalerOf(context)
+                      .clamp(maxScaleFactor: 1.2),
+                  style: TextStyle(
+                    fontFamily: 'Geist',
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    color: selected ? colors.ink : colors.inkSoft,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -570,7 +636,9 @@ class JarvisNavRail extends StatelessWidget {
     required this.selected,
     required this.onSelect,
     required this.onJarvis,
+    this.onJarvisHold,
     this.chatsAttention = false,
+    this.homeAttention = false,
     this.jarvisBusy = false,
     super.key,
   });
@@ -578,7 +646,9 @@ class JarvisNavRail extends StatelessWidget {
   final JarvisTab? selected;
   final ValueChanged<JarvisTab> onSelect;
   final VoidCallback onJarvis;
+  final VoidCallback? onJarvisHold;
   final bool chatsAttention;
+  final bool homeAttention;
   final bool jarvisBusy;
 
   @override
@@ -590,6 +660,7 @@ class JarvisNavRail extends StatelessWidget {
         tab: value,
         selected: value == selected,
         attention: value == JarvisTab.chats && chatsAttention,
+        urgent: value == JarvisTab.home && homeAttention,
         onTap: () => onSelect(value),
       ),
     );
@@ -607,7 +678,11 @@ class JarvisNavRail extends StatelessWidget {
               const SizedBox(height: 18),
               SizedBox(
                 height: 64,
-                child: JarvisOrbButton(onPressed: onJarvis, busy: jarvisBusy),
+                child: JarvisOrbButton(
+                  onPressed: onJarvis,
+                  onLongPress: onJarvisHold,
+                  busy: jarvisBusy,
+                ),
               ),
               const SizedBox(height: 14),
               tab(JarvisTab.home),

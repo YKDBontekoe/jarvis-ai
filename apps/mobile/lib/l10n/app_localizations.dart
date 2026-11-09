@@ -128,6 +128,12 @@ abstract class AppLocalizations {
   /// **'{label}, unread'**
   String tabUnread(String label);
 
+  /// Screen reader label of a tab with unread items.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}, something needs you'**
+  String tabNeedsYou(String label);
+
   /// No description provided for @greetingMorning.
   ///
   /// In en, this message translates to:

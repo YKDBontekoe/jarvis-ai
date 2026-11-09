@@ -52,66 +52,108 @@ class ClockHeader extends StatelessWidget {
         _Recede(
           scroll: scroll,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 16, 4, 0),
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
             child: LayoutBuilder(
               builder: (context, box) {
+                // One line, "Good evening, Youri", so Right now and the Ask bar
+                // share the first screen. The name drops under the greeting only
+                // when the two cannot fit side by side.
                 final style = JarvisType.displayOf(context).copyWith(
-                  fontSize: box.maxWidth < 330 ? 32 : 38,
+                  fontSize: box.maxWidth < 330 ? 26 : 30,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: -1.2,
-                  height: 1.08,
+                  letterSpacing: -1,
+                  height: 1.12,
                 );
                 final name = preferredName?.trim();
+                final hasName = name != null && name.isNotEmpty;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    BlurIn(
-                      // Shrinks with very large text instead of breaking
-                      // "afternoon" in the middle.
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Text(
-                          greetingFor(now, context.l10n),
-                          key: const Key('home-greeting'),
-                          maxLines: 1,
-                          style: style,
-                        ),
-                      ),
-                    ),
-                    MotionSwitcher(
-                      resize: true,
-                      child: name != null && name.isNotEmpty
-                          ? Padding(
-                              key: ValueKey(name),
-                              padding: const EdgeInsets.only(top: 2),
-                              child: BlurIn(
-                                delay: const Duration(milliseconds: 140),
-                                // The name catches the orb's iridescence.
-                                child: ShaderMask(
-                                  blendMode: BlendMode.srcIn,
-                                  shaderCallback: (bounds) => LinearGradient(
-                                    colors: [
-                                      colors.accent,
-                                      colors.violet,
-                                      Color.lerp(
-                                        colors.violet,
-                                        colors.rose,
-                                        .6,
-                                      )!,
-                                    ],
-                                  ).createShader(bounds),
-                                  child: Text(
-                                    name,
-                                    key: const Key('home-name'),
-                                    style: style.copyWith(color: colors.accent),
-                                  ),
+                    // Display headings stop growing at 1.3×; body text below
+                    // still follows the full system size.
+                    MediaQuery.withClampedTextScaling(
+                      maxScaleFactor: 1.3,
+                      child: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.end,
+                        spacing: 8,
+                        children: [
+                          BlurIn(
+                            // Shrinks with very large text instead of breaking
+                            // "afternoon" in the middle.
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: box.maxWidth,
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      greetingFor(now, context.l10n),
+                                      key: const Key('home-greeting'),
+                                      maxLines: 1,
+                                      style: style,
+                                    ),
+                                    if (hasName)
+                                      ExcludeSemantics(
+                                        child: Text(',', style: style),
+                                      ),
+                                  ],
                                 ),
                               ),
-                            )
-                          : const SizedBox.shrink(key: ValueKey('no-name')),
+                            ),
+                          ),
+                          MotionSwitcher(
+                            resize: true,
+                            child: hasName
+                                ? BlurIn(
+                                    key: ValueKey(name),
+                                    delay: const Duration(milliseconds: 140),
+                                    // The name catches the orb's iridescence.
+                                    child: ShaderMask(
+                                      blendMode: BlendMode.srcIn,
+                                      shaderCallback: (bounds) =>
+                                          LinearGradient(
+                                            colors: [
+                                              colors.accent,
+                                              colors.violet,
+                                              Color.lerp(
+                                                colors.violet,
+                                                colors.rose,
+                                                .6,
+                                              )!,
+                                            ],
+                                          ).createShader(bounds),
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          maxWidth: box.maxWidth,
+                                        ),
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          alignment:
+                                              AlignmentDirectional.centerStart,
+                                          child: Text(
+                                            name,
+                                            key: const Key('home-name'),
+                                            maxLines: 1,
+                                            style: style.copyWith(
+                                              color: colors.accent,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : const SizedBox.shrink(
+                                    key: ValueKey('no-name'),
+                                  ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     FadeSlideIn(
                       index: 3,
                       child: Text(
@@ -129,8 +171,12 @@ class ClockHeader extends StatelessWidget {
                               child: Text(
                                 dayLine!,
                                 key: const Key('home-day-line'),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                textScaler: MediaQuery.textScalerOf(context)
+                                    .clamp(maxScaleFactor: 1.6),
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   height: 1.4,
                                   letterSpacing: -.2,
                                   color: colors.ink.withValues(alpha: .82),
@@ -144,7 +190,7 @@ class ClockHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
         FadeSlideIn(
           index: 2,
           offset: 16,

@@ -343,83 +343,82 @@ class _TasksScreenState extends State<TasksScreen> {
       ('review', 'Needs review'),
       ('done', 'Done'),
     ];
-    return SurfaceCard(
-      padding: const EdgeInsets.all(4),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final (id, label) in stats)
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  selected: _filter == id,
-                  label: '$label, ${count(id)}',
-                  hint: _filter == id ? 'Show all tasks' : 'Show only these',
-                  excludeSemantics: true,
-                  child: PressFeedback(
-                    scale: .97,
-                    builder: (context, onHighlight) => InkWell(
-                      key: Key('tasks-filter-$id'),
-                      onHighlightChanged: onHighlight,
-                      borderRadius: BorderRadius.circular(JarvisRadii.md),
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        setState(() => _filter = _filter == id ? null : id);
-                      },
-                      child: AnimatedContainer(
-                        duration: JarvisMotion.of(context, JarvisMotion.fast),
-                        constraints: const BoxConstraints(minHeight: 48),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _filter == id
-                              ? colors.accentSoft
-                              : colors.accentSoft.withValues(alpha: 0),
-                          borderRadius: BorderRadius.circular(JarvisRadii.md),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            RollingNumber(
-                              '${count(id)}',
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
-                                    color: _filter == id
-                                        ? colors.accentDeep
-                                        : null,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                  ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: _filter == id
-                                        ? colors.accentDeep
-                                        : null,
-                                    fontWeight: _filter == id
-                                        ? FontWeight.w600
-                                        : null,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
+    // At large text three columns break words, so the counts stack as rows.
+    final stacked = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+    Widget tile(String id, String label) => Semantics(
+      button: true,
+      selected: _filter == id,
+      label: '$label, ${count(id)}',
+      hint: _filter == id ? 'Show all tasks' : 'Show only these',
+      excludeSemantics: true,
+      child: PressFeedback(
+        scale: .97,
+        builder: (context, onHighlight) => InkWell(
+          key: Key('tasks-filter-$id'),
+          onHighlightChanged: onHighlight,
+          borderRadius: BorderRadius.circular(JarvisRadii.md),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() => _filter = _filter == id ? null : id);
+          },
+          child: AnimatedContainer(
+            duration: JarvisMotion.of(context, JarvisMotion.fast),
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: _filter == id
+                  ? colors.accentSoft
+                  : colors.accentSoft.withValues(alpha: 0),
+              borderRadius: BorderRadius.circular(JarvisRadii.md),
+            ),
+            child: Flex(
+              direction: stacked ? Axis.horizontal : Axis.vertical,
+              crossAxisAlignment: stacked
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.start,
+              children: [
+                RollingNumber(
+                  '${count(id)}',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: _filter == id ? colors.accentDeep : null,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(width: 12, height: 2),
+                Flexible(
+                  flex: stacked ? 1 : 0,
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _filter == id ? colors.accentDeep : null,
+                      fontWeight: _filter == id ? FontWeight.w600 : null,
                     ),
                   ),
                 ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
+    );
+    return SurfaceCard(
+      padding: const EdgeInsets.all(4),
+      child: stacked
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [for (final (id, label) in stats) tile(id, label)],
+            )
+          : IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final (id, label) in stats)
+                    Expanded(child: tile(id, label)),
+                ],
+              ),
+            ),
     );
   }
 

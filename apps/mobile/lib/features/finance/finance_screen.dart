@@ -71,6 +71,8 @@ class _FinanceScreenState extends State<FinanceScreen>
         controller: _tabs,
         isScrollable: true,
         tabAlignment: TabAlignment.start,
+        // Lines the first tab up with the page's 16pt gutter.
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         tabs: [for (final tab in FinanceTab.values) Tab(text: tab.label)],
       ),
     ),

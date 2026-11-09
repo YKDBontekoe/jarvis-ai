@@ -144,6 +144,14 @@ mixin _ChatScreenUi on _ChatScreenController {
     }
   }
 
+  /// Holding the orb: open the chat and start listening straight away. With
+  /// no conversation yet, or while Jarvis is busy, it opens the chat as a tap would.
+  void _talkToJarvis() {
+    _openJarvis();
+    if (_conversationId == null || _voiceActive || _voiceStarting) return;
+    unawaited(_toggleVoice());
+  }
+
   /// Where the tab bar's orb is on screen, or null when it is not showing.
   Rect? _tabOrbRect() {
     final box = _tabOrbKey.currentContext?.findRenderObject();

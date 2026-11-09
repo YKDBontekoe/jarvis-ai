@@ -27,6 +27,11 @@ class AppLocalizationsNl extends AppLocalizations {
   }
 
   @override
+  String tabNeedsYou(String label) {
+    return '$label, er wacht iets op je';
+  }
+
+  @override
   String get greetingMorning => 'Goedemorgen';
 
   @override
