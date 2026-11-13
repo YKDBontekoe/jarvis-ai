@@ -60,6 +60,8 @@ const destinations = [
   'people',
   'play',
   'know-me',
+  'discover',
+  'museum',
   'talk-differently',
   'approvals',
   'reminders',

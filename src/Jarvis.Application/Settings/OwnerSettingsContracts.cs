@@ -52,4 +52,5 @@ public static class SettingsSections
     public const string Improvements = "improvements";
     public const string Game = "game";
     public const string Knowing = "knowing";
+    public const string Collisions = "collisions";
 }

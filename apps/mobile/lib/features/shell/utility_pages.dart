@@ -57,6 +57,8 @@ import '../meetings/meeting_screen.dart';
 import '../meetings/meetings_screen.dart';
 import '../decisions/decisions_screen.dart';
 import '../game/game_screen.dart';
+import '../discover/discover_screen.dart';
+import '../discover/museum_screen.dart';
 import '../knowing/knowing_screen.dart';
 import '../knowing/special_chats_screen.dart';
 import '../entities/entity_ref.dart';
@@ -157,6 +159,8 @@ Widget? utilityPageFor(
   'decisions' => DecisionsScreen(http: http),
   'play' => GameScreen(http: http),
   'know-me' => KnowingScreen(http: http),
+  'discover' => DiscoverScreen(http: http, onAskInChat: onAskInChat),
+  'museum' => MuseumScreen(http: http),
   'talk-differently' => SpecialChatsScreen(
     http: http,
     onOpenConversation: onOpenConversation,

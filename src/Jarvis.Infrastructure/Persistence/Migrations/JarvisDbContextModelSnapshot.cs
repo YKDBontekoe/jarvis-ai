@@ -2452,6 +2452,82 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("document_collection_files", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.DuelEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly>("EndsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("ends_on");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("last_error");
+
+                    b.Property<string>("Metric")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("metric");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("PeerName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("peer_name");
+
+                    b.Property<Guid>("RemoteAgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("remote_agent_id");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("role");
+
+                    b.Property<DateOnly>("StartsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("starts_on");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<int?>("TheirScore")
+                        .HasColumnType("integer")
+                        .HasColumnName("their_score");
+
+                    b.Property<DateTimeOffset?>("TheirScoreAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("their_score_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "Code", "Role")
+                        .IsUnique();
+
+                    b.ToTable("duels", (string)null);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.EntityLinkEntity", b =>
                 {
                     b.Property<Guid>("Id")

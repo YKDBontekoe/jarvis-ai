@@ -84,6 +84,39 @@ public sealed class KnowingPersistenceTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task A_duel_code_has_one_row_per_side_and_owner()
+    {
+        var owner = Guid.CreateVersion7();
+        Jarvis.Domain.Discover.Duel Duel(string role) => new(Guid.CreateVersion7(), owner, "ABCD2345", role,
+            Guid.NewGuid(), "Sam", Jarvis.Application.Discover.DuelMetrics.JournalDays, new DateOnly(2026, 11, 9),
+            new DateOnly(2026, 11, 15), Jarvis.Application.Discover.DuelStatuses.Active, null, null, null,
+            DateTimeOffset.UtcNow);
+        var challenger = Duel(Jarvis.Application.Discover.DuelRoles.Challenger);
+        await using (var database = CreateDbContext())
+        {
+            var repository = new DuelRepository(database);
+            await repository.AddAsync(challenger, default);
+            await repository.AddAsync(Duel(Jarvis.Application.Discover.DuelRoles.Joiner), default);
+        }
+
+        await using (var database = CreateDbContext())
+        {
+            await Assert.ThrowsAsync<DbUpdateException>(() =>
+                new DuelRepository(database).AddAsync(Duel(Jarvis.Application.Discover.DuelRoles.Joiner), default));
+        }
+
+        await using (var database = CreateDbContext())
+        {
+            var repository = new DuelRepository(database);
+            Assert.Equal(2, (await repository.ListAsync(owner, default)).Count);
+            Assert.Null(await repository.FindAsync(Guid.CreateVersion7(), "ABCD2345", "challenger", default));
+            Assert.True(await repository.UpdateAsync(challenger with { TheirScore = 4, TheirScoreAt = DateTimeOffset.UtcNow },
+                default));
+            Assert.Equal(4, (await repository.FindAsync(owner, "ABCD2345", "challenger", default))!.TheirScore);
+        }
+    }
+
     private JarvisDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<JarvisDbContext>()

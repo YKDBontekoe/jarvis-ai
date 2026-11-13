@@ -154,6 +154,27 @@ final List<TileSpec> tileSpecs = [
     fallback: 'Rehearse, past you, the council',
   ),
   const TileSpec(
+    id: 'discover',
+    description: 'A daily collision between two things you kept, and duels with friends’ Jarvises.',
+    name: 'Discover',
+    icon: PhosphorIconsRegular.lightbulbFilament,
+    category: TileCategory.know,
+    sizes: [_icon, _strip],
+    destination: 'discover',
+    fallback: 'Today’s collision',
+  ),
+  const TileSpec(
+    id: 'museum',
+    description:
+        'Your year as a museum: best days, streaks, calls you made and more.',
+    name: 'Life museum',
+    icon: PhosphorIconsRegular.image,
+    category: TileCategory.know,
+    sizes: [_icon, _strip],
+    destination: 'museum',
+    fallback: 'Your year, framed',
+  ),
+  const TileSpec(
     id: 'weekly-review',
     description: 'Look back at your week and mood trends.',
     name: 'Weekly review',

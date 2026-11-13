@@ -109,6 +109,13 @@ public static class LifeFeaturesRegistration
         services.AddScoped<Jarvis.Application.Knowing.IKnowledgeMapService, Jarvis.Application.Knowing.KnowledgeMapService>();
         services.AddScoped<Jarvis.Application.Knowing.ITrustLadderService, Jarvis.Application.Knowing.TrustLadderService>();
         services.AddScoped<Jarvis.Application.Knowing.IChatModeService, Jarvis.Application.Knowing.ChatModeService>();
+
+        // Discover: collisions, the life museum and duels (the duel peer client lives in the API).
+        services.AddScoped<Jarvis.Application.Discover.ICollisionService, Jarvis.Application.Discover.CollisionService>();
+        services.AddScoped<Jarvis.Application.Discover.IMuseumService, Jarvis.Application.Discover.MuseumService>();
+        services.AddScoped<Jarvis.Application.Discover.IDuelRepository, DuelRepository>();
+        services.AddScoped<Jarvis.Application.Discover.IDuelPeerClient, UnavailableDuelPeerClient>();
+        services.AddScoped<Jarvis.Application.Discover.IDuelService, Jarvis.Application.Discover.DuelService>();
         services.AddScoped<Jarvis.Application.Finance.ISubscriptionReviewService,
             Jarvis.Application.Finance.SubscriptionReviewService>();
         services.AddScoped<Jarvis.Application.Inbox.ICommitmentFollowUpService,

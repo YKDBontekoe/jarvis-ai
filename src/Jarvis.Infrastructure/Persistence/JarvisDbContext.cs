@@ -58,6 +58,7 @@ public sealed class JarvisDbContext(DbContextOptions<JarvisDbContext> options)
     public DbSet<GameQuestEntity> GameQuests => Set<GameQuestEntity>();
     public DbSet<MemoryReviewEntity> MemoryReviews => Set<MemoryReviewEntity>();
     public DbSet<ChatModeEntity> ChatModes => Set<ChatModeEntity>();
+    public DbSet<DuelEntity> Duels => Set<DuelEntity>();
     public DbSet<ComparisonEntity> Comparisons => Set<ComparisonEntity>();
     public DbSet<MeetingEntity> Meetings => Set<MeetingEntity>();
     public DbSet<OwnerEventEntity> OwnerEvents => Set<OwnerEventEntity>();

@@ -1620,8 +1620,101 @@ List<Map<String, Object?>> chatModes() => [
   },
 ];
 
+Map<String, Object?> collision() => {
+  'key': 'k1',
+  'left': {
+    'kind': 'library',
+    'id': 'lib-1',
+    'title': 'The patience of sourdough',
+    'excerpt': 'A starter teaches patience: fermentation cannot be hurried, only fed and waited on.',
+    'on': '2026-04-02',
+  },
+  'right': {
+    'kind': 'journal',
+    'id': 'jr-1',
+    'title': 'Journal, 2 Nov 2026',
+    'excerpt': 'The new team feels like fermentation. Patience, feed it, don’t poke at it every hour.',
+    'on': '2026-11-02',
+  },
+  'shared': ['fermentation', 'patience'],
+  'prompt': 'Help me see a connection between my saved piece “The patience of sourdough” and my journal entry.',
+};
+
+List<Map<String, Object?>> duels() => [
+  {
+    'id': 'duel-1',
+    'code': 'KQ7M3XWP',
+    'role': 'challenger',
+    'peerName': 'Sam’s Jarvis',
+    'metric': 'habit_checkins',
+    'metricLabel': 'Habit check-ins',
+    'startsOn': '2026-11-09',
+    'endsOn': '2026-11-15',
+    'status': 'active',
+    'myScore': 11,
+    'theirScore': 9,
+    'theirScoreAt': '2026-11-11T08:00:00Z',
+    'outcome': null,
+    'lastError': null,
+  },
+  {
+    'id': 'duel-2',
+    'code': 'HT4N8RVA',
+    'role': 'joiner',
+    'peerName': 'Noor’s Jarvis',
+    'metric': 'journal_days',
+    'metricLabel': 'Days journalled',
+    'startsOn': '2026-10-26',
+    'endsOn': '2026-11-01',
+    'status': 'finished',
+    'myScore': 6,
+    'theirScore': 4,
+    'theirScoreAt': '2026-11-02T08:00:00Z',
+    'outcome': 'won',
+    'lastError': null,
+  },
+];
+
+Map<String, Object?> museum() => {
+  'year': 2026,
+  'years': [2026, 2025, 2024],
+  'rooms': [
+    {
+      'key': 'numbers',
+      'title': '2026 in numbers',
+      'caption': 'The entrance hall.',
+      'exhibits': [
+        {'title': 'Journal entries', 'value': '214'},
+        {'title': 'Average mood', 'value': '3.7 of 5'},
+        {'title': 'Promises kept', 'value': '38'},
+      ],
+    },
+    {
+      'key': 'best-days',
+      'title': 'Best days',
+      'caption': 'The days you rated highest in your journal.',
+      'exhibits': [
+        {
+          'title':
+              'Swam in the lake at sunrise with Rosa, then breakfast on the dock.',
+          'value': '10/10',
+          'on': '2026-06-14',
+        },
+        {
+          'title': 'Shipped the relaunch. The whole team stayed for pizza.',
+          'value': '9/10',
+          'on': '2026-10-03',
+        },
+      ],
+    },
+  ],
+};
+
 Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   'GET /api/v1/game': gameBoard(),
+  'GET /api/v1/discover/collision': collision(),
+  'GET /api/v1/duels': duels(),
+  'GET /api/v1/discover/museum': museum(),
   'GET /api/v1/knowing/training': trainingDeck(),
   'GET /api/v1/knowing/map': knowledgeMap(),
   'GET /api/v1/knowing/trust': trustLadder(),
