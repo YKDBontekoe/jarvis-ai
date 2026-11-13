@@ -125,7 +125,7 @@ abstract class _ChatScreenController extends State<ChatScreen>
   /// that tell where the screen is within the transcript.
   ReadingPositions _readingPositions = ReadingPositions.memory();
   final _anchors = TranscriptAnchors();
-  final _tiles = TileLayoutController.device();
+  late final _tiles = TileLayoutController.device(http: _http);
   late final _tileSource = TileDataSource(_http, ensureMorningBriefing: true);
   Timer? _chatsTimer;
   int _realtimeGeneration = 0;

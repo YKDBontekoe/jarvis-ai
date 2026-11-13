@@ -6,34 +6,64 @@ import 'package:flutter/foundation.dart';
 import '../../json_maps.dart';
 import '../../schedule_format.dart' show deviceTimeZoneLookup;
 import '../home/home_context.dart';
+import 'home_layout_sync.dart';
 import 'tile_actions.dart';
 import 'tile_layout.dart';
 import 'tile_models.dart';
 import 'tile_registry.dart';
 
-/// Owns which tiles are pinned to Home and at what size, and saves every change
-/// on this device.
+/// Owns which tiles are pinned to Home, at what size, and which Home cards are
+/// put away. Every change is kept on this device and sent to the account, where
+/// Jarvis can read and rearrange it; [sync] brings in changes made elsewhere.
 class TileLayoutController extends ChangeNotifier {
-  TileLayoutController({TileLayoutStore? store})
+  TileLayoutController({TileLayoutStore? store, this.http})
     : _store = store ?? TileLayoutStore.memory(),
       _layout = List.of(defaultTileLayout),
       _ready = true;
 
   /// A controller that reads this device's saved layout; [ready] turns true
   /// once [open] has finished, so Home does not draw the default layout first.
-  TileLayoutController.device()
+  /// With [http] it keeps the layout in step with the account.
+  TileLayoutController.device({this.http})
     : _store = TileLayoutStore.memory(),
       _layout = List.of(defaultTileLayout),
       _ready = false;
 
   TileLayoutStore _store;
+
+  /// Reaches the account's copy of Home; null keeps the layout on this device.
+  final Dio? http;
   List<TilePlacement> _layout;
+  Set<String> _hidden = {};
   bool _ready;
+
+  /// The server revision this device last had, 0 before the first sync.
+  int _revision = 0;
+
+  /// A change made here has not reached the server yet.
+  bool _dirty = false;
+
+  /// Counts local changes, so a sync that started before one does not undo it.
+  int _localChanges = 0;
+
+  /// Bumped on sign-out, so answers for the previous account are dropped.
+  int _account = 0;
+  bool _syncing = false;
+  JarvisHomeChange? _jarvisChange;
 
   /// The saved layout is loaded, so the grid can be drawn.
   bool get ready => _ready;
 
   List<TilePlacement> get layout => List.unmodifiable(_layout);
+
+  /// Home cards the owner (or Jarvis, when asked) put away; see [HomeCardIds].
+  Set<String> get hiddenCards => Set.unmodifiable(_hidden);
+
+  bool showsCard(String card) => !_hidden.contains(card);
+
+  /// A change Jarvis made to Home since this device last looked, so Home can
+  /// say so and offer Undo. Null once seen.
+  JarvisHomeChange? get jarvisChange => _jarvisChange;
 
   /// The layout Home is showing, so pages such as an app's detail screen can
   /// offer "Pin to Home". Null until Home opened its layout.
@@ -44,6 +74,10 @@ class TileLayoutController extends ChangeNotifier {
     active = this;
     _store = await TileLayoutStore.open();
     _layout = List.of(_store.read());
+    final meta = _store.readMeta();
+    _hidden = {...meta.hiddenCards};
+    _revision = meta.revision;
+    _dirty = meta.dirty;
     _ready = true;
     notifyListeners();
   }
@@ -54,8 +88,8 @@ class TileLayoutController extends ChangeNotifier {
   // history; the layout is saved only when the owner taps Done, and Cancel puts
   // back what Home looked like before.
 
-  List<TilePlacement>? _sessionStart;
-  final List<List<TilePlacement>> _undo = [];
+  ({List<TilePlacement> tiles, Set<String> hidden})? _sessionStart;
+  final List<({List<TilePlacement> tiles, Set<String> hidden})> _undo = [];
 
   /// Most steps Undo can go back.
   static const maxUndo = 50;
@@ -63,23 +97,26 @@ class TileLayoutController extends ChangeNotifier {
   bool get editing => _sessionStart != null;
   bool get canUndo => _undo.isNotEmpty;
 
+  ({List<TilePlacement> tiles, Set<String> hidden}) get _snapshot =>
+      (tiles: List.of(_layout), hidden: {..._hidden});
+
   /// Starts an editing session. Changes are not saved until [commitEdit].
   void beginEdit() {
     if (editing) return;
-    _sessionStart = List.of(_layout);
+    _sessionStart = _snapshot;
     _undo.clear();
     notifyListeners();
   }
 
   /// Saves the edited layout and ends the session.
   void commitEdit() {
-    if (!editing) return;
-    final changed = !_same(_sessionStart!, _layout);
+    final start = _sessionStart;
+    if (start == null) return;
+    final changed =
+        !_same(start.tiles, _layout) || !setEquals(start.hidden, _hidden);
     _sessionStart = null;
     _undo.clear();
-    if (changed) {
-      unawaited(_store.write(_layout));
-    }
+    if (changed) _save();
     notifyListeners();
   }
 
@@ -87,16 +124,19 @@ class TileLayoutController extends ChangeNotifier {
   void cancelEdit() {
     final start = _sessionStart;
     if (start == null) return;
-    _layout = List.of(start);
+    _layout = List.of(start.tiles);
+    _hidden = {...start.hidden};
     _sessionStart = null;
     _undo.clear();
     notifyListeners();
   }
 
-  /// Takes back the latest move, resize or removal.
+  /// Takes back the latest move, resize, removal or card switch.
   void undo() {
     if (_undo.isEmpty) return;
-    _layout = _undo.removeLast();
+    final last = _undo.removeLast();
+    _layout = last.tiles;
+    _hidden = last.hidden;
     notifyListeners();
   }
 
@@ -110,7 +150,7 @@ class TileLayoutController extends ChangeNotifier {
   /// Records the layout before a change so [undo] can return to it.
   void _remember() {
     if (!editing) return;
-    _undo.add(List.of(_layout));
+    _undo.add(_snapshot);
     if (_undo.length > maxUndo) _undo.removeAt(0);
   }
 
@@ -173,15 +213,160 @@ class TileLayoutController extends ChangeNotifier {
     _changed();
   }
 
+  /// Shows or puts away one of the cards above the tiles ([HomeCardIds]).
+  void setCardVisible(String card, bool visible) {
+    if (!HomeCardIds.all.containsKey(card) || showsCard(card) == visible) {
+      return;
+    }
+    _remember();
+    visible ? _hidden.remove(card) : _hidden.add(card);
+    _changed();
+  }
+
   void reset() {
     _remember();
     _layout = List.of(defaultTileLayout);
+    _hidden = {};
     _changed();
   }
 
   void _changed() {
     // During an editing session nothing is saved until Done.
-    if (!editing) unawaited(_store.write(_layout));
+    if (!editing) _save();
+    notifyListeners();
+  }
+
+  /// Keeps the layout on this device and sends it to the account.
+  void _save() {
+    _localChanges++;
+    _dirty = http != null;
+    unawaited(_store.write(_layout));
+    unawaited(_writeMeta());
+    if (http != null) unawaited(_push());
+  }
+
+  Future<void> _writeMeta() => _store.writeMeta(
+    TileLayoutMeta(hiddenCards: _hidden, revision: _revision, dirty: _dirty),
+  );
+
+  // --- Account sync ----------------------------------------------------
+
+  /// Sends this device's layout to the account. Left marked dirty when it
+  /// fails, so the next [sync] tries again.
+  Future<void> _push() async {
+    final http = this.http;
+    if (http == null) return;
+    final account = _account;
+    final changes = _localChanges;
+    try {
+      final response = await http.put<dynamic>(
+        '/api/v1/home/layout',
+        data: {
+          'tiles': [for (final item in _layout) item.toJson()],
+          'hiddenCards': _hidden.toList()..sort(),
+        },
+      );
+      if (account != _account) return;
+      final remote = RemoteHomeLayout.fromJson(response.data);
+      if (remote == null) return;
+      _revision = remote.revision;
+      // A newer change here is still on its way; it clears the flag itself.
+      if (changes == _localChanges) _dirty = false;
+      await _writeMeta();
+    } catch (_) {
+      // Offline or an older server: Home keeps working from this device.
+    }
+  }
+
+  /// Brings in a layout changed on another device or by Jarvis, or sends this
+  /// device's own when the account has none yet or a change here never
+  /// arrived. Does nothing while Home is being edited.
+  Future<void> sync() async {
+    final http = this.http;
+    if (http == null || !_ready || editing || _syncing) return;
+    _syncing = true;
+    final account = _account;
+    final changes = _localChanges;
+    try {
+      if (_dirty) {
+        await _push();
+        return;
+      }
+      final response = await http.get<dynamic>('/api/v1/home/layout');
+      if (account != _account || editing || changes != _localChanges) return;
+      final remote = RemoteHomeLayout.fromJson(response.data);
+      if (remote == null) return;
+      if (!remote.stored) {
+        _localChanges++;
+        await _push();
+        return;
+      }
+      if (remote.revision == _revision) return;
+      final firstSync = _revision == 0;
+      _apply(remote);
+      // A new device simply takes the account's Home; one that was already in
+      // step says what Jarvis changed.
+      _jarvisChange = !firstSync && remote.changedBy == homeLayoutByJarvis
+          ? JarvisHomeChange(
+              revision: remote.revision,
+              note: remote.note,
+              canUndo: remote.canUndo,
+            )
+          : null;
+      notifyListeners();
+    } catch (_) {
+      // Offline or an older server: keep what this device has.
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  void _apply(RemoteHomeLayout remote) {
+    _layout = List.of(remote.tiles.isEmpty ? defaultTileLayout : remote.tiles);
+    _hidden = {...remote.hiddenCards};
+    _revision = remote.revision;
+    _dirty = false;
+    unawaited(_store.write(_layout));
+    unawaited(_writeMeta());
+  }
+
+  /// The owner saw what Jarvis changed and keeps it.
+  void keepJarvisChange() {
+    if (_jarvisChange == null) return;
+    _jarvisChange = null;
+    notifyListeners();
+  }
+
+  /// Puts back Home from before Jarvis's change. False when that failed.
+  Future<bool> undoJarvisChange() async {
+    final http = this.http;
+    if (http == null || _jarvisChange == null) return false;
+    final account = _account;
+    try {
+      final response = await http.post<dynamic>('/api/v1/home/layout/undo');
+      if (account != _account) return false;
+      final remote = RemoteHomeLayout.fromJson(response.data);
+      if (remote == null) return false;
+      _apply(remote);
+      _jarvisChange = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Forgets the layout on sign-out without touching the account's copy.
+  void forgetAccount() {
+    _account++;
+    _sessionStart = null;
+    _undo.clear();
+    _layout = List.of(defaultTileLayout);
+    _hidden = {};
+    _revision = 0;
+    _dirty = false;
+    _jarvisChange = null;
+    unawaited(_store.clear());
     notifyListeners();
   }
 }

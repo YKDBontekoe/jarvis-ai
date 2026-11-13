@@ -103,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentToolContributor, Comparisons.ComparisonToolContributor>();
         services.AddScoped<IAgentToolContributor, Goals.GoalToolContributor>();
         services.AddScoped<IAgentToolContributor, Lists.ListToolContributor>();
+        services.AddScoped<IAgentToolContributor, Home.HomeLayoutToolContributor>();
         services.AddScoped<IAgentToolContributor, FileDeletionToolContributor>();
         services.AddScoped<IAgentToolContributor, Calendar.CalendarToolContributor>();
         services.AddScoped<IAgentToolContributor, Conversations.ConversationToolContributor>();

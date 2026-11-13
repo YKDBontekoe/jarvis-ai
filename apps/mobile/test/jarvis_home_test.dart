@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chats/chat_list.dart';
+import 'package:jarvis_mobile/features/home/home_layout_cards.dart';
 import 'package:jarvis_mobile/features/home/jarvis_home.dart';
+import 'package:jarvis_mobile/features/tiles/home_layout_sync.dart';
 import 'package:jarvis_mobile/features/tiles/tile_controller.dart';
 import 'package:jarvis_mobile/features/tiles/tile_layout.dart';
 import 'package:jarvis_mobile/features/tiles/tile_models.dart';
@@ -471,6 +473,88 @@ void main() {
     await tester.tap(find.byKey(const Key('home-needs-you-button-Reply')));
     expect(openedChats, ['whatsapp:wa:+31611']);
   });
+
+  testWidgets('cards the owner put away stay off Home', (tester) async {
+    http.on('GET', '/api/v1/home', {
+      'approvals': <Object>[],
+      'latestBriefing': {
+        'id': 'n1',
+        'body': 'Two plans today.',
+        'createdAt': _iso(DateTime(2026, 10, 3, 8)),
+        'read': false,
+      },
+    });
+    layout
+      ..setCardVisible(HomeCardIds.brief, false)
+      ..setCardVisible(HomeCardIds.suggestions, false);
+    await show(tester, at: DateTime(2026, 10, 3, 9));
+    expect(find.byKey(const Key('home-brief')), findsNothing);
+    expect(find.byKey(const Key('home-ask-suggestions')), findsNothing);
+  });
+
+  testWidgets('a change Jarvis made shows its reason with Keep it and Undo', (
+    tester,
+  ) async {
+    Map<String, Object?> remote(int revision, String by, List<String> ids) => {
+      'tiles': [
+        for (final id in ids) {'id': id, 'size': 'square'},
+      ],
+      'hiddenCards': <String>[],
+      'revision': revision,
+      'changedBy': by,
+      'note': by == 'jarvis' ? 'Tasks first, you open them most' : null,
+      'canUndo': by == 'jarvis',
+      'stored': true,
+    };
+    layout = TileLayoutController(http: http.client());
+    http.on(
+      'GET',
+      '/api/v1/home/layout',
+      remote(1, 'app', ['memory', 'tasks']),
+    );
+    await tester.runAsync(layout.sync);
+    http.on(
+      'GET',
+      '/api/v1/home/layout',
+      remote(2, 'jarvis', ['tasks', 'memory']),
+    );
+    http.on(
+      'POST',
+      '/api/v1/home/layout/undo',
+      remote(3, 'app', ['memory', 'tasks']),
+    );
+
+    await show(tester);
+    await reveal(tester, find.byKey(const Key('home-jarvis-change')));
+    expect(find.text('Tasks first, you open them most'), findsOneWidget);
+    expect(layout.layout.map((p) => p.id), ['tasks', 'memory']);
+
+    await tester.tap(find.byKey(const Key('home-jarvis-change-undo')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('home-jarvis-change')), findsNothing);
+    expect(layout.layout.map((p) => p.id), ['memory', 'tasks']);
+    expect(http.sent('POST', '/api/v1/home/layout/undo'), hasLength(1));
+  });
+
+  testWidgets(
+    'Customize Home switches cards and can ask Jarvis to arrange it',
+    (tester) async {
+      await show(tester);
+      await enterEdit(tester);
+      final evening = find.byKey(const Key('home-card-evening'));
+      await reveal(tester, evening);
+      await tester.tap(evening);
+      await tester.pumpAndSettle();
+      expect(layout.showsCard(HomeCardIds.evening), isFalse);
+
+      await reveal(tester, find.byKey(const Key('home-ask-jarvis-arrange')));
+      await tester.tap(find.byKey(const Key('home-ask-jarvis-arrange')));
+      await tester.pumpAndSettle();
+      expect(suggestions.single, arrangeHomePrompt);
+      expect(layout.editing, isFalse);
+      expect(layout.showsCard(HomeCardIds.evening), isFalse);
+    },
+  );
 
   testWidgets("today's brief shows on Home and can be dismissed", (
     tester,

@@ -39,6 +39,8 @@ import 'get_started_card.dart';
 import 'next_up.dart' hide greetingFor;
 import '../../l10n/l10n.dart';
 import '../proactivity/proactive_home_card.dart';
+import '../tiles/home_layout_sync.dart';
+import 'home_layout_cards.dart';
 
 /// Replaces Home's wall clock when no [JarvisHome.clock] is given
 /// (screenshots of the evening).
@@ -238,6 +240,8 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
       ..reset()
       ..start();
     widget.source.invalidate();
+    // Jarvis may have rearranged Home from a chat or another device.
+    unawaited(widget.layout.sync());
     unawaited(_loadPreferredName(generation));
     unawaited(_loadContext(generation));
     final briefing = await widget.source.briefing();
@@ -843,6 +847,25 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   }
 
   /// Done saves the layout; Cancel puts back what Home looked like before.
+  /// Putting back Home from before Jarvis changed it.
+  bool _undoingJarvis = false;
+
+  Future<void> _undoJarvisChange() async {
+    setState(() => _undoingJarvis = true);
+    final undone = await widget.layout.undoJarvisChange();
+    if (!mounted) return;
+    setState(() => _undoingJarvis = false);
+    if (!undone) {
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Could not undo the change. Try again in a moment.'),
+          ),
+        );
+    }
+  }
+
   void _endEdit({required bool save}) {
     if (save) {
       widget.layout.commitEdit();
@@ -855,6 +878,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final now = _now;
+    final shows = widget.layout.showsCard;
     final upcoming = upcomingItems(_briefing, now);
     final calendar = _briefing?['calendar'];
     final calendarOff =
@@ -921,17 +945,19 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                       child: AskBar(
                         controller: _ask,
                         busy: widget.jarvisBusy,
-                        suggestions: homeSuggestions(
-                          now: now,
-                          briefing: _briefing,
-                          chats: widget.chats,
-                        ),
+                        suggestions: shows(HomeCardIds.suggestions)
+                            ? homeSuggestions(
+                                now: now,
+                                briefing: _briefing,
+                                chats: widget.chats,
+                              )
+                            : const [],
                         onSubmit: widget.onSuggestion,
                         onVoice: () => widget.onOpen('voice'),
                       ),
                     ),
                     const SizedBox(height: 28),
-                    if (widget.ready)
+                    if (widget.ready && shows(HomeCardIds.ongoing))
                       ProactiveHomeCard(
                         http: widget.source.http,
                         onOpen: widget.onOpen,
@@ -959,7 +985,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                         ),
                       ),
                     const SizedBox(height: 20),
-                    if (noticed.isNotEmpty)
+                    if (noticed.isNotEmpty && shows(HomeCardIds.noticed))
                       Padding(
                         padding: const EdgeInsets.only(bottom: 24),
                         child: FadeSlideIn(
@@ -973,6 +999,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                         ),
                       ),
                     if (evening &&
+                        shows(HomeCardIds.evening) &&
                         homeContext != null &&
                         EveningCard.shows(homeContext.recap, tomorrow))
                       Padding(
@@ -996,7 +1023,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                         ),
                       )
                     else if (_briefNote case final note?
-                        when hero?.kind != 'brief')
+                        when hero?.kind != 'brief' && shows(HomeCardIds.brief))
                       Padding(
                         padding: const EdgeInsets.only(bottom: 20),
                         child: FadeSlideIn(
@@ -1016,7 +1043,8 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                           _briefing,
                           seenAt: _learningSeenAt,
                         )
-                        case final changes when changes.isNotEmpty)
+                        case final changes
+                        when changes.isNotEmpty && shows(HomeCardIds.learning))
                       Padding(
                         padding: const EdgeInsets.only(bottom: 20),
                         child: FadeSlideIn(
@@ -1101,6 +1129,20 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                         ],
                       ),
                     ),
+                  if (!_editing)
+                    if (widget.layout.jarvisChange case final change?)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: FadeSlideIn(
+                          index: 0,
+                          child: JarvisHomeChangeCard(
+                            change: change,
+                            undoing: _undoingJarvis,
+                            onKeep: widget.layout.keepJarvisChange,
+                            onUndo: () => unawaited(_undoJarvisChange()),
+                          ),
+                        ),
+                      ),
                   ListenableBuilder(
                     listenable: widget.layout,
                     builder: (context, _) => !widget.layout.ready
@@ -1170,6 +1212,20 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                             borderRadius: BorderRadius.circular(tileRadius),
                           ),
                         ),
+                      ),
+                    ),
+                  if (_editing)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: HomeCardsEditor(
+                        isShown: widget.layout.showsCard,
+                        onChanged: widget.layout.setCardVisible,
+                        onAskJarvis: widget.onSuggestion == null
+                            ? null
+                            : () {
+                                _endEdit(save: true);
+                                widget.onSuggestion!(arrangeHomePrompt);
+                              },
                       ),
                     ),
                 ],

@@ -377,7 +377,7 @@ mixin _ChatScreenNav on _ChatScreenController {
       unawaited(HomeWidgetSync.instance.clear());
       unawaited(AppShortcuts.clear());
       _tileSource.reset();
-      _tiles.reset();
+      _tiles.forgetAccount();
       await hub?.stop();
     } finally {
       _signingOut = false;

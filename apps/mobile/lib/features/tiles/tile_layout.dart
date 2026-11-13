@@ -134,11 +134,53 @@ List<TilePlacement>? decodeTileLayout(String? raw) {
   }
 }
 
-/// Saves the home layout on this device.
+/// What this device knows about the account's Home besides the tiles: the
+/// cards that are put away, the server revision it last had, and whether a
+/// change made here still has to reach the server.
+class TileLayoutMeta {
+  const TileLayoutMeta({
+    this.hiddenCards = const {},
+    this.revision = 0,
+    this.dirty = false,
+  });
+
+  final Set<String> hiddenCards;
+  final int revision;
+  final bool dirty;
+
+  Map<String, Object?> toJson() => {
+    'hidden': hiddenCards.toList()..sort(),
+    'revision': revision,
+    'dirty': dirty,
+  };
+
+  static TileLayoutMeta decode(String? raw) {
+    if (raw == null) return const TileLayoutMeta();
+    try {
+      final data = jsonDecode(raw);
+      if (data is! Map) return const TileLayoutMeta();
+      return TileLayoutMeta(
+        hiddenCards: {
+          for (final card
+              in data['hidden'] is List ? data['hidden'] as List : const [])
+            if (card is String) card,
+        },
+        revision: data['revision'] is int ? data['revision'] as int : 0,
+        dirty: data['dirty'] == true,
+      );
+    } on FormatException {
+      return const TileLayoutMeta();
+    }
+  }
+}
+
+/// Keeps the home layout on this device, so Home draws at once and works
+/// offline; the account's copy on the server is the one that counts.
 class TileLayoutStore {
   TileLayoutStore._(this._prefs);
 
   static const _key = 'home.tiles.v1';
+  static const _metaKey = 'home.tiles.meta.v1';
 
   final SharedPreferences? _prefs;
 
@@ -163,12 +205,24 @@ class TileLayoutStore {
     );
   }
 
-  Future<void> clear() async => _prefs?.remove(_key);
+  TileLayoutMeta readMeta() =>
+      TileLayoutMeta.decode(_prefs?.getString(_metaKey));
+
+  Future<void> writeMeta(TileLayoutMeta meta) async {
+    await _prefs?.setString(_metaKey, jsonEncode(meta.toJson()));
+  }
+
+  Future<void> clear() async {
+    await _prefs?.remove(_key);
+    await _prefs?.remove(_metaKey);
+  }
 
   /// Forgets the saved layout of everyone on this device (sign out).
   static Future<void> clearAll() async {
     try {
-      await (await SharedPreferences.getInstance()).remove(_key);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_key);
+      await prefs.remove(_metaKey);
     } catch (_) {
       // Nothing was stored.
     }

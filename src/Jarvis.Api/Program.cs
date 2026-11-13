@@ -141,6 +141,7 @@ api.MapSetupEndpoints();
 api.MapPreferenceEndpoints();
 api.MapTripEndpoints();
 api.MapHomeRoutineEndpoints();
+api.MapHomeLayoutEndpoints();
 api.MapOutcomeEndpoints();
 api.MapWorkspaceEndpoints();
 api.MapAttentionEndpoints();

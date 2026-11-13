@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jarvis_mobile/api/api_config.dart';
 import 'package:jarvis_mobile/features/chat/chat_entries.dart';
 import 'package:jarvis_mobile/features/chat/chat_widgets.dart';
@@ -434,10 +435,48 @@ void main() {
     screenshotTest('edit home $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);
-      await tester.ensureVisible(find.byKey(const Key('home-edit')));
+      // Centred, so the tap lands clear of the floating dock.
+      await Scrollable.ensureVisible(
+        tester.element(find.byKey(const Key('home-edit'))),
+        alignment: .5,
+      );
+      await settle(tester);
       await tester.tap(find.byKey(const Key('home-edit')));
       await settle(tester);
       await capture(tester, '33-edit-home-$mode');
+      final cards = find.byKey(const Key('home-cards-editor'));
+      await Scrollable.ensureVisible(tester.element(cards), alignment: .2);
+      await settle(tester);
+      await capture(tester, '33b-edit-home-cards-$mode');
+    });
+
+    screenshotTest('home jarvis change $mode', (tester) async {
+      usePhone(tester);
+      // This device last saw revision 1; the account is at 2, changed by Jarvis.
+      SharedPreferences.setMockInitialValues({
+        'home.tiles.meta.v1': '{"hidden":[],"revision":1,"dirty":false}',
+      });
+      http.routes['GET /api/v1/home/layout'] = {
+        'tiles': [
+          {'id': 'habits', 'size': 'wide'},
+          {'id': 'today', 'size': 'wide'},
+          {'id': 'tasks', 'size': 'square'},
+          {'id': 'journal', 'size': 'square'},
+          {'id': 'people', 'size': 'icon'},
+          {'id': 'voice', 'size': 'icon'},
+        ],
+        'hiddenCards': ['brief'],
+        'revision': 2,
+        'changedBy': 'jarvis',
+        'note': 'Habits and journal up front, finance moved off: you open them most in the evening',
+        'canUndo': true,
+        'stored': true,
+      };
+      await start(tester, dark: dark);
+      final card = find.byKey(const Key('home-jarvis-change'));
+      await Scrollable.ensureVisible(tester.element(card), alignment: .2);
+      await settle(tester);
+      await capture(tester, '33c-home-jarvis-change-$mode');
     });
   }
 

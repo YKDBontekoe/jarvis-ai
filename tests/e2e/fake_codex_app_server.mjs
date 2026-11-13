@@ -205,6 +205,20 @@ function plan(prompt) {
   if (results.length > 0 && /rejected/i.test(last))
     return text("Understood — I didn't do that. Let me know if you'd like a different approach.");
 
+  // Home layout: "put my habits at the top of my home screen", "hide the morning brief on home".
+  const pinHome = lower.match(/\bput my ([a-z-]+) (?:first|at the top)\b.*\bhome\b/);
+  if (pinHome && has('PinHomeTile')) {
+    if (results.length === 0) return call('GetHomeLayout', {});
+    if (results.length === 1)
+      return call('PinHomeTile', { tile: pinHome[1], size: 'wide', position: 1, reason: `${pinHome[1]} first, as you asked` });
+    return text(/could not change Home/.test(last) ? `I couldn't change Home: ${last}` :
+      `Done — ${pinHome[1]} is now at the top of Home. You can undo it there.`);
+  }
+  if (/\bhide the morning brief\b.*\bhome\b/.test(lower) && has('SetHomeCardVisibility')) {
+    if (results.length === 0) return call('SetHomeCardVisibility', { card: 'brief', visible: false, reason: 'Brief hidden, as you asked' });
+    return text('Done — the morning brief no longer shows on Home.');
+  }
+
   if (/\bremind me\b/.test(lower) && has('CreateReminder')) {
     if (results.length === 0) {
       const reminder = parseReminder(request);

@@ -52,6 +52,7 @@ From `BuiltInAgentContributors` / dedicated tool classes:
 | Tool area | Class | Approval notes |
 |-----------|-------|----------------|
 | Time | `ClockAgentTools.GetCurrentTime` | — |
+| Home screen | `HomeLayoutAgentTools` `GetHomeLayout` (tiles in order with sizes, the cards and whether they show, and every tile that can be added with its sizes, from `home-tiles.json`), `ArrangeHomeTiles` (whole grid at once), `PinHomeTile` (add, move or resize; id or name, 1-based position), `RemoveHomeTile`, `SetHomeCardVisibility` (ongoing, brief, noticed, evening, learning, suggestions; Needs you and Right now cannot be hidden), `UndoHomeLayoutChange`, `ResetHomeLayout`. Group `home` | No approval: only the owner's own screen, and every change shows on Home with its `reason` and an Undo. Writers are hidden in background tasks, so Jarvis changes Home only when asked in chat. Each change publishes `home.layout_changed` (origin `Agent`), which refreshes open apps |
 | Time zone | `PreferenceAgentTools` `SetHomeTimeZone` | No approval; only changes how future times are read, scheduled reminders keep their moment |
 | This chat | `ConversationAgentTools` `RenameThisChat`, `PinThisChat` | No approval; only the current chat, never in background tasks |
 | Calendar | `CalendarAgentTools` `GetCalendarEvents` (the owner's ICS link; says so when none is connected) | Read-only; titles are untrusted text |
