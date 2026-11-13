@@ -9,3 +9,4 @@ Rendered from the screenshot fixtures (`trainingDeck()`, `knowledgeMap()`, `trus
 - `42-council-sheet-dark.png`: asking the council.
 
 Regenerate: `cd apps/mobile && flutter test --no-pub test/screenshots/app_screenshots.dart --plain-name "know me"` (and `"talk differently"`).
+- `train-jarvis.mp4`: Everything → search "know" → Know me → Start → True → Wrong.
