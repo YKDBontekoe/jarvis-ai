@@ -146,6 +146,7 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
   - An empty card collapses to "You're all caught up".
 - **Jarvis is learning.** Below the brief, a calm card (never the dark focal style) lists up to three things Jarvis changed by itself in the last 7 days (a learned or retired skill, a lesson, a memory it saved), each with Undo, Turn on or Open, and "N changes this week". Decisions only the owner can make are not here; they are Needs you rows. "Got it" and "Learning ›" mark everything up to now as seen on this phone (`LearningSeenStore`, cleared on sign-out), so the card returns only when something new happens. Board: [mockups/home-self-improvement.html](mockups/home-self-improvement.html).
 - **Notifications.** Each row says what kind of thing it is in a caps label above the title (`notificationLook`: "JARVIS LEARNED", "APP READY TO SWITCH ON", "REMINDER"), with a tinted icon in the type's tone, the body, the time and the next step tapping takes ("Review in Learning ›"). Delivery details sit behind a quiet ⓘ, which joins the time line from 1.5× text. A new notification type gets an entry in `notificationLook` and, when it has a destination, in `notification_routing.dart`.
+- **Play (game screens).** One `HeroCard` with the level as its caps label, points as the title and a 10-segment bar for progress through the level. Bets and quests are `FeatureRow`s with the reward as an `accentSoft` pill on the right ("Beat it 81", "+30"); the boss quest alone uses `warning` for its icon. Settled and finished rows go quiet (finished quests struck through). Comparisons with the past self draw *you* in `accent` and *the ghost* in `outlineStrong`, each bar labelled and valued, so they never differ by hue alone. Calling off a bet confirms first.
 - **Jarvis noticed.** One insight at a time (swipe or dots), with evidence and an optional confidence bar. Its actions: Set it up (draft routine), Say hi (opens the chat), Plan a message, and Not useful.
 - **Evening (from 18:00) and day one.**
   - The evening card (your day plus tomorrow) replaces the brief.
@@ -215,7 +216,7 @@ Reuse before you build. All of these live under `apps/mobile/lib/`.
 3. **Verify** (see `AGENTS.md`):
    - `flutter analyze` and `flutter test`.
    - The screenshot suites: `test/screenshots/app_screenshots.dart` (add a case for every new state), `ui_polish.dart` (320–430pt, 1× and 2× text, light and dark) and `layout_audit.dart`. Look at the PNGs in `apps/mobile/build/screenshots/`.
-   - A web recording: `flutter build web -t tool/ui_preview.dart --profile`, then `node tool/record_web.mjs --steps "A;B;C"` (separate steps with `;`).
+   - A web recording: `flutter build web -t tool/ui_preview.dart --profile`, then `node tool/record_web.mjs --steps "A;B;C"` (separate steps with `;`). A step `scroll:600` scrolls; `type:play` types into the focused (or first) text field, so a feature can be opened through Everything's search. Of several partial name matches the recorder taps the smallest, the row rather than its container.
    - Send the screenshots and video.
 4. **Format only the files you touched** (`dart format <files>`), never all of `lib/`.
 5. **Update this playbook** when you add a token, component or pattern.

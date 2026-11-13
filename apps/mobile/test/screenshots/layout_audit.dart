@@ -58,6 +58,7 @@ const destinations = [
   'habits',
   'lists',
   'people',
+  'play',
   'approvals',
   'reminders',
   'notifications',

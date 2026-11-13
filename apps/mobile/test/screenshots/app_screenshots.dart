@@ -80,6 +80,28 @@ void main() {
   for (final dark in [false, true]) {
     final mode = dark ? 'dark' : 'light';
 
+    screenshotTest('play $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'play');
+      expect(find.byKey(const Key('game-score')), findsOneWidget);
+      await capture(tester, '40-play-$mode');
+      final list = find.descendant(
+        of: find.byKey(const Key('game-list')),
+        matching: find.byType(Scrollable),
+      );
+      final quests = find.byKey(const Key('game-quest-q-boss'));
+      await tester.scrollUntilVisible(quests, 200, scrollable: list.first);
+      await Scrollable.ensureVisible(tester.element(quests), alignment: .05);
+      await settle(tester);
+      await capture(tester, '40-play-quests-$mode');
+      final ghost = find.byKey(const Key('game-ghost'));
+      await tester.scrollUntilVisible(ghost, 200, scrollable: list.first);
+      await Scrollable.ensureVisible(tester.element(ghost), alignment: .1);
+      await settle(tester);
+      await capture(tester, '40-play-ghost-$mode');
+    });
+
     screenshotTest('ongoing work $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);

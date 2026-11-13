@@ -202,6 +202,10 @@ mixin _ChatScreenPush on _ChatScreenController {
       _openUtility('automations');
       return;
     }
+    if (opensGame(type)) {
+      _openUtility('play');
+      return;
+    }
     if (opensImprovementSuggestions(type)) {
       _openUtility('learning');
       return;

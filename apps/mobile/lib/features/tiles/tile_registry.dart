@@ -122,6 +122,17 @@ final List<TileSpec> tileSpecs = [
     fallback: 'Track a call',
   ),
   const TileSpec(
+    id: 'play',
+    description: 'Beat Jarvis’s bets on your habits and budgets, finish weekly quests, and race the you of a month ago.',
+    name: 'Play',
+    icon: PhosphorIconsRegular.trophy,
+    category: TileCategory.plan,
+    sizes: [_icon, _strip, _square],
+    destination: 'play',
+    load: _play,
+    fallback: 'Bets, quests and your ghost',
+  ),
+  const TileSpec(
     id: 'weekly-review',
     description: 'Look back at your week and mood trends.',
     name: 'Weekly review',
@@ -810,6 +821,46 @@ Future<TileData?> _decisions(TileEnv env) async {
           _first(decision, ['title']) ?? 'Decision',
           meta: _first(decision, ['prediction']),
           id: asJsonString(decision['id']),
+        ),
+    ],
+  );
+}
+
+Future<TileData?> _play(TileEnv env) async {
+  final response = await env.http.get<dynamic>('/api/v1/game');
+  final board = jsonObject(response.data);
+  if (board == null) return null;
+  final score = jsonObject(board['score']) ?? const <String, dynamic>{};
+  final open = [
+    for (final quest in jsonMaps(board['quests']))
+      if (quest['status'] == 'open') quest,
+  ];
+  final bets = [
+    for (final bet in jsonMaps(board['bets']))
+      if (bet['status'] == 'open') bet,
+  ];
+  final points = asJsonInt(score['points']);
+  final start = asJsonInt(score['levelStart']);
+  final next = asJsonInt(score['nextLevelAt'], 100);
+  return TileData(
+    stat: '$points',
+    unit: points == 1 ? 'point' : 'points',
+    subtitle:
+        'Level ${asJsonInt(score['level'], 1)} · '
+        '${open.length == 1 ? '1 quest' : '${open.length} quests'} open',
+    progress: next > start ? (points - start) / (next - start) : null,
+    rows: [
+      for (final bet in bets.take(_maxRows))
+        TileRow(
+          _first(bet, ['claim']) ?? 'Bet',
+          meta: 'Jarvis ${asJsonInt(bet['confidencePercent'])}% sure',
+          id: asJsonString(bet['id']),
+        ),
+      for (final quest in open.take(_maxRows - bets.length.clamp(0, _maxRows)))
+        TileRow(
+          _first(quest, ['title']) ?? 'Quest',
+          meta: '+${asJsonInt(quest['points'])}',
+          id: asJsonString(quest['id']),
         ),
     ],
   );

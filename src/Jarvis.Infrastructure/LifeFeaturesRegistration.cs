@@ -97,6 +97,10 @@ public static class LifeFeaturesRegistration
         // Decision journal: predictions with a confidence, resolved later and scored for calibration.
         services.AddScoped<IDecisionRepository, DecisionRepository>();
         services.AddScoped<IDecisionService, DecisionService>();
+
+        // The game: bets against the owner, weekly side quests and the race against last month's self.
+        services.AddScoped<Jarvis.Application.Game.IGameRepository, GameRepository>();
+        services.AddScoped<Jarvis.Application.Game.IGameService, Jarvis.Application.Game.GameService>();
         services.AddScoped<Jarvis.Application.Finance.ISubscriptionReviewService,
             Jarvis.Application.Finance.SubscriptionReviewService>();
         services.AddScoped<Jarvis.Application.Inbox.ICommitmentFollowUpService,

@@ -125,6 +125,7 @@ api.MapModeEndpoints(app.Logger);
 api.MapRoutineEndpoints(app.Logger);
 api.MapImprovementEndpoints();
 api.MapDecisionEndpoints(app.Logger);
+api.MapGameEndpoints();
 api.MapComparisonEndpoints();
 api.MapGoalEndpoints();
 api.MapListEndpoints();
