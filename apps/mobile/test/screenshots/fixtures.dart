@@ -1695,8 +1695,7 @@ Map<String, Object?> museum() => {
       'caption': 'The days you rated highest in your journal.',
       'exhibits': [
         {
-          'title':
-              'Swam in the lake at sunrise with Rosa, then breakfast on the dock.',
+          'title': 'Swam in the lake at sunrise with Rosa, then breakfast on the dock.',
           'value': '10/10',
           'on': '2026-06-14',
         },
@@ -2236,6 +2235,9 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
       'Reminders and problems still arrive.',
     ],
   },
+  // The account's Home: the standard layout, as a new account has it.
+  'GET /api/v1/home/layout': _homeLayout,
+  'PUT /api/v1/home/layout': _homeLayout,
   'GET /api/v1/home-routines': {
     'routines': [
       {
@@ -3029,4 +3031,23 @@ Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   },
   'PUT /api/v1/push-devices': <String, Object>{},
   'POST /*': <String, Object>{},
+};
+
+const _homeLayout = {
+  'tiles': [
+    {'id': 'today', 'size': 'wide'},
+    {'id': 'tasks', 'size': 'square'},
+    {'id': 'chats', 'size': 'square'},
+    {'id': 'habits', 'size': 'strip'},
+    {'id': 'finance', 'size': 'strip'},
+    {'id': 'memory', 'size': 'icon'},
+    {'id': 'journal', 'size': 'icon'},
+    {'id': 'people', 'size': 'icon'},
+    {'id': 'voice', 'size': 'icon'},
+  ],
+  'hiddenCards': <String>[],
+  'revision': 1,
+  'changedBy': 'app',
+  'canUndo': false,
+  'stored': true,
 };

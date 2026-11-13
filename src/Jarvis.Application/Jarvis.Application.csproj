@@ -2,4 +2,8 @@
   <ItemGroup>
     <ProjectReference Include="../Jarvis.Domain/Jarvis.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The Home tiles the app offers; apps/mobile/test/home_layout_sync_test.dart keeps it equal to tile_registry.dart. -->
+    <EmbeddedResource Include="Home/home-tiles.json" LogicalName="Jarvis.Application.Home.home-tiles.json" />
+  </ItemGroup>
 </Project>

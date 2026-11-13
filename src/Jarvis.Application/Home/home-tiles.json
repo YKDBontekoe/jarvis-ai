@@ -1,0 +1,518 @@
+[
+  {
+    "id": "proactive",
+    "name": "Ongoing work",
+    "category": "plan",
+    "description": "The responsibilities Jarvis keeps moving, with sources and a history of every change.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "activity",
+    "name": "Activity",
+    "category": "plan",
+    "description": "What happened across Jarvis and what Jarvis did on its own, newest first.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide",
+      "large"
+    ]
+  },
+  {
+    "id": "today",
+    "name": "Today",
+    "category": "plan",
+    "description": "Your calendar, reminders and plan for today.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide",
+      "large"
+    ]
+  },
+  {
+    "id": "tasks",
+    "name": "Tasks",
+    "category": "plan",
+    "description": "Track work you have asked Jarvis to do.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide",
+      "large"
+    ]
+  },
+  {
+    "id": "reminders",
+    "name": "Reminders",
+    "category": "plan",
+    "description": "Set reminders for a time or place.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "habits",
+    "name": "Habits",
+    "category": "plan",
+    "description": "Check in on routines and follow your streaks.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "lists",
+    "name": "Lists",
+    "category": "plan",
+    "description": "Shopping, packing and other lists you tick off.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "journal",
+    "name": "Journal",
+    "category": "plan",
+    "description": "Write about your day and record your mood.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "decisions",
+    "name": "Decisions",
+    "category": "plan",
+    "description": "Log a call with how sure you are, answer later, and see how well calibrated you are.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "play",
+    "name": "Play",
+    "category": "plan",
+    "description": "Beat Jarvis’s bets on your habits and budgets, finish weekly quests, and race the you of a month ago.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "know-me",
+    "name": "Know me",
+    "category": "know",
+    "description": "Check what Jarvis believes about you, clear the map of the unknown, and see what it has earned trust in.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "talk-differently",
+    "name": "Talk differently",
+    "category": "talk",
+    "description": "The stranger, rehearsing a hard talk, past you and the council: chats where Jarvis plays a part.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "discover",
+    "name": "Discover",
+    "category": "know",
+    "description": "A daily collision between two things you kept, and duels with friends’ Jarvises.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "museum",
+    "name": "Life museum",
+    "category": "know",
+    "description": "Your year as a museum: best days, streaks, calls you made and more.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "weekly-review",
+    "name": "Weekly review",
+    "category": "plan",
+    "description": "Look back at your week and mood trends.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "briefing",
+    "name": "Daily briefing",
+    "category": "plan",
+    "description": "Read your daily summary and priorities.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "chats",
+    "name": "Chats",
+    "category": "talk",
+    "description": "Your Jarvis and WhatsApp conversations.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide",
+      "large"
+    ]
+  },
+  {
+    "id": "voice",
+    "name": "Voice",
+    "category": "talk",
+    "description": "Have a hands-free conversation with Jarvis.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "whatsapp",
+    "name": "WhatsApp",
+    "category": "talk",
+    "description": "Manage linked accounts and chats Jarvis can read.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "inbox",
+    "name": "Inbox",
+    "category": "talk",
+    "description": "Review messages that need your attention.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "approvals",
+    "name": "Approvals",
+    "category": "talk",
+    "description": "Review sensitive actions before Jarvis proceeds.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "channels",
+    "name": "Channels",
+    "category": "talk",
+    "description": "Connect messaging accounts to Jarvis.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "memory",
+    "name": "Memory",
+    "category": "know",
+    "description": "Review and edit what Jarvis remembers about you.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "library",
+    "name": "Library",
+    "category": "know",
+    "description": "Find articles, links and notes you have saved.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "people",
+    "name": "People",
+    "category": "know",
+    "description": "Keep track of people, birthdays and follow-ups.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "timeline",
+    "name": "Timeline",
+    "category": "know",
+    "description": "Browse your activity and events over time.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "files",
+    "name": "Files",
+    "category": "know",
+    "description": "Manage documents Jarvis can search and use.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "captures",
+    "name": "Captures",
+    "category": "know",
+    "description": "Review what you shared into Jarvis from other apps.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "graph",
+    "name": "Knowledge graph",
+    "category": "know",
+    "description": "Explore connections between people and ideas.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "projects",
+    "name": "Projects",
+    "category": "know",
+    "description": "Keep related chats, files and tasks together.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "finance",
+    "name": "Finance",
+    "category": "money",
+    "description": "Spending, receipts, budgets, subscriptions, bank accounts and your portfolio in one place.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "missions",
+    "name": "Missions",
+    "category": "automate",
+    "description": "Plan larger goals with a team of agents.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide",
+      "large"
+    ]
+  },
+  {
+    "id": "automations",
+    "name": "Automations",
+    "category": "automate",
+    "description": "Set up actions that repeat on a schedule.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "watches",
+    "name": "Watches",
+    "category": "automate",
+    "description": "Ask Jarvis to monitor changes and notify you.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "modes",
+    "name": "Modes",
+    "category": "automate",
+    "description": "Adjust Jarvis’s behavior and notifications.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "coding",
+    "name": "Coding",
+    "category": "automate",
+    "description": "Follow coding runs and review their progress.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "agents",
+    "name": "Agents",
+    "category": "automate",
+    "description": "Connect other assistants that Jarvis can work with.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "integrations",
+    "name": "Integrations",
+    "category": "system",
+    "description": "Connect apps and services to Jarvis.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "skills",
+    "name": "Skills",
+    "category": "system",
+    "description": "Manage the instructions and skills Jarvis uses.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "persona",
+    "name": "Persona",
+    "category": "system",
+    "description": "Choose how Jarvis speaks and responds to you.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "profiles",
+    "name": "Profiles",
+    "category": "system",
+    "description": "Create assistants with separate context and settings.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "learning",
+    "name": "Learning",
+    "category": "system",
+    "description": "Manage how Jarvis learns your preferences.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  },
+  {
+    "id": "devices",
+    "name": "Devices",
+    "category": "system",
+    "description": "Manage your devices and their capabilities.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "usage",
+    "name": "Usage",
+    "category": "system",
+    "description": "See model usage, token counts and costs.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square"
+    ]
+  },
+  {
+    "id": "notifications",
+    "name": "Notifications",
+    "category": "system",
+    "description": "Read updates and alerts from Jarvis.",
+    "sizes": [
+      "icon",
+      "strip",
+      "square",
+      "wide"
+    ]
+  },
+  {
+    "id": "settings",
+    "name": "Settings",
+    "category": "system",
+    "description": "Appearance, connection and account preferences.",
+    "sizes": [
+      "icon",
+      "strip"
+    ]
+  }
+]

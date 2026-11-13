@@ -39,6 +39,8 @@ import 'get_started_card.dart';
 import 'next_up.dart' hide greetingFor;
 import '../../l10n/l10n.dart';
 import '../proactivity/proactive_home_card.dart';
+import '../tiles/home_layout_sync.dart';
+import 'home_layout_cards.dart';
 
 /// Replaces Home's wall clock when no [JarvisHome.clock] is given
 /// (screenshots of the evening).
@@ -238,6 +240,8 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
       ..reset()
       ..start();
     widget.source.invalidate();
+    // Jarvis may have rearranged Home from a chat or another device.
+    unawaited(widget.layout.sync());
     unawaited(_loadPreferredName(generation));
     unawaited(_loadContext(generation));
     final briefing = await widget.source.briefing();
@@ -843,6 +847,25 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   }
 
   /// Done saves the layout; Cancel puts back what Home looked like before.
+  /// Putting back Home from before Jarvis changed it.
+  bool _undoingJarvis = false;
+
+  Future<void> _undoJarvisChange() async {
+    setState(() => _undoingJarvis = true);
+    final undone = await widget.layout.undoJarvisChange();
+    if (!mounted) return;
+    setState(() => _undoingJarvis = false);
+    if (!undone) {
+      ScaffoldMessenger.maybeOf(context)
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Could not undo the change. Try again in a moment.'),
+          ),
+        );
+    }
+  }
+
   void _endEdit({required bool save}) {
     if (save) {
       widget.layout.commitEdit();
@@ -855,6 +878,7 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final now = _now;
+    final shows = widget.layout.showsCard;
     final upcoming = upcomingItems(_briefing, now);
     final calendar = _briefing?['calendar'];
     final calendarOff =
@@ -871,6 +895,232 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
     ];
     final dayOne = homeContext == null ? null : _dayOneSteps();
     final showDayOne = dayOne != null && DayOneCard.shows(dayOne);
+    // Each part of Home under the Ask bar, in the order the owner chose.
+    final eveningShows =
+        evening &&
+        shows(HomeCardIds.evening) &&
+        homeContext != null &&
+        EveningCard.shows(homeContext.recap, tomorrow);
+    List<Widget> section(String id) => switch (id) {
+      HomeSectionIds.ongoing => [
+        if (widget.ready && shows(HomeCardIds.ongoing))
+          ProactiveHomeCard(
+            http: widget.source.http,
+            onOpen: widget.onOpen,
+            revision: widget.refreshRevision,
+          ),
+      ],
+      HomeSectionIds.needsYou => [
+        if (_briefing != null)
+          FadeSlideIn(
+            index: 2,
+            child: NeedsYouCard(
+              items: needsYouItems(
+                now: now,
+                briefing: _briefing,
+                chats: widget.chats,
+              ),
+              http: widget.source.http,
+              pending: _pending,
+              failed: _failed,
+              onReplyWith: widget.onReplyWith == null
+                  ? null
+                  : (item, draft) => widget.onReplyWith!(item.id, draft),
+              onSeeAll: () => widget.onOpen('attention'),
+              onAction: (item, action) => unawaited(_needsYou(item, action)),
+            ),
+          ),
+        const SizedBox(height: 20),
+      ],
+      HomeSectionIds.noticed => [
+        if (noticed.isNotEmpty && shows(HomeCardIds.noticed))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: FadeSlideIn(
+              index: 3,
+              child: NoticedCard(
+                insights: noticed,
+                onAction: (item) => unawaited(_noticed(item)),
+                onDismiss: (item) => _dismissCard(item.id, item.kind),
+              ),
+            ),
+          ),
+      ],
+      HomeSectionIds.evening => [
+        if (homeContext case final today? when eveningShows)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: FadeSlideIn(
+              index: 4,
+              child: EveningCard(
+                recap: today.recap,
+                tomorrow: tomorrow,
+                onWrite: widget.onSuggestion == null
+                    ? null
+                    : () => widget.onSuggestion!(
+                        'Help me write a short journal entry about today. Ask me one question at a time.',
+                      ),
+                onPlan: widget.onSuggestion == null
+                    ? null
+                    : () => widget.onSuggestion!('Help me plan tomorrow.'),
+              ),
+            ),
+          ),
+      ],
+      HomeSectionIds.brief => [
+        if (!eveningShows)
+          if (_briefNote case final note?
+              when hero?.kind != 'brief' && shows(HomeCardIds.brief))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: FadeSlideIn(
+                index: 3,
+                child: BriefCard(
+                  note: note,
+                  onDismiss: () =>
+                      unawaited(_dismissBrief(asJsonString(note['id']) ?? '')),
+                  onFollowUp: widget.onSuggestion == null
+                      ? null
+                      : () => _ask.text = 'About my morning brief: ',
+                ),
+              ),
+            ),
+      ],
+      HomeSectionIds.learning => [
+        if (LearningChange.fromBriefing(_briefing, seenAt: _learningSeenAt)
+            case final changes
+            when changes.isNotEmpty && shows(HomeCardIds.learning))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: FadeSlideIn(
+              index: 5,
+              child: LearningCard(
+                changes: changes,
+                // Once some were marked seen, the server's weekly count would include those.
+                total: _learningSeenAt != null
+                    ? changes.length
+                    : asJsonInt(
+                        jsonObject(_briefing?['learning'])?['changesThisWeek'],
+                        changes.length,
+                      ),
+                pending: _learningPending,
+                onAction: (change) => unawaited(_learningAction(change)),
+                onSeen: _learningSeen,
+                onOpenLearning: () {
+                  _learningSeen();
+                  widget.onOpen('learning');
+                },
+              ),
+            ),
+          ),
+      ],
+      HomeSectionIds.tiles => [
+        if (widget.ready && _briefing != null) ...[
+          CodexSignInCard(http: widget.source.http),
+          if (showDayOne && !_editing)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: DayOneCard(steps: dayOne, http: widget.source.http),
+            )
+          else
+            GetStartedCard(
+              http: widget.source.http,
+              briefing: _briefing,
+              onSuggestion: widget.onSuggestion,
+              refreshRevision: widget.refreshRevision,
+            ),
+        ],
+        if (_editing)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Hold and drag to move. Use the corner button to change size.',
+                    key: const Key('home-edit-hint'),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: JarvisColors.of(context).inkSoft,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ListenableBuilder(
+                  listenable: widget.layout,
+                  builder: (context, _) => TextButton(
+                    key: const Key('home-edit-undo'),
+                    onPressed: widget.layout.canUndo
+                        ? widget.layout.undo
+                        : null,
+                    child: const Text('Undo'),
+                  ),
+                ),
+                TextButton(
+                  key: const Key('home-edit-cancel'),
+                  onPressed: () => _endEdit(save: false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  key: const Key('home-edit-done'),
+                  onPressed: () => _endEdit(save: true),
+                  child: const Text('Done'),
+                ),
+              ],
+            ),
+          ),
+        if (!_editing)
+          if (widget.layout.jarvisChange case final change?)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: FadeSlideIn(
+                index: 0,
+                child: JarvisHomeChangeCard(
+                  change: change,
+                  undoing: _undoingJarvis,
+                  onKeep: widget.layout.keepJarvisChange,
+                  onUndo: () => unawaited(_undoJarvisChange()),
+                ),
+              ),
+            ),
+        ListenableBuilder(
+          listenable: widget.layout,
+          builder: (context, _) => !widget.layout.ready
+              ? const SizedBox(height: 240)
+              : TileGrid(
+                  layout: widget.layout.layout,
+                  data: _tileData,
+                  editing: _editing,
+                  onOpen: (spec) => widget.onOpen(spec.destination),
+                  onRowTap: (spec, row) {
+                    final target = row.target;
+                    if (target != null && target.startsWith('chat:')) {
+                      widget.onOpenChat(target.substring(5));
+                    } else if (target != null &&
+                        (target.startsWith(entityDestinationPrefix) ||
+                            target.startsWith(appDestinationPrefix))) {
+                      widget.onOpen(target);
+                    } else {
+                      widget.onOpen(spec.destination);
+                    }
+                  },
+                  onEdit: _beginEdit,
+                  now: now,
+                  isLoading: _isLoading,
+                  pending: _pending,
+                  onAction: _runAction,
+                  onMenu: _showMenu,
+                  onRemove: (item) => widget.layout.unpin(item.id),
+                  onResize: (item) => widget.layout.cycleSize(item.id),
+                  onReorder: widget.layout.move,
+                ),
+        ),
+      ],
+      _ => const <Widget>[],
+    };
+    final order = _editing
+        ? const [HomeSectionIds.tiles]
+        : widget.layout.sections;
     final list = OrbRefresh(
       onRefresh: _refresh,
       child: ListView(
@@ -921,222 +1171,26 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                       child: AskBar(
                         controller: _ask,
                         busy: widget.jarvisBusy,
-                        suggestions: homeSuggestions(
-                          now: now,
-                          briefing: _briefing,
-                          chats: widget.chats,
-                        ),
+                        suggestions: shows(HomeCardIds.suggestions)
+                            ? homeSuggestions(
+                                now: now,
+                                briefing: _briefing,
+                                chats: widget.chats,
+                              )
+                            : const [],
                         onSubmit: widget.onSuggestion,
                         onVoice: () => widget.onOpen('voice'),
                       ),
                     ),
                     const SizedBox(height: 28),
-                    if (widget.ready)
-                      ProactiveHomeCard(
-                        http: widget.source.http,
-                        onOpen: widget.onOpen,
-                        revision: widget.refreshRevision,
-                      ),
-                    if (_briefing != null)
-                      FadeSlideIn(
-                        index: 2,
-                        child: NeedsYouCard(
-                          items: needsYouItems(
-                            now: now,
-                            briefing: _briefing,
-                            chats: widget.chats,
-                          ),
-                          http: widget.source.http,
-                          pending: _pending,
-                          failed: _failed,
-                          onReplyWith: widget.onReplyWith == null
-                              ? null
-                              : (item, draft) =>
-                                    widget.onReplyWith!(item.id, draft),
-                          onSeeAll: () => widget.onOpen('attention'),
-                          onAction: (item, action) =>
-                              unawaited(_needsYou(item, action)),
-                        ),
-                      ),
-                    const SizedBox(height: 20),
-                    if (noticed.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 24),
-                        child: FadeSlideIn(
-                          index: 3,
-                          child: NoticedCard(
-                            insights: noticed,
-                            onAction: (item) => unawaited(_noticed(item)),
-                            onDismiss: (item) =>
-                                _dismissCard(item.id, item.kind),
-                          ),
-                        ),
-                      ),
-                    if (evening &&
-                        homeContext != null &&
-                        EveningCard.shows(homeContext.recap, tomorrow))
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: FadeSlideIn(
-                          index: 4,
-                          child: EveningCard(
-                            recap: homeContext.recap,
-                            tomorrow: tomorrow,
-                            onWrite: widget.onSuggestion == null
-                                ? null
-                                : () => widget.onSuggestion!(
-                                    'Help me write a short journal entry about today. Ask me one question at a time.',
-                                  ),
-                            onPlan: widget.onSuggestion == null
-                                ? null
-                                : () => widget.onSuggestion!(
-                                    'Help me plan tomorrow.',
-                                  ),
-                          ),
-                        ),
-                      )
-                    else if (_briefNote case final note?
-                        when hero?.kind != 'brief')
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: FadeSlideIn(
-                          index: 3,
-                          child: BriefCard(
-                            note: note,
-                            onDismiss: () => unawaited(
-                              _dismissBrief(asJsonString(note['id']) ?? ''),
-                            ),
-                            onFollowUp: widget.onSuggestion == null
-                                ? null
-                                : () => _ask.text = 'About my morning brief: ',
-                          ),
-                        ),
-                      ),
-                    if (LearningChange.fromBriefing(
-                          _briefing,
-                          seenAt: _learningSeenAt,
-                        )
-                        case final changes when changes.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: FadeSlideIn(
-                          index: 5,
-                          child: LearningCard(
-                            changes: changes,
-                            // Once some were marked seen, the server's weekly count would include those.
-                            total: _learningSeenAt != null
-                                ? changes.length
-                                : asJsonInt(
-                                    jsonObject(
-                                      _briefing?['learning'],
-                                    )?['changesThisWeek'],
-                                    changes.length,
-                                  ),
-                            pending: _learningPending,
-                            onAction: (change) =>
-                                unawaited(_learningAction(change)),
-                            onSeen: _learningSeen,
-                            onOpenLearning: () {
-                              _learningSeen();
-                              widget.onOpen('learning');
-                            },
-                          ),
-                        ),
-                      ),
                   ],
-                  if (widget.ready && _briefing != null) ...[
-                    CodexSignInCard(http: widget.source.http),
-                    if (showDayOne && !_editing)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: DayOneCard(
-                          steps: dayOne,
-                          http: widget.source.http,
-                        ),
-                      )
-                    else
-                      GetStartedCard(
-                        http: widget.source.http,
-                        briefing: _briefing,
-                        onSuggestion: widget.onSuggestion,
-                        refreshRevision: widget.refreshRevision,
-                      ),
+                  for (final (index, id) in order.indexed) ...[
+                    ...section(id),
+                    // The grid has no margin of its own; keep the rhythm when
+                    // something follows it.
+                    if (id == HomeSectionIds.tiles && index < order.length - 1)
+                      const SizedBox(height: 28),
                   ],
-                  if (_editing)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Hold and drag to move. Use the corner button to change size.',
-                              key: const Key('home-edit-hint'),
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: JarvisColors.of(context).inkSoft,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ListenableBuilder(
-                            listenable: widget.layout,
-                            builder: (context, _) => TextButton(
-                              key: const Key('home-edit-undo'),
-                              onPressed: widget.layout.canUndo
-                                  ? widget.layout.undo
-                                  : null,
-                              child: const Text('Undo'),
-                            ),
-                          ),
-                          TextButton(
-                            key: const Key('home-edit-cancel'),
-                            onPressed: () => _endEdit(save: false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            key: const Key('home-edit-done'),
-                            onPressed: () => _endEdit(save: true),
-                            child: const Text('Done'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ListenableBuilder(
-                    listenable: widget.layout,
-                    builder: (context, _) => !widget.layout.ready
-                        ? const SizedBox(height: 240)
-                        : TileGrid(
-                            layout: widget.layout.layout,
-                            data: _tileData,
-                            editing: _editing,
-                            onOpen: (spec) => widget.onOpen(spec.destination),
-                            onRowTap: (spec, row) {
-                              final target = row.target;
-                              if (target != null &&
-                                  target.startsWith('chat:')) {
-                                widget.onOpenChat(target.substring(5));
-                              } else if (target != null &&
-                                  (target.startsWith(entityDestinationPrefix) ||
-                                      target.startsWith(
-                                        appDestinationPrefix,
-                                      ))) {
-                                widget.onOpen(target);
-                              } else {
-                                widget.onOpen(spec.destination);
-                              }
-                            },
-                            onEdit: _beginEdit,
-                            now: now,
-                            isLoading: _isLoading,
-                            pending: _pending,
-                            onAction: _runAction,
-                            onMenu: _showMenu,
-                            onRemove: (item) => widget.layout.unpin(item.id),
-                            onResize: (item) =>
-                                widget.layout.cycleSize(item.id),
-                            onReorder: widget.layout.move,
-                          ),
-                  ),
                   if (!_editing)
                     Padding(
                       padding: const EdgeInsets.only(top: 20),
@@ -1169,6 +1223,25 @@ class _JarvisHomeState extends State<JarvisHome> with WidgetsBindingObserver {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(tileRadius),
                           ),
+                        ),
+                      ),
+                    ),
+                  if (_editing)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 24),
+                      child: ListenableBuilder(
+                        listenable: widget.layout,
+                        builder: (context, _) => HomeCardsEditor(
+                          sections: widget.layout.sections,
+                          isShown: widget.layout.showsCard,
+                          onChanged: widget.layout.setCardVisible,
+                          onMove: widget.layout.moveSection,
+                          onAskJarvis: widget.onSuggestion == null
+                              ? null
+                              : () {
+                                  _endEdit(save: true);
+                                  widget.onSuggestion!(arrangeHomePrompt);
+                                },
                         ),
                       ),
                     ),

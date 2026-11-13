@@ -60,12 +60,19 @@ public sealed class ToolGroupTests
     [InlineData("Every morning at 8 send me the weather", "automations")]
     [InlineData("What's my net worth?", "money")]
     [InlineData("Did I keep my streak going?", "habits")]
+    [InlineData("Put my habits at the top of my home screen", "home")]
+    [InlineData("I never use the finance tile", "home")]
+    [InlineData("Zet mijn agenda bovenaan op mijn startscherm", "home")]
+    [InlineData("Make Home more personal", "home")]
+    [InlineData("Put the tiles above everything else", "home")]
+    [InlineData("Verander de volgorde op mijn startscherm", "home")]
     public void Keywords_pick_the_group_a_message_needs(string message, string group) =>
         Assert.Contains(group, ToolGroups.MatchKeywords(message).Select(match => match.Id));
 
     [Theory]
     [InlineData("Remind me to call the dentist at 5")]
     [InlineData("What do you remember about me?")]
+    [InlineData("I'm working from home today")]
     public void Everyday_requests_load_no_feature_groups(string message) =>
         Assert.Empty(ToolGroups.MatchKeywords(message));
 

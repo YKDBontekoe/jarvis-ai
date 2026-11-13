@@ -53,6 +53,10 @@ public static partial class ToolGroups
         new("lists", "Plain lists such as shopping or packing: show, add items, tick them off, clear the ticked ones",
             ["GetLists", "AddToList", "TickListItems", "RemoveFromList", "RenameList", "ClearTickedListItems"],
             ListKeywords()),
+        new("home", "The user's Home screen: which tiles show, in what order and size, which cards are hidden and the order of its sections",
+            ["GetHomeLayout", "ArrangeHomeTiles", "PinHomeTile", "RemoveHomeTile", "SetHomeCardVisibility",
+             "ReorderHomeSections", "UndoHomeLayoutChange", "ResetHomeLayout"],
+            HomeLayoutKeywords()),
         new("people", "Contacts the user keeps up with: details, birthdays, logging contact, relationship radar",
             ["GetPeople", "SavePerson", "LogContact", "RemovePerson", "GetRelationshipRadar", "GetPersonFollowThrough"],
             PeopleKeywords()),
@@ -283,6 +287,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(shopping list|grocery list|groceries|packing list|to-?buy|(add|put) .{1,60} (to|on) (my|the) .{0,20}list|(my|the) .{0,20}list|boodschappen|winkellijst|inpaklijst|lijstje)", KeywordOptions)]
     private static partial Regex ListKeywords();
+
+    [GeneratedRegex(@"\b(home ?(screen|page|layout|tiles?|widgets?|cards?)|homescreen|widgets?\b|tiles?\b|dashboard|rearrange|re-?order|customi[sz]e|personali[sz]e|(on|to|off) (my |the )?home ?(screen)?\b|(make|change|edit|update|redo|redesign|tidy|clean up|arrange|set up) (my |the )?home\b|home\b.{0,30}\b(more personal|cleaner|calmer|simpler|minimal|busy|cluttered)|startscherm|beginscherm|thuisscherm|tegels?\b|indeling|(op|naar|van) (mijn |het )?(home|startscherm)\b)", KeywordOptions)]
+    private static partial Regex HomeLayoutKeywords();
 
     [GeneratedRegex(@"\b(delete|remove|get rid of|throw away|verwijder|wis)\b.{0,40}\b(file|document|pdf|upload|photo|bestand|foto)", KeywordOptions)]
     private static partial Regex FileCleanupKeywords();
