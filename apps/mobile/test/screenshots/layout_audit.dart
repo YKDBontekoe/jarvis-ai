@@ -59,6 +59,8 @@ const destinations = [
   'lists',
   'people',
   'play',
+  'know-me',
+  'talk-differently',
   'approvals',
   'reminders',
   'notifications',

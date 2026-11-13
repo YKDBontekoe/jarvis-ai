@@ -102,6 +102,41 @@ void main() {
       await capture(tester, '40-play-ghost-$mode');
     });
 
+    screenshotTest('know me $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'know-me');
+      expect(find.byKey(const Key('knowing-hero')), findsOneWidget);
+      await capture(tester, '41-know-me-$mode');
+      final list = find.descendant(
+        of: find.byKey(const Key('knowing-list')),
+        matching: find.byType(Scrollable),
+      );
+      final trust = find.byKey(const Key('knowing-trust-whatsapp.send'));
+      await tester.scrollUntilVisible(trust, 200, scrollable: list.first);
+      await Scrollable.ensureVisible(tester.element(trust), alignment: .3);
+      await settle(tester);
+      await capture(tester, '41-know-me-trust-$mode');
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('knowing-train-start')),
+        -200,
+        scrollable: list.first,
+      );
+      await tester.tap(find.byKey(const Key('knowing-train-start')));
+      await settle(tester);
+      await capture(tester, '41-train-jarvis-$mode');
+    });
+
+    screenshotTest('talk differently $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'talk-differently');
+      await capture(tester, '42-talk-differently-$mode');
+      await tester.tap(find.byKey(const Key('special-council')));
+      await settle(tester);
+      await capture(tester, '42-council-sheet-$mode');
+    });
+
     screenshotTest('ongoing work $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);

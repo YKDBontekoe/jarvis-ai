@@ -2024,6 +2024,38 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.ToTable("channel_threads", (string)null);
                 });
 
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.ChatModeEntity", b =>
+                {
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload_json");
+
+                    b.HasKey("ConversationId");
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.ToTable("chat_modes", (string)null);
+                });
+
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.CommitmentEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3855,6 +3887,42 @@ namespace Jarvis.Infrastructure.Persistence.Migrations
                     b.HasIndex("OwnerId", "ProfileId");
 
                     b.ToTable("memories", (string)null);
+                });
+
+            modelBuilder.Entity("Jarvis.Infrastructure.Persistence.MemoryReviewEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MemoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("memory_id");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<DateTimeOffset>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<string>("Snapshot")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("snapshot");
+
+                    b.Property<string>("Verdict")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("verdict");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "ReviewedAt");
+
+                    b.ToTable("memory_reviews", (string)null);
                 });
 
             modelBuilder.Entity("Jarvis.Infrastructure.Persistence.MessageFeedbackEntity", b =>

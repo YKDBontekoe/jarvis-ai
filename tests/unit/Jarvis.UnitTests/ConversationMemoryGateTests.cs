@@ -16,7 +16,8 @@ public sealed class ConversationMemoryGateTests
             false, [], null, null, null, null, MemoryScopes.All, true, contribute, true, remember, DateTimeOffset.UtcNow);
 
     private static async Task<List<(Guid SourceId, Guid? ProfileId, IReadOnlyList<MemoryExtractionTurn> Context)>>
-        RunAsync(AssistantProfileSnapshot snapshot, Func<Guid, Guid, IReadOnlyList<Message>>? history = null)
+        RunAsync(AssistantProfileSnapshot snapshot, Func<Guid, Guid, IReadOnlyList<Message>>? history = null,
+            string? chatMode = null)
     {
         var extracted = new List<(Guid, Guid?, IReadOnlyList<MemoryExtractionTurn>)>();
         var conversation = new Conversation(Owner, "Chat");
@@ -31,10 +32,27 @@ public sealed class ConversationMemoryGateTests
             {
                 extracted.Add(((Guid)args[1]!, (Guid?)args[4], (IReadOnlyList<MemoryExtractionTurn>)args[5]!));
                 return Task.CompletedTask;
-            })));
+            })),
+            chatModes: Fake<Jarvis.Application.Knowing.IKnowingRepository>.Create(("GetChatModeAsync", _ =>
+                chatMode is null
+                    ? null
+                    : new Jarvis.Domain.Knowing.ChatMode(conversation.Id, Owner, chatMode, "{}", DateTimeOffset.UtcNow))));
 
         await gate.ExtractAsync(Owner, conversation.Id, source, "I live in Amsterdam now.", default);
         return extracted;
+    }
+
+    [Theory]
+    [InlineData("rehearse", 0)]
+    [InlineData("council", 0)]
+    [InlineData("past_self", 0)]
+    [InlineData("stranger", 1)]
+    [InlineData(null, 1)]
+    public async Task Role_play_chats_teach_Jarvis_nothing_but_the_strangers_interview_does(string? mode, int expected)
+    {
+        var extracted = await RunAsync(Snapshot(remember: true, contribute: true), chatMode: mode);
+
+        Assert.Equal(expected, extracted.Count);
     }
 
     [Fact]

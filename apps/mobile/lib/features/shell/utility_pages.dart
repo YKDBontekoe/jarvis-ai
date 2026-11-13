@@ -57,6 +57,8 @@ import '../meetings/meeting_screen.dart';
 import '../meetings/meetings_screen.dart';
 import '../decisions/decisions_screen.dart';
 import '../game/game_screen.dart';
+import '../knowing/knowing_screen.dart';
+import '../knowing/special_chats_screen.dart';
 import '../entities/entity_ref.dart';
 import '../entities/entity_screen.dart';
 import '../devices/devices_screen.dart';
@@ -154,6 +156,11 @@ Widget? utilityPageFor(
   'journal' => JournalScreen(http: http, onTalkAboutDay: onAskInChat),
   'decisions' => DecisionsScreen(http: http),
   'play' => GameScreen(http: http),
+  'know-me' => KnowingScreen(http: http),
+  'talk-differently' => SpecialChatsScreen(
+    http: http,
+    onOpenConversation: onOpenConversation,
+  ),
   'comparisons' => ComparisonsScreen(http: http),
   'find-app' => AppGoalsScreen(http: http, onAskInChat: onAskInChat),
   'build-app' => BuildAppScreen(http: http, onAskInChat: onAskInChat),

@@ -101,6 +101,14 @@ public static class LifeFeaturesRegistration
         // The game: bets against the owner, weekly side quests and the race against last month's self.
         services.AddScoped<Jarvis.Application.Game.IGameRepository, GameRepository>();
         services.AddScoped<Jarvis.Application.Game.IGameService, Jarvis.Application.Game.GameService>();
+
+        // Jarvis knows you: train its memory, the map of the unknown, the trust ladder and special chats.
+        services.AddScoped<Jarvis.Application.Knowing.IKnowingRepository, KnowingRepository>();
+        services.AddScoped<Jarvis.Application.Knowing.IApprovalHistory, ApprovalHistory>();
+        services.AddScoped<Jarvis.Application.Knowing.ITrainingService, Jarvis.Application.Knowing.TrainingService>();
+        services.AddScoped<Jarvis.Application.Knowing.IKnowledgeMapService, Jarvis.Application.Knowing.KnowledgeMapService>();
+        services.AddScoped<Jarvis.Application.Knowing.ITrustLadderService, Jarvis.Application.Knowing.TrustLadderService>();
+        services.AddScoped<Jarvis.Application.Knowing.IChatModeService, Jarvis.Application.Knowing.ChatModeService>();
         services.AddScoped<Jarvis.Application.Finance.ISubscriptionReviewService,
             Jarvis.Application.Finance.SubscriptionReviewService>();
         services.AddScoped<Jarvis.Application.Inbox.ICommitmentFollowUpService,

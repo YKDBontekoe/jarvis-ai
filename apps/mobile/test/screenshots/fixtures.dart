@@ -1485,8 +1485,147 @@ Map<String, Object?> gameBoard() => {
   },
 };
 
+Map<String, Object?> trainingDeck() => {
+  'cards': [
+    {
+      'memoryId': 'mem-1',
+      'kind': 'preference',
+      'content': 'You prefer to run in the morning before work.',
+      'confidencePercent': 55,
+      'learnedAt': '2026-09-02T08:00:00Z',
+    },
+    {
+      'memoryId': 'mem-2',
+      'kind': 'fact',
+      'content': 'Your sister Noor lives in Rotterdam.',
+      'confidencePercent': 62,
+      'learnedAt': '2026-08-14T08:00:00Z',
+    },
+  ],
+  'stats': {
+    'reviewed': 24,
+    'right': 19,
+    'wrong': 3,
+    'outdated': 2,
+    'accuracyPercent': 79,
+    'today': 2,
+    'dailyGoal': 5,
+    'streakDays': 4,
+    'reviewableLeft': 37,
+  },
+};
+
+Map<String, Object?> knowledgeMap() => {
+  'fogPercent': 42,
+  'known': 14,
+  'expected': 24,
+  'answeredToday': 0,
+  'question': {
+    'entityId': 'ent-lars',
+    'entityName': 'Lars',
+    'entityType': 'person',
+    'predicate': 'job_title',
+    'question': 'What does Lars do for work?',
+  },
+  'entities': [
+    {
+      'id': 'ent-rosa',
+      'name': 'Rosa',
+      'type': 'person',
+      'known': 3,
+      'expected': 3,
+    },
+    {
+      'id': 'ent-noor',
+      'name': 'Noor',
+      'type': 'person',
+      'known': 2,
+      'expected': 3,
+    },
+    {
+      'id': 'ent-lars',
+      'name': 'Lars',
+      'type': 'person',
+      'known': 1,
+      'expected': 3,
+    },
+    {
+      'id': 'ent-site',
+      'name': 'Website relaunch',
+      'type': 'project',
+      'known': 1,
+      'expected': 2,
+    },
+    {
+      'id': 'ent-mama',
+      'name': 'Mama',
+      'type': 'person',
+      'known': 3,
+      'expected': 3,
+    },
+  ],
+};
+
+List<Map<String, Object?>> trustLadder() => [
+  {
+    'category': 'whatsapp.send',
+    'label': 'Sending WhatsApp messages',
+    'level': 'trusted',
+    'streak': 12,
+    'approved': 15,
+    'declined': 1,
+    'nextAt': 10,
+    'canHandOver': true,
+    'lastDecidedAt': '2026-11-10T18:00:00Z',
+    'handedOverUntil': null,
+  },
+  {
+    'category': 'graph.change',
+    'label': 'Changing the knowledge graph',
+    'level': 'hands_free',
+    'streak': 14,
+    'approved': 14,
+    'declined': 0,
+    'nextAt': 10,
+    'canHandOver': false,
+    'lastDecidedAt': '2026-11-01T18:00:00Z',
+    'handedOverUntil': '2027-01-30T18:00:00Z',
+  },
+  {
+    'category': 'expenses.delete',
+    'label': 'Deleting expenses',
+    'level': 'learning',
+    'streak': 4,
+    'approved': 6,
+    'declined': 1,
+    'nextAt': 10,
+    'canHandOver': false,
+    'lastDecidedAt': '2026-11-08T18:00:00Z',
+    'handedOverUntil': null,
+  },
+];
+
+List<Map<String, Object?>> chatModes() => [
+  {
+    'conversationId': 'cm-1',
+    'kind': 'council',
+    'title': 'The council',
+    'createdAt': '2026-11-09T19:00:00Z',
+  },
+  {
+    'conversationId': 'cm-2',
+    'kind': 'rehearse',
+    'title': 'Rehearsal with Rosa',
+    'createdAt': '2026-11-05T19:00:00Z',
+  },
+];
+
 Map<String, Object?> fixtureRoutes({bool withApproval = true}) => {
   'GET /api/v1/game': gameBoard(),
+  'GET /api/v1/knowing/training': trainingDeck(),
+  'GET /api/v1/knowing/map': knowledgeMap(),
+  'GET /api/v1/knowing/trust': trustLadder(),
+  'GET /api/v1/chat-modes': chatModes(),
   'GET /api/v1/planner/today': plannerToday(),
   'GET /api/v1/finance/wealth': financeWealth(),
   'GET /api/v1/finance/overview': financeOverview(),

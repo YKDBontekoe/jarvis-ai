@@ -133,6 +133,27 @@ final List<TileSpec> tileSpecs = [
     fallback: 'Bets, quests and your ghost',
   ),
   const TileSpec(
+    id: 'know-me',
+    description: 'Check what Jarvis believes about you, clear the map of the unknown, and see what it has earned trust in.',
+    name: 'Know me',
+    icon: PhosphorIconsRegular.brain,
+    category: TileCategory.know,
+    sizes: [_icon, _strip, _square],
+    destination: 'know-me',
+    load: _knowMe,
+    fallback: 'How well Jarvis knows you',
+  ),
+  const TileSpec(
+    id: 'talk-differently',
+    description: 'The stranger, rehearsing a hard talk, past you and the council: chats where Jarvis plays a part.',
+    name: 'Talk differently',
+    icon: PhosphorIconsRegular.chatsCircle,
+    category: TileCategory.talk,
+    sizes: [_icon, _strip],
+    destination: 'talk-differently',
+    fallback: 'Rehearse, past you, the council',
+  ),
+  const TileSpec(
     id: 'weekly-review',
     description: 'Look back at your week and mood trends.',
     name: 'Weekly review',
@@ -863,6 +884,22 @@ Future<TileData?> _play(TileEnv env) async {
           id: asJsonString(quest['id']),
         ),
     ],
+  );
+}
+
+Future<TileData?> _knowMe(TileEnv env) async {
+  final response = await env.http.get<dynamic>('/api/v1/knowing/training');
+  final stats = jsonObject(jsonObject(response.data)?['stats']);
+  if (stats == null) return null;
+  final accuracy = stats['accuracyPercent'];
+  final today = asJsonInt(stats['today']);
+  final goal = asJsonInt(stats['dailyGoal'], 5);
+  return TileData(
+    stat: accuracy is num ? '${accuracy.round()}%' : '–',
+    unit: 'right',
+    subtitle: '$today of $goal cards today',
+    progress: goal == 0 ? null : (today / goal).clamp(0, 1).toDouble(),
+    attention: today < goal && asJsonInt(stats['reviewableLeft']) > 0,
   );
 }
 

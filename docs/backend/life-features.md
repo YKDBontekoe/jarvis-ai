@@ -165,6 +165,28 @@ A small game around the owner's own data, under Everything → Play. Nothing in 
 - A refresh (settle, place, write, auto-complete) runs whenever the board is read and after the nightly dream. New bets send at most one `game` notification a day ("Jarvis is betting against you"), which opens Play.
 - Endpoints: `GET /game` (refreshes, then returns `today`, `score`, `bets`, `quests` with `progress`, and `ghost`), `POST /game/refresh`, `POST /game/quests/{id}/complete`, `POST /game/quests/{id}/skip`, `POST /game/bets/{id}/call-off` (404 when unknown or no longer open). Tables `game_bets` and `game_quests`. Tools: `GetGameBoard`, `CompleteQuest` (group `game`); they only touch the owner's own game, so neither needs approval.
 
+## Know me: training, the map of the unknown and the trust ladder
+
+Under Everything → Know me. Owner-scoped; nothing here needs a model.
+
+- **Train Jarvis** (`TrainingService`, `TrainingEngine`). A deck of up to 10 active memories Jarvis inferred (unpinned, not `journal`, not superseded or ended), least confident and oldest first, skipping any answered in the last 90 days. `right` raises confidence to at least 0.95, `wrong` deletes the memory, `outdated` ends it (a pinned memory is left as it is). Each answer is a `memory_reviews` row holding a 300-character snapshot, so the score still counts a deleted memory. The score is right ÷ answered; the day streak counts local days with an answer, alive until the day is over; the daily goal is 5. Audit `memory.reviewed` carries the id and verdict only.
+- **Map of the unknown** (`KnowledgeMapService`, `GapEngine`). For the 30 best-connected people, projects and pets in the graph (not the owner's own node), which basics are missing: a person's birthday, work (`job_title`, `works_at` or `studies_at`) and home (`lives_in`); a project's `status` and `deadline`; a pet's age. Fog is missing ÷ expected. The daily question rotates through the open gaps by date. An answer is merged as an exclusive fact with confidence 1 (`lives_in` as a place entity, the rest as values); "I don't know" stores the gap in owner settings (`knowing`, at most 500) so it is never asked again.
+- **Trust ladder** (`TrustLadderService`, `TrustEngine`). From the owner's decided approvals in the last year, grouped by `ApprovalCategories`: approvals in a row climb (`learning` at 3, `trusted` at 10) and one decline sets the streak back to 0. At `trusted` the owner may hand the category over: that is an ordinary standing approval for 90 days (`IStandingApprovalService`), so it shows and can be revoked there too, and it reads `hands_free` here. Coding, integrations, delegation and removing people are never offered, whatever the streak. Nothing changes what Jarvis may do until the owner taps Hand it over.
+- Endpoints: `GET /knowing/training`, `POST /knowing/training/{memoryId}` (`verdict`), `GET /knowing/map`, `POST /knowing/map/answer` (`entityId`, `predicate`, `answer`), `POST /knowing/map/skip`, `GET /knowing/trust`, `POST /knowing/trust/{category}/hand-over` (204; 400 when not earned or never offered), `DELETE /knowing/trust/{category}`.
+
+## Talk differently: special chats
+
+Under Everything → Talk differently. `POST /chat-modes` (`kind` plus that kind's fields) creates an ordinary conversation, stores a `chat_modes` row (conversation id, kind, the owner's choices as JSON) and writes an opening line; the app then opens the chat. `ChatModeContextContributor` adds a "Special chat: …" block to every turn of that conversation (not to background tasks). It changes how Jarvis talks, never which tools or approvals apply, and the owner's text in it is framed as untrusted.
+
+| Kind | Fields | What Jarvis does |
+|---|---|---|
+| `stranger` | — | Interviews the owner as if they had never met, one question at a time, then lists what is new, different or no longer true compared with what it had on file |
+| `rehearse` | `personId`, `scenario`, `goal?` | Plays that person from People, styled on up to 25 of their recent messages in linked WhatsApp chats; steps out with notes when the owner says "debrief". Nothing is sent to them |
+| `past_self` | `asOf` (a past day, up to 10 years back) | Speaks as the owner on that day, from memories created by then and still valid then (up to 60) and the journal from the 60 days before; says "I don't know that yet" about anything later |
+| `council` | `question`, `advisers` (2–5; default the sceptic, the stoic, your accountant, your future self) | A short debate under each adviser's name, ending with where they agree and split; never decides |
+
+`ConversationMemoryGate` skips memory extraction in `rehearse`, `past_self` and `council` chats (role play is not a fact about the owner); the stranger's interview is extracted as usual, which is how what changed reaches memory. `GET /chat-modes` lists earlier special chats; `GET /chat-modes/{conversationId}` returns the kind.
+
 ## Routine miner
 
 Jarvis looks for repeated behaviour in the life timeline and offers a ready automation for each pattern. `RoutineMinerEngine` is pure: it reads 8 weeks of timeline moments (journal, expense, habit, finished task) in the owner's time zone and finds two kinds of pattern.

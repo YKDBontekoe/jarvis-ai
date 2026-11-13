@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<Jarvis.Application.Integrations.IMcpOAuthService, Jarvis.Mcp.McpOAuthService>();
         services.AddScoped<IAgentContextContributor, Profiles.ProfileContextContributor>();
         services.AddScoped<IAgentContextContributor, Projects.ProjectContextContributor>();
+        services.AddScoped<IAgentContextContributor, Knowing.ChatModeContextContributor>();
         services.AddScoped<IAgentToolContributor, Skills.SkillToolContributor>();
         services.AddScoped<IAgentContextContributor, Skills.SkillContextContributor>();
         services.AddScoped<IAgentToolContributor, Journal.JournalToolContributor>();

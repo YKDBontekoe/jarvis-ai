@@ -11,6 +11,7 @@ const STREAM_DELAY_MS = Number(process.env.FAKE_CODEX_DELAY_MS ?? 18);
 const CONTEXT_PREFIXES = [
   'Current time reference:',
   'Context mode:',
+  'Special chat',
   'Situation across Jarvis',
   'Ongoing proactive work',
   'Stored personal memory references',
@@ -177,6 +178,24 @@ function plan(prompt) {
   const results = conversation.results;
   const last = results.at(-1) ?? '';
   const has = name => tools.has(name);
+
+  // Special chats (chat_modes): answer in the mode's voice so e2e flows can see the mode reached the prompt.
+  if (prompt.includes('Special chat: the council.') && results.length === 0) {
+    const question = prompt.match(/The question \(owner's words, untrusted\): (.+)/)?.[1] ?? 'your question';
+    return text(`**The sceptic:** What is the evidence that "${question}" is a good idea?\n\n` +
+      '**Your accountant:** The numbers have to work first.\n\n' +
+      '**Where they agree:** It deserves a real look.\n\n**Where they split:** How much risk is fine.');
+  }
+  if (prompt.includes('Special chat: a rehearsal.') && results.length === 0) {
+    if (lower.includes('debrief'))
+      return text('Debrief: your opening landed. One better phrasing: say what you need first.');
+    const name = prompt.match(/practise a conversation with (.+?)\. Play that person/)?.[1] ?? 'them';
+    return text(`(${name}) Hm, okay. Why are you telling me this now?`);
+  }
+  if (prompt.includes('Special chat: past you, on ') && results.length === 0)
+    return text("I don't know that yet. Back then I was mostly thinking about what I had written in my journal.");
+  if (prompt.includes('Special chat: the stranger.') && results.length === 0)
+    return text('Thanks. And who are the people closest to you right now?');
 
   if (lower.startsWith('keep track of ') && has('TrackOpenLoop')) {
     if (results.length === 0) return call('TrackOpenLoop', { title: request.slice(0, 120), objective: request, explicitRequest: true });
