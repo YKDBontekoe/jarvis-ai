@@ -51,6 +51,17 @@ internal sealed class AssistantDreamingActivities(IServiceScopeFactory scopeFact
         }
         try
         {
+            // Bets settle and the week's quests are written overnight, so the morning board is current.
+            await services.GetRequiredService<Jarvis.Application.Game.IGameService>()
+                .RefreshAsync(input.OwnerId, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            services.GetRequiredService<ILogger<AssistantDreamingActivities>>()
+                .LogWarning(exception, "The game could not be refreshed after dreaming.");
+        }
+        try
+        {
             // Old run traces and signals are dropped here so they never grow without bound.
             var now = DateTimeOffset.UtcNow;
             await services.GetRequiredService<ILearningStore>().PruneAsync(input.OwnerId, settings.TraceCutoff(now),

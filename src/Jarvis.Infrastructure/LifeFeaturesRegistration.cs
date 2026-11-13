@@ -97,6 +97,25 @@ public static class LifeFeaturesRegistration
         // Decision journal: predictions with a confidence, resolved later and scored for calibration.
         services.AddScoped<IDecisionRepository, DecisionRepository>();
         services.AddScoped<IDecisionService, DecisionService>();
+
+        // The game: bets against the owner, weekly side quests and the race against last month's self.
+        services.AddScoped<Jarvis.Application.Game.IGameRepository, GameRepository>();
+        services.AddScoped<Jarvis.Application.Game.IGameService, Jarvis.Application.Game.GameService>();
+
+        // Jarvis knows you: train its memory, the map of the unknown, the trust ladder and special chats.
+        services.AddScoped<Jarvis.Application.Knowing.IKnowingRepository, KnowingRepository>();
+        services.AddScoped<Jarvis.Application.Knowing.IApprovalHistory, ApprovalHistory>();
+        services.AddScoped<Jarvis.Application.Knowing.ITrainingService, Jarvis.Application.Knowing.TrainingService>();
+        services.AddScoped<Jarvis.Application.Knowing.IKnowledgeMapService, Jarvis.Application.Knowing.KnowledgeMapService>();
+        services.AddScoped<Jarvis.Application.Knowing.ITrustLadderService, Jarvis.Application.Knowing.TrustLadderService>();
+        services.AddScoped<Jarvis.Application.Knowing.IChatModeService, Jarvis.Application.Knowing.ChatModeService>();
+
+        // Discover: collisions, the life museum and duels (the duel peer client lives in the API).
+        services.AddScoped<Jarvis.Application.Discover.ICollisionService, Jarvis.Application.Discover.CollisionService>();
+        services.AddScoped<Jarvis.Application.Discover.IMuseumService, Jarvis.Application.Discover.MuseumService>();
+        services.AddScoped<Jarvis.Application.Discover.IDuelRepository, DuelRepository>();
+        services.AddScoped<Jarvis.Application.Discover.IDuelPeerClient, UnavailableDuelPeerClient>();
+        services.AddScoped<Jarvis.Application.Discover.IDuelService, Jarvis.Application.Discover.DuelService>();
         services.AddScoped<Jarvis.Application.Finance.ISubscriptionReviewService,
             Jarvis.Application.Finance.SubscriptionReviewService>();
         services.AddScoped<Jarvis.Application.Inbox.ICommitmentFollowUpService,

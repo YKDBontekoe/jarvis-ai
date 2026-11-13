@@ -122,6 +122,59 @@ final List<TileSpec> tileSpecs = [
     fallback: 'Track a call',
   ),
   const TileSpec(
+    id: 'play',
+    description: 'Beat Jarvis’s bets on your habits and budgets, finish weekly quests, and race the you of a month ago.',
+    name: 'Play',
+    icon: PhosphorIconsRegular.trophy,
+    category: TileCategory.plan,
+    sizes: [_icon, _strip, _square],
+    destination: 'play',
+    load: _play,
+    fallback: 'Bets, quests and your ghost',
+  ),
+  const TileSpec(
+    id: 'know-me',
+    description: 'Check what Jarvis believes about you, clear the map of the unknown, and see what it has earned trust in.',
+    name: 'Know me',
+    icon: PhosphorIconsRegular.brain,
+    category: TileCategory.know,
+    sizes: [_icon, _strip, _square],
+    destination: 'know-me',
+    load: _knowMe,
+    fallback: 'How well Jarvis knows you',
+  ),
+  const TileSpec(
+    id: 'talk-differently',
+    description: 'The stranger, rehearsing a hard talk, past you and the council: chats where Jarvis plays a part.',
+    name: 'Talk differently',
+    icon: PhosphorIconsRegular.chatsCircle,
+    category: TileCategory.talk,
+    sizes: [_icon, _strip],
+    destination: 'talk-differently',
+    fallback: 'Rehearse, past you, the council',
+  ),
+  const TileSpec(
+    id: 'discover',
+    description: 'A daily collision between two things you kept, and duels with friends’ Jarvises.',
+    name: 'Discover',
+    icon: PhosphorIconsRegular.lightbulbFilament,
+    category: TileCategory.know,
+    sizes: [_icon, _strip],
+    destination: 'discover',
+    fallback: 'Today’s collision',
+  ),
+  const TileSpec(
+    id: 'museum',
+    description:
+        'Your year as a museum: best days, streaks, calls you made and more.',
+    name: 'Life museum',
+    icon: PhosphorIconsRegular.image,
+    category: TileCategory.know,
+    sizes: [_icon, _strip],
+    destination: 'museum',
+    fallback: 'Your year, framed',
+  ),
+  const TileSpec(
     id: 'weekly-review',
     description: 'Look back at your week and mood trends.',
     name: 'Weekly review',
@@ -812,6 +865,62 @@ Future<TileData?> _decisions(TileEnv env) async {
           id: asJsonString(decision['id']),
         ),
     ],
+  );
+}
+
+Future<TileData?> _play(TileEnv env) async {
+  final response = await env.http.get<dynamic>('/api/v1/game');
+  final board = jsonObject(response.data);
+  if (board == null) return null;
+  final score = jsonObject(board['score']) ?? const <String, dynamic>{};
+  final open = [
+    for (final quest in jsonMaps(board['quests']))
+      if (quest['status'] == 'open') quest,
+  ];
+  final bets = [
+    for (final bet in jsonMaps(board['bets']))
+      if (bet['status'] == 'open') bet,
+  ];
+  final points = asJsonInt(score['points']);
+  final start = asJsonInt(score['levelStart']);
+  final next = asJsonInt(score['nextLevelAt'], 100);
+  return TileData(
+    stat: '$points',
+    unit: points == 1 ? 'point' : 'points',
+    subtitle:
+        'Level ${asJsonInt(score['level'], 1)} · '
+        '${open.length == 1 ? '1 quest' : '${open.length} quests'} open',
+    progress: next > start ? (points - start) / (next - start) : null,
+    rows: [
+      for (final bet in bets.take(_maxRows))
+        TileRow(
+          _first(bet, ['claim']) ?? 'Bet',
+          meta: 'Jarvis ${asJsonInt(bet['confidencePercent'])}% sure',
+          id: asJsonString(bet['id']),
+        ),
+      for (final quest in open.take(_maxRows - bets.length.clamp(0, _maxRows)))
+        TileRow(
+          _first(quest, ['title']) ?? 'Quest',
+          meta: '+${asJsonInt(quest['points'])}',
+          id: asJsonString(quest['id']),
+        ),
+    ],
+  );
+}
+
+Future<TileData?> _knowMe(TileEnv env) async {
+  final response = await env.http.get<dynamic>('/api/v1/knowing/training');
+  final stats = jsonObject(jsonObject(response.data)?['stats']);
+  if (stats == null) return null;
+  final accuracy = stats['accuracyPercent'];
+  final today = asJsonInt(stats['today']);
+  final goal = asJsonInt(stats['dailyGoal'], 5);
+  return TileData(
+    stat: accuracy is num ? '${accuracy.round()}%' : '–',
+    unit: 'right',
+    subtitle: '$today of $goal cards today',
+    progress: goal == 0 ? null : (today / goal).clamp(0, 1).toDouble(),
+    attention: today < goal && asJsonInt(stats['reviewableLeft']) > 0,
   );
 }
 

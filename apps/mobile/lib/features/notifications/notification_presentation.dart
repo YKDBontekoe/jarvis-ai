@@ -116,6 +116,12 @@ NotificationLook notificationLook(String? type) => switch (type) {
     tone: NotificationTone.accent,
     nextStep: 'Review it',
   ),
+  'game' => const NotificationLook(
+    'Jarvis bets',
+    PhosphorIconsRegular.target,
+    tone: NotificationTone.accent,
+    nextStep: 'Open Play',
+  ),
   'budget.alert' => const NotificationLook(
     'Budget',
     PhosphorIconsRegular.wallet,

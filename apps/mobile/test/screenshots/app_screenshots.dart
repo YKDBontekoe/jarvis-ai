@@ -80,6 +80,93 @@ void main() {
   for (final dark in [false, true]) {
     final mode = dark ? 'dark' : 'light';
 
+    screenshotTest('play $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'play');
+      expect(find.byKey(const Key('game-score')), findsOneWidget);
+      await capture(tester, '40-play-$mode');
+      final list = find.descendant(
+        of: find.byKey(const Key('game-list')),
+        matching: find.byType(Scrollable),
+      );
+      final quests = find.byKey(const Key('game-quest-q-boss'));
+      await tester.scrollUntilVisible(quests, 200, scrollable: list.first);
+      await Scrollable.ensureVisible(tester.element(quests), alignment: .05);
+      await settle(tester);
+      await capture(tester, '40-play-quests-$mode');
+      final ghost = find.byKey(const Key('game-ghost'));
+      await tester.scrollUntilVisible(ghost, 200, scrollable: list.first);
+      await Scrollable.ensureVisible(tester.element(ghost), alignment: .1);
+      await settle(tester);
+      await capture(tester, '40-play-ghost-$mode');
+    });
+
+    screenshotTest('know me $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'know-me');
+      expect(find.byKey(const Key('knowing-hero')), findsOneWidget);
+      await capture(tester, '41-know-me-$mode');
+      final list = find.descendant(
+        of: find.byKey(const Key('knowing-list')),
+        matching: find.byType(Scrollable),
+      );
+      final trust = find.byKey(const Key('knowing-trust-whatsapp.send'));
+      await tester.scrollUntilVisible(trust, 200, scrollable: list.first);
+      await Scrollable.ensureVisible(tester.element(trust), alignment: .3);
+      await settle(tester);
+      await capture(tester, '41-know-me-trust-$mode');
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('knowing-train-start')),
+        -200,
+        scrollable: list.first,
+      );
+      await tester.tap(find.byKey(const Key('knowing-train-start')));
+      await settle(tester);
+      await capture(tester, '41-train-jarvis-$mode');
+    });
+
+    screenshotTest('talk differently $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'talk-differently');
+      await capture(tester, '42-talk-differently-$mode');
+      await tester.tap(find.byKey(const Key('special-council')));
+      await settle(tester);
+      await capture(tester, '42-council-sheet-$mode');
+    });
+
+    screenshotTest('discover $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'discover');
+      expect(find.byKey(const Key('discover-collision')), findsOneWidget);
+      await capture(tester, '43-discover-$mode');
+      final list = find.descendant(
+        of: find.byKey(const Key('discover-list')),
+        matching: find.byType(Scrollable),
+      );
+      final duel = find.byKey(const Key('discover-duel-duel-1'));
+      await tester.scrollUntilVisible(duel, 200, scrollable: list.first);
+      await Scrollable.ensureVisible(tester.element(duel), alignment: .2);
+      await settle(tester);
+      await capture(tester, '43-discover-duels-$mode');
+    });
+
+    screenshotTest('museum $mode', (tester) async {
+      usePhone(tester);
+      await start(tester, dark: dark);
+      await openFeature(tester, 'museum');
+      await capture(tester, '44-museum-$mode');
+      await tester.drag(
+        find.byKey(const Key('museum-rooms')),
+        const Offset(-400, 0),
+      );
+      await settle(tester);
+      await capture(tester, '44-museum-best-days-$mode');
+    });
+
     screenshotTest('ongoing work $mode', (tester) async {
       usePhone(tester);
       await start(tester, dark: dark);

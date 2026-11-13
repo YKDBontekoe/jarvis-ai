@@ -15,6 +15,7 @@ import '../chat/tool_catalog.dart';
 import '../../api/api_config.dart';
 import '../coding/coding_run_detail_screen.dart';
 import '../automations/automations_screen.dart';
+import '../game/game_screen.dart';
 import '../habits/habits_screen.dart';
 import '../learning/learning_screen.dart';
 import '../skills/skills_screen.dart';
@@ -689,6 +690,10 @@ abstract class _RemindersController extends State<RemindersScreen>
         MaterialPageRoute<void>(
           builder: (_) => AutomationsScreen(http: widget.http),
         ),
+      );
+    } else if (opensGame(type)) {
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(builder: (_) => GameScreen(http: widget.http)),
       );
     } else if (opensSkill(type)) {
       await Navigator.of(context).push<void>(

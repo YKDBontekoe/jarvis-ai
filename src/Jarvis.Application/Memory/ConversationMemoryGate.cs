@@ -18,13 +18,20 @@ public sealed class ConversationMemoryGate(
     IConversationStore conversations,
     IAssistantProfileService profiles,
     IConversationMemoryExtractor extractor,
-    IDoNotLearnService? doNotLearn = null) : IConversationMemoryGate
+    IDoNotLearnService? doNotLearn = null,
+    Knowing.IKnowingRepository? chatModes = null) : IConversationMemoryGate
 {
     public async Task ExtractAsync(Guid ownerId, Guid conversationId, Guid sourceMessageId, string userMessage,
         CancellationToken cancellationToken)
     {
         // The owner's own "never learn about" topics come first: such a message is not looked at for memories at all.
         if (doNotLearn is not null && await doNotLearn.MentionsAsync(ownerId, userMessage, cancellationToken)) return;
+        // Rehearsals, past-you chats and council debates are role play: nothing said there is a fact about the owner.
+        // The stranger's interview is the exception; learning what changed is its point.
+        if (chatModes is not null &&
+            await chatModes.GetChatModeAsync(conversationId, ownerId, cancellationToken) is { } mode &&
+            mode.Kind != Knowing.ChatModeKinds.Stranger)
+            return;
         var conversation = await conversations.GetAsync(conversationId, ownerId, cancellationToken);
         ProfileBinding? binding = conversation?.ProfileId is { } profileId
             ? new ProfileBinding(profileId, conversation.ProfileVersion ?? 0,

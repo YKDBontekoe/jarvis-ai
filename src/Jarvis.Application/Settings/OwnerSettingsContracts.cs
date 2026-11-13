@@ -50,4 +50,7 @@ public static class SettingsSections
     public const string PushDigest = "push-digest";
     public const string AutonomyUsage = "autonomy-usage";
     public const string Improvements = "improvements";
+    public const string Game = "game";
+    public const string Knowing = "knowing";
+    public const string Collisions = "collisions";
 }

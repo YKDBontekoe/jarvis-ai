@@ -68,6 +68,9 @@ public static partial class ToolGroups
         new("decisions", "Decision journal: log and resolve decisions, see calibration",
             ["LogDecision", "ResolveDecision", "GetDecisions", "GetCalibration"],
             DecisionKeywords()),
+        new("game", "The game: Jarvis's bets against the user, weekly side quests, the race against last month's self, score and level",
+            ["GetGameBoard", "CompleteQuest"],
+            GameKeywords()),
         new("projects", "Projects: what each is for, its status and the next action to take",
             ["GetProjects", "DeleteProject", "SetProjectOutcome", "SetProjectNextAction"],
             ProjectKeywords()),
@@ -301,6 +304,9 @@ public static partial class ToolGroups
 
     [GeneratedRegex(@"\b(decision|decide|decided|calibration|prediction|beslis|besluit|beslissing|voorspelling)", KeywordOptions)]
     private static partial Regex DecisionKeywords();
+
+    [GeneratedRegex(@"\b(game|bet|bets|betting|quest|quests|ghost|score|points|boss|spel|weddenschap|wedden|uitdaging|punten|niveau)", KeywordOptions)]
+    private static partial Regex GameKeywords();
 
     [GeneratedRegex(@"\b(project|next (step|action)|outcome|goal of|project(en)?|volgende (stap|actie)|doel van)", KeywordOptions)]
     private static partial Regex ProjectKeywords();

@@ -3,6 +3,7 @@
 //   flutter build web -t tool/ui_preview.dart --profile   # fixture data, no backend
 //   node tool/record_web.mjs [--out build/recordings] [--width 393] [--height 852]
 //                            [--steps "Chats,Everything,Home"]  (or "a; b" when a name has a comma)
+//   A step "scroll:600" scrolls the page; "type:play" types into the focused field.
 //
 // Each step taps the first element whose accessible name contains the text
 // (Flutter semantics are switched on first) and saves a numbered screenshot.
@@ -88,6 +89,16 @@ await capture('start');
 
 let failed = false;
 for (const step of steps) {
+  if (step.startsWith('type:')) {
+    // Types into the focused field, or the first text field on the page when none has focus.
+    const focused = await page.evaluate(() => ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName));
+    const field = page.locator('input, textarea').first();
+    if (!focused && (await field.count()) > 0) await field.focus();
+    await page.keyboard.type(step.slice(5), { delay: 60 });
+    await page.waitForTimeout(800);
+    await capture(step);
+    continue;
+  }
   if (/^scroll:-?\d+$/.test(step)) {
     await page.mouse.move(width / 2, height * 0.65);
     await page.mouse.wheel(0, Math.max(-2000, Math.min(2000, Number(step.slice(7)))));
@@ -97,9 +108,21 @@ for (const step of steps) {
   }
   // Exact button names first (tab bar, toolbars), then any visible partial match.
   const exact = page.getByRole('button', { name: step, exact: true });
-  const target = (await exact.count()) > 0
-    ? exact.first()
-    : page.locator(`[aria-label*="${step}" i]:visible, flt-semantics:visible:has-text("${step}")`).first();
+  // Of several partial matches, the smallest is the row itself rather than a container around it.
+  let target = exact.first();
+  if ((await exact.count()) === 0) {
+    const candidates = await page
+      .locator(`[aria-label*="${step}" i]:visible, flt-semantics:visible:has-text("${step}")`).all();
+    let smallest = Infinity;
+    target = page.locator(`[aria-label*="${step}" i]:visible`).first();
+    for (const candidate of candidates.slice(0, 40)) {
+      const box = await candidate.boundingBox();
+      if (box && box.width > 0 && box.height > 0 && box.width * box.height < smallest) {
+        smallest = box.width * box.height;
+        target = candidate;
+      }
+    }
+  }
   try {
     await target.click({ timeout: 5_000 });
   } catch {

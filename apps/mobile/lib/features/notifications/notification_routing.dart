@@ -8,6 +8,7 @@ bool opensDailyBriefing(String? type) => type == 'briefing.daily';
 
 bool opensWeeklyReview(String? type) => type == 'briefing.weekly';
 bool opensRoutineSuggestions(String? type) => type == 'routine.suggested';
+bool opensGame(String? type) => type == 'game';
 
 /// Self-improvement news: suggestions to review, an app Jarvis built, and what a reflection or dream changed.
 bool opensImprovementSuggestions(String? type) =>

@@ -50,6 +50,41 @@ internal static class A2AEndpoints
                 var result = await ownedTurns.SendAsync(ownerId.Value, conversation.Id, text, ct);
                 return JsonRpcResult(id, result, conversation.Id);
             }
+            // Duels: a friend's Jarvis asks for the terms of a challenge or the owner's score in it. Only the metric,
+            // the dates and one number ever leave; -32004 means there is no such duel for this owner.
+            if (method is Discover.DuelPeerClient.TermsMethod or Discover.DuelPeerClient.ScoreMethod)
+            {
+                var parameters = body.TryGetProperty("params", out var p) && p.ValueKind == JsonValueKind.Object
+                    ? p
+                    : default;
+                var code = parameters.ValueKind == JsonValueKind.Object &&
+                           parameters.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.String
+                    ? c.GetString()!
+                    : string.Empty;
+                await using var scope = scopes.CreateOwnerScope(ownerId.Value);
+                var duels = scope.ServiceProvider.GetRequiredService<Jarvis.Application.Discover.IDuelService>();
+                if (method == Discover.DuelPeerClient.TermsMethod)
+                {
+                    var terms = await duels.TermsForPeerAsync(ownerId.Value, code, ct);
+                    return terms is null
+                        ? JsonRpcError(body, -32004, "No such duel.")
+                        : JsonRpcResult(id, new
+                        {
+                            metric = terms.Metric,
+                            startsOn = terms.StartsOn.ToString("yyyy-MM-dd"),
+                            endsOn = terms.EndsOn.ToString("yyyy-MM-dd")
+                        }, default);
+                }
+
+                var role = parameters.ValueKind == JsonValueKind.Object &&
+                           parameters.TryGetProperty("role", out var r) && r.ValueKind == JsonValueKind.String
+                    ? r.GetString()!
+                    : string.Empty;
+                var score = await duels.ScoreForPeerAsync(ownerId.Value, code, role, ct);
+                return score is null
+                    ? JsonRpcError(body, -32004, "No such duel.")
+                    : JsonRpcResult(id, new { score }, default);
+            }
             if (method is "agent/authenticatedExtendedCard" or "agent/getAuthenticatedExtendedCard")
                 return JsonRpcResult(id, AgentCard(request.HttpContext.RequestServices.GetRequiredService<IConfiguration>(), request), default);
             return JsonRpcError(body, -32601, $"Unsupported method '{method}'.");

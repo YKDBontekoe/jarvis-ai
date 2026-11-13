@@ -22,6 +22,7 @@ mixin _ChatScreenNav on _ChatScreenController {
           utilityBaseDestination(destination) == 'integrations' ||
               destination == 'captures' ||
               destination == 'journal' ||
+              destination == 'discover' ||
               destination.startsWith(appDestinationPrefix)
           ? (prompt) {
               _presentChat();
