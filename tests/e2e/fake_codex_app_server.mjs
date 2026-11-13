@@ -214,6 +214,10 @@ function plan(prompt) {
     return text(/could not change Home/.test(last) ? `I couldn't change Home: ${last}` :
       `Done — ${pinHome[1]} is now at the top of Home. You can undo it there.`);
   }
+  if (/\bput the tiles (first|above everything|at the top)\b/.test(lower) && has('ReorderHomeSections')) {
+    if (results.length === 0) return call('ReorderHomeSections', { order: ['tiles'], reason: 'Tiles first, as you asked' });
+    return text('Done — your tiles now come first on Home.');
+  }
   if (/\bhide the morning brief\b.*\bhome\b/.test(lower) && has('SetHomeCardVisibility')) {
     if (results.length === 0) return call('SetHomeCardVisibility', { card: 'brief', visible: false, reason: 'Brief hidden, as you asked' });
     return text('Done — the morning brief no longer shows on Home.');

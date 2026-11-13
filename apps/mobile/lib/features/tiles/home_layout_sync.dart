@@ -24,6 +24,55 @@ abstract final class HomeCardIds {
   };
 }
 
+/// The parts of Home under the greeting and the Ask bar, in an order the owner
+/// (or Jarvis, when asked) chooses. [tiles] is the tile grid itself. The ids
+/// match `HomeSections` on the server.
+abstract final class HomeSectionIds {
+  static const needsYou = 'needs-you';
+  static const ongoing = HomeCardIds.ongoing;
+  static const noticed = HomeCardIds.noticed;
+  static const evening = HomeCardIds.evening;
+  static const brief = HomeCardIds.brief;
+  static const learning = HomeCardIds.learning;
+  static const tiles = 'tiles';
+
+  /// How Home always looked, and what a new account gets.
+  static const defaults = [
+    ongoing,
+    needsYou,
+    noticed,
+    evening,
+    brief,
+    learning,
+    tiles,
+  ];
+
+  static const names = <String, String>{
+    needsYou: 'Needs you',
+    ongoing: 'Ongoing work',
+    noticed: 'Jarvis noticed',
+    evening: 'Evening recap',
+    brief: 'Morning brief',
+    learning: 'Jarvis is learning',
+    tiles: 'Tiles',
+  };
+
+  /// Known sections once each, in the given order, with any left out added
+  /// in the default order, so an older or edited list never loses a section.
+  static List<String> normalize(Iterable<Object?>? order) {
+    final result = <String>[];
+    for (final id in order ?? const []) {
+      if (id is String && names.containsKey(id) && !result.contains(id)) {
+        result.add(id);
+      }
+    }
+    for (final id in defaults) {
+      if (!result.contains(id)) result.add(id);
+    }
+    return result;
+  }
+}
+
 /// Who made the latest change to Home, as `/home/layout` says it.
 const homeLayoutByJarvis = 'jarvis';
 
@@ -36,6 +85,7 @@ class RemoteHomeLayout {
     required this.revision,
     required this.changedBy,
     required this.stored,
+    this.sections = HomeSectionIds.defaults,
     this.note,
     this.canUndo = false,
   });
@@ -47,6 +97,9 @@ class RemoteHomeLayout {
 
   /// False while the account never saved a layout; the device then sends its own.
   final bool stored;
+
+  /// Home's sections top to bottom; see [HomeSectionIds].
+  final List<String> sections;
 
   /// Jarvis's one line on what it changed and why.
   final String? note;
@@ -72,6 +125,9 @@ class RemoteHomeLayout {
       revision: asJsonInt(json['revision'], 0),
       changedBy: asJsonString(json['changedBy']) ?? 'app',
       stored: json['stored'] != false,
+      sections: HomeSectionIds.normalize(
+        json['sections'] is List ? json['sections'] as List : null,
+      ),
       note: asJsonString(json['note'])?.trim(),
       canUndo: asJsonBool(json['canUndo']),
     );

@@ -142,9 +142,13 @@ class TileLayoutMeta {
     this.hiddenCards = const {},
     this.revision = 0,
     this.dirty = false,
+    this.sections,
   });
 
   final Set<String> hiddenCards;
+
+  /// Home's section order; null in metadata saved before it could change.
+  final List<String>? sections;
   final int revision;
   final bool dirty;
 
@@ -152,6 +156,7 @@ class TileLayoutMeta {
     'hidden': hiddenCards.toList()..sort(),
     'revision': revision,
     'dirty': dirty,
+    'sections': ?sections,
   };
 
   static TileLayoutMeta decode(String? raw) {
@@ -167,6 +172,12 @@ class TileLayoutMeta {
         },
         revision: data['revision'] is int ? data['revision'] as int : 0,
         dirty: data['dirty'] == true,
+        sections: data['sections'] is List
+            ? [
+                for (final id in data['sections'] as List)
+                  if (id is String) id,
+              ]
+            : null,
       );
     } on FormatException {
       return const TileLayoutMeta();

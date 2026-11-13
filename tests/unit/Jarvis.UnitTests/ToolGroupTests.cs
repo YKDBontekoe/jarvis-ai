@@ -64,6 +64,8 @@ public sealed class ToolGroupTests
     [InlineData("I never use the finance tile", "home")]
     [InlineData("Zet mijn agenda bovenaan op mijn startscherm", "home")]
     [InlineData("Make Home more personal", "home")]
+    [InlineData("Put the tiles above everything else", "home")]
+    [InlineData("Verander de volgorde op mijn startscherm", "home")]
     public void Keywords_pick_the_group_a_message_needs(string message, string group) =>
         Assert.Contains(group, ToolGroups.MatchKeywords(message).Select(match => match.Id));
 

@@ -450,6 +450,26 @@ void main() {
       await capture(tester, '33b-edit-home-cards-$mode');
     });
 
+    screenshotTest('home tiles first $mode', (tester) async {
+      usePhone(tester);
+      http.routes['GET /api/v1/home/layout'] = {
+        'tiles': [
+          {'id': 'today', 'size': 'wide'},
+          {'id': 'habits', 'size': 'square'},
+          {'id': 'tasks', 'size': 'square'},
+        ],
+        'hiddenCards': <String>[],
+        'sections': ['tiles', 'needs-you'],
+        'revision': 1,
+        'changedBy': 'app',
+        'stored': true,
+      };
+      await start(tester, dark: dark);
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -760));
+      await settle(tester);
+      await capture(tester, '33d-home-tiles-first-$mode');
+    });
+
     screenshotTest('home jarvis change $mode', (tester) async {
       usePhone(tester);
       // This device last saw revision 1; the account is at 2, changed by Jarvis.

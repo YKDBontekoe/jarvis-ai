@@ -53,17 +53,31 @@ console.log('Jarvis hides a card...');
 assert.match((await send('Please hide the morning brief on my home screen')).data.content, /no longer shows/);
 assert.deepEqual((await request('GET', '/home/layout')).data.hiddenCards, ['brief']);
 
+console.log('Jarvis reorders the sections, and the app can too...');
+assert.deepEqual(saved.data.sections, ['ongoing', 'needs-you', 'noticed', 'evening', 'brief', 'learning', 'tiles']);
+assert.match((await send('Put the tiles first on my home screen')).data.content, /tiles now come first/);
+const reordered = (await request('GET', '/home/layout')).data;
+assert.deepEqual(reordered.sections.slice(0, 2), ['tiles', 'ongoing']);
+assert.equal(reordered.sections.length, 7);
+const appOrder = await request('PUT', '/home/layout', {
+  tiles: reordered.tiles, hiddenCards: reordered.hiddenCards, sections: ['needs-you', 'tiles', 'bogus'],
+});
+assert.deepEqual(appOrder.data.sections.slice(0, 3), ['needs-you', 'tiles', 'ongoing']);
+const kept = await request('PUT', '/home/layout', { tiles: reordered.tiles });
+assert.deepEqual(kept.data.sections, appOrder.data.sections, 'an app that sends no order keeps it');
+
 console.log('Undo puts back the step before, twice...');
 const undone = await request('POST', '/home/layout/undo');
 assert.equal(undone.status, 200, undone.text);
-assert.deepEqual(undone.data.hiddenCards, []);
+assert.deepEqual(undone.data.sections, reordered.sections);
 assert.equal(undone.data.changedBy, 'app');
 const undone2 = await request('POST', '/home/layout/undo');
-assert.deepEqual(undone2.data.hiddenCards, ['brief'], 'undoing an undo redoes it');
+assert.deepEqual(undone2.data.sections, appOrder.data.sections, 'undoing an undo redoes it');
 
 console.log('Reset...');
 const reset = await request('POST', '/home/layout/reset');
 assert.equal(reset.status, 200, reset.text);
 assert.deepEqual(reset.data.hiddenCards, []);
+assert.equal(reset.data.sections.at(-1), 'tiles');
 assert.equal(reset.data.tiles[0].id, 'today');
 console.log('home_layout_flow ok');

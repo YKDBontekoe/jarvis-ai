@@ -12,6 +12,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       final hidden = <String>{};
+      final sections = List.of(HomeSectionIds.defaults);
       var kept = 0;
       await tester.pumpWidget(
         MaterialApp(
@@ -39,6 +40,10 @@ void main() {
                         onUndo: () {},
                       ),
                       HomeCardsEditor(
+                        sections: sections,
+                        onMove: (from, to) => setState(
+                          () => sections.insert(to, sections.removeAt(from)),
+                        ),
                         isShown: (card) => !hidden.contains(card),
                         onChanged: (card, visible) => setState(
                           () =>
@@ -63,6 +68,11 @@ void main() {
       await tester.tap(find.byKey(const Key('home-card-brief')));
       await tester.pumpAndSettle();
       expect(hidden, {HomeCardIds.brief});
+      // Needs you and the tiles have no switch; every section has a handle.
+      expect(find.byKey(const Key('home-card-needs-you')), findsNothing);
+      expect(find.byKey(const Key('home-card-tiles')), findsNothing);
+      expect(find.byType(ReorderableDragStartListener), findsNWidgets(7));
+      expect(find.byKey(const Key('home-card-suggestions')), findsOneWidget);
     });
   }
 }

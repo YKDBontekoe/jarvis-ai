@@ -156,11 +156,64 @@ public static class HomeTileCatalog
     }
 }
 
+/// <summary>
+/// The parts of Home under the greeting and the Ask bar, which stay on top. The owner (or Jarvis, when asked) puts
+/// them in any order; <see cref="Tiles"/> is the tile grid itself, so the tiles can lead.
+/// </summary>
+public static class HomeSections
+{
+    public const string NeedsYou = "needs-you";
+    public const string Ongoing = HomeCards.Ongoing;
+    public const string Noticed = HomeCards.Noticed;
+    public const string Evening = HomeCards.Evening;
+    public const string Brief = HomeCards.Brief;
+    public const string Learning = HomeCards.Learning;
+    public const string Tiles = "tiles";
+
+    /// <summary>The order a new account gets, which is how Home always looked.</summary>
+    public static readonly IReadOnlyList<string> Default = [Ongoing, NeedsYou, Noticed, Evening, Brief, Learning, Tiles];
+
+    public static readonly IReadOnlyDictionary<string, string> Names = new Dictionary<string, string>
+    {
+        [NeedsYou] = "Needs you (always shows)",
+        [Ongoing] = "Ongoing work",
+        [Noticed] = "Jarvis noticed",
+        [Evening] = "Evening recap (from 18:00, in place of the brief)",
+        [Brief] = "Morning brief",
+        [Learning] = "Jarvis is learning",
+        [Tiles] = "The tiles",
+    };
+
+    public static string? Parse(string? value)
+    {
+        var clean = value?.Trim().ToLowerInvariant().Replace(' ', '-');
+        if (string.IsNullOrEmpty(clean)) return null;
+        if (Names.ContainsKey(clean)) return clean;
+        return clean switch
+        {
+            "needsyou" or "needs" or "approvals" => NeedsYou,
+            "grid" or "tile-grid" or "widgets" or "the-tiles" => Tiles,
+            _ => HomeCards.Parse(clean) is { } card && Names.ContainsKey(card) ? card : null,
+        };
+    }
+
+    /// <summary>Known sections once each, in the given order, with any left out added in the default order.</summary>
+    public static List<string> Normalize(IEnumerable<string>? order)
+    {
+        var result = (order ?? []).Select(Parse).OfType<string>().Distinct().ToList();
+        result.AddRange(Default.Where(s => !result.Contains(s)));
+        return result;
+    }
+}
+
 /// <summary>A tile on Home at a size, in the order the grid packs them.</summary>
 public sealed record HomeLayoutTile(string Id, string Size);
 
 /// <summary>What Home looked like before the latest change, so it can be undone.</summary>
-public sealed record HomeLayoutSnapshot(IReadOnlyList<HomeLayoutTile> Tiles, IReadOnlyList<string> HiddenCards);
+public sealed record HomeLayoutSnapshot(
+    IReadOnlyList<HomeLayoutTile> Tiles,
+    IReadOnlyList<string> HiddenCards,
+    IReadOnlyList<string>? Sections = null);
 
 /// <summary>Who made the latest change: the owner in the app, or Jarvis in chat.</summary>
 public static class HomeLayoutAuthors
@@ -169,7 +222,10 @@ public static class HomeLayoutAuthors
     public const string Jarvis = "jarvis";
 }
 
-/// <summary>Owner settings section <see cref="Section"/>: the owner's Home, shared by every device.</summary>
+/// <summary>
+/// Owner settings section <see cref="Section"/>: the owner's Home, shared by every device. <see cref="Sections"/> is
+/// null in layouts saved before sections could move, which means the default order.
+/// </summary>
 public sealed record HomeLayoutState(
     IReadOnlyList<HomeLayoutTile> Tiles,
     IReadOnlyList<string> HiddenCards,
@@ -177,7 +233,8 @@ public sealed record HomeLayoutState(
     string ChangedBy,
     DateTimeOffset UpdatedAt,
     string? Note = null,
-    HomeLayoutSnapshot? Previous = null)
+    HomeLayoutSnapshot? Previous = null,
+    IReadOnlyList<string>? Sections = null)
 {
     public const string Section = "home.layout";
 }
@@ -194,7 +251,8 @@ public sealed record HomeLayoutView(
     DateTimeOffset? UpdatedAt,
     string? Note,
     bool CanUndo,
-    bool Stored);
+    bool Stored,
+    IReadOnlyList<string>? Sections = null);
 
 public sealed record HomeLayoutResult(HomeLayoutView? View, string? Error = null, bool Changed = true)
 {
@@ -202,13 +260,23 @@ public sealed record HomeLayoutResult(HomeLayoutView? View, string? Error = null
     public static HomeLayoutResult Fail(string error) => new(null, error, false);
 }
 
+/// <summary>A connected app the owner added, which can be a Home tile.</summary>
+public sealed record HomeAppTile(string Id, string Name);
+
 public interface IHomeLayoutService
 {
     Task<HomeLayoutView> GetAsync(Guid ownerId, CancellationToken cancellationToken);
 
-    /// <summary>Saves what the owner arranged in the app. Unknown tiles are dropped and sizes fitted, never refused.</summary>
+    /// <summary>Connected apps the owner added that can go on Home as a tile.</summary>
+    Task<IReadOnlyList<HomeAppTile>> ListAppTilesAsync(Guid ownerId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Saves what the owner arranged in the app. Unknown tiles are dropped and sizes fitted, never refused. A null
+    /// <paramref name="hiddenCards"/> or <paramref name="sections"/> keeps what was stored.
+    /// </summary>
     Task<HomeLayoutResult> SaveFromAppAsync(Guid ownerId, IReadOnlyList<HomeLayoutTile> tiles,
-        IReadOnlyList<string>? hiddenCards, CancellationToken cancellationToken);
+        IReadOnlyList<string>? hiddenCards, CancellationToken cancellationToken,
+        IReadOnlyList<string>? sections = null);
 
     /// <summary>Jarvis replaces the whole grid with <paramref name="tiles"/>, in order.</summary>
     Task<HomeLayoutResult> ArrangeAsync(Guid ownerId, IReadOnlyList<HomeLayoutTile> tiles, string? note,
@@ -223,10 +291,17 @@ public interface IHomeLayoutService
     Task<HomeLayoutResult> SetCardVisibleAsync(Guid ownerId, string card, bool visible, string? note,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Jarvis puts the sections in <paramref name="order"/> first, in that order; the ones left out follow in their
+    /// current order. <c>["tiles"]</c> puts the tiles first.
+    /// </summary>
+    Task<HomeLayoutResult> ReorderSectionsAsync(Guid ownerId, IReadOnlyList<string> order, string? note,
+        CancellationToken cancellationToken);
+
     /// <summary>Puts back the layout from before the latest change, by anyone.</summary>
     Task<HomeLayoutResult> UndoAsync(Guid ownerId, CancellationToken cancellationToken);
 
-    /// <summary>Back to the layout a new account gets, with every card showing.</summary>
+    /// <summary>Back to the layout a new account gets, with every card showing in the standard order.</summary>
     Task<HomeLayoutResult> ResetAsync(Guid ownerId, string author, CancellationToken cancellationToken);
 }
 
@@ -286,12 +361,29 @@ public static class HomeLayoutRules
     /// <summary>The readable name of a tile id, for messages and the activity feed.</summary>
     public static string NameOf(string id) =>
         HomeTileCatalog.IsAppTile(id) ? HomeTileCatalog.AppTileName(id) : HomeTileCatalog.Find(id)?.Name ?? id;
+
+    /// <summary>
+    /// The tile id the app gives a connected app: <c>app:&lt;serverId&gt;~&lt;name&gt;</c>, the name encoded the way
+    /// Dart's <c>Uri.encodeComponent</c> does it, with <c>~</c> as <c>%7E</c> (see <c>appTileId</c> in the app).
+    /// </summary>
+    public static string AppTileId(string serverId, string name)
+    {
+        var encoded = new System.Text.StringBuilder();
+        foreach (var b in System.Text.Encoding.UTF8.GetBytes(name))
+        {
+            var c = (char)b;
+            if (b < 0x80 && (char.IsAsciiLetterOrDigit(c) || "-_.!*'()".Contains(c))) encoded.Append(c);
+            else encoded.Append('%').Append(b.ToString("X2", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        return $"{HomeTileCatalog.AppTilePrefix}{serverId}~{encoded}";
+    }
 }
 
 public sealed class HomeLayoutService(
     IOwnerSettingsStore settings,
     IJarvisEventBus? events = null,
-    TimeProvider? timeProvider = null) : IHomeLayoutService
+    TimeProvider? timeProvider = null,
+    Integrations.IUserMcpServerRegistry? apps = null) : IHomeLayoutService
 {
     public const string ChangedEventKind = "home.layout_changed";
 
@@ -303,23 +395,42 @@ public sealed class HomeLayoutService(
     public async Task<HomeLayoutView> GetAsync(Guid ownerId, CancellationToken cancellationToken) =>
         View(await settings.GetAsync<HomeLayoutState>(ownerId, HomeLayoutState.Section, cancellationToken));
 
-    public Task<HomeLayoutResult> SaveFromAppAsync(Guid ownerId, IReadOnlyList<HomeLayoutTile> tiles,
-        IReadOnlyList<string>? hiddenCards, CancellationToken cancellationToken) =>
-        ChangeAsync(ownerId, HomeLayoutAuthors.App, null, current =>
+    public async Task<IReadOnlyList<HomeAppTile>> ListAppTilesAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        if (apps is null) return [];
+        try
         {
-            var next = HomeLayoutRules.Normalize(tiles);
-            return Edit.To(next, hiddenCards is null ? current.HiddenCards : HomeLayoutRules.NormalizeCards(hiddenCards));
-        }, cancellationToken);
+            return (await apps.ListAsync(ownerId, cancellationToken))
+                .Where(s => s.Enabled && s.IsValid && !string.IsNullOrWhiteSpace(s.Name))
+                .Select(s => new HomeAppTile(HomeLayoutRules.AppTileId(s.Id, s.Name), s.Name))
+                .ToList();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Apps are a bonus here; Home's own tiles still work without them.
+            return [];
+        }
+    }
 
-    public Task<HomeLayoutResult> ArrangeAsync(Guid ownerId, IReadOnlyList<HomeLayoutTile> tiles, string? note,
-        CancellationToken cancellationToken) =>
-        ChangeAsync(ownerId, HomeLayoutAuthors.Jarvis, note, current =>
+    public Task<HomeLayoutResult> SaveFromAppAsync(Guid ownerId, IReadOnlyList<HomeLayoutTile> tiles,
+        IReadOnlyList<string>? hiddenCards, CancellationToken cancellationToken,
+        IReadOnlyList<string>? sections = null) =>
+        ChangeAsync(ownerId, HomeLayoutAuthors.App, null, current => Edit.To(
+            HomeLayoutRules.Normalize(tiles),
+            hiddenCards is null ? current.HiddenCards : HomeLayoutRules.NormalizeCards(hiddenCards),
+            sections is null ? current.Sections : HomeSections.Normalize(sections)), cancellationToken);
+
+    public async Task<HomeLayoutResult> ArrangeAsync(Guid ownerId, IReadOnlyList<HomeLayoutTile> tiles, string? note,
+        CancellationToken cancellationToken)
+    {
+        var connected = await ListAppTilesAsync(ownerId, cancellationToken);
+        return await ChangeAsync(ownerId, HomeLayoutAuthors.Jarvis, note, current =>
         {
             var unknown = new List<string>();
             var resolved = new List<HomeLayoutTile>();
             foreach (var tile in tiles ?? [])
             {
-                var id = ResolveId(tile.Id, current.Tiles);
+                var id = ResolveId(tile.Id, current.Tiles, connected);
                 if (id is null) { unknown.Add(tile.Id); continue; }
                 resolved.Add(new HomeLayoutTile(id, HomeTileSizes.Parse(tile.Size) ?? SizeIn(current.Tiles, id) ?? HomeTileSizes.Square));
             }
@@ -328,15 +439,18 @@ public sealed class HomeLayoutService(
             var next = HomeLayoutRules.Normalize(resolved);
             return next.Count == 0
                 ? Edit.Fail("Home needs at least one tile. Use RemoveHomeTile to take single tiles away.")
-                : Edit.To(next, current.HiddenCards);
+                : current.With(tiles: next);
         }, cancellationToken);
+    }
 
-    public Task<HomeLayoutResult> PinAsync(Guid ownerId, string tile, string? size, int? position, string? note,
-        CancellationToken cancellationToken) =>
-        ChangeAsync(ownerId, HomeLayoutAuthors.Jarvis, note, current =>
+    public async Task<HomeLayoutResult> PinAsync(Guid ownerId, string tile, string? size, int? position, string? note,
+        CancellationToken cancellationToken)
+    {
+        var connected = await ListAppTilesAsync(ownerId, cancellationToken);
+        return await ChangeAsync(ownerId, HomeLayoutAuthors.Jarvis, note, current =>
         {
-            var id = ResolveId(tile, current.Tiles);
-            if (id is null) return Edit.Fail($"There is no Home tile called \"{tile}\". GetHomeLayout lists them.");
+            var id = ResolveId(tile, current.Tiles, connected);
+            if (id is null) return Edit.Fail($"There is no Home tile or connected app called \"{tile}\". GetHomeLayout lists them.");
             if (size is not null && HomeTileSizes.Parse(size) is null)
                 return Edit.Fail("Size must be icon, strip, square, wide or large.");
             var tiles = current.Tiles.ToList();
@@ -347,20 +461,21 @@ public sealed class HomeLayoutService(
                 return Edit.Fail($"Home holds at most {HomeLayoutRules.MaxTiles} tiles. Remove one first.");
             var index = position is { } p ? Math.Clamp(p - 1, 0, tiles.Count) : at >= 0 ? Math.Min(at, tiles.Count) : tiles.Count;
             tiles.Insert(index, new HomeLayoutTile(id, wanted));
-            return Edit.To(HomeLayoutRules.Normalize(tiles), current.HiddenCards);
+            return current.With(tiles: HomeLayoutRules.Normalize(tiles));
         }, cancellationToken);
+    }
 
     public Task<HomeLayoutResult> RemoveAsync(Guid ownerId, string tile, string? note,
         CancellationToken cancellationToken) =>
         ChangeAsync(ownerId, HomeLayoutAuthors.Jarvis, note, current =>
         {
-            var id = ResolveId(tile, current.Tiles);
+            var id = ResolveId(tile, current.Tiles, []);
             var tiles = current.Tiles.ToList();
             if (id is null || tiles.RemoveAll(t => t.Id == id) == 0)
                 return Edit.Fail($"\"{tile}\" is not on Home.");
             return tiles.Count == 0
                 ? Edit.Fail("That is the last tile; Home needs at least one.")
-                : Edit.To(tiles, current.HiddenCards);
+                : current.With(tiles: tiles);
         }, cancellationToken);
 
     public Task<HomeLayoutResult> SetCardVisibleAsync(Guid ownerId, string card, bool visible, string? note,
@@ -373,7 +488,20 @@ public sealed class HomeLayoutService(
                                  ". Needs you and Right now always show.");
             var hidden = current.HiddenCards.Where(c => c != id).ToList();
             if (!visible) hidden.Add(id);
-            return Edit.To(current.Tiles, HomeLayoutRules.NormalizeCards(hidden));
+            return current.With(hidden: HomeLayoutRules.NormalizeCards(hidden));
+        }, cancellationToken);
+
+    public Task<HomeLayoutResult> ReorderSectionsAsync(Guid ownerId, IReadOnlyList<string> order, string? note,
+        CancellationToken cancellationToken) =>
+        ChangeAsync(ownerId, HomeLayoutAuthors.Jarvis, note, current =>
+        {
+            var unknown = (order ?? []).Where(s => HomeSections.Parse(s) is null).ToList();
+            if (unknown.Count > 0)
+                return Edit.Fail("Unknown section(s): " + string.Join(", ", unknown) + ". Sections: " +
+                                 string.Join(", ", HomeSections.Default) + ".");
+            var first = (order ?? []).Select(HomeSections.Parse).OfType<string>().Distinct().ToList();
+            if (first.Count == 0) return Edit.Fail("Name at least one section to move.");
+            return current.With(sections: HomeSections.Normalize([.. first, .. current.Sections.Where(s => !first.Contains(s))]));
         }, cancellationToken);
 
     public async Task<HomeLayoutResult> UndoAsync(Guid ownerId, CancellationToken cancellationToken)
@@ -384,7 +512,8 @@ public sealed class HomeLayoutService(
         // Undo is undone by undoing again, so the change that was taken back is kept as the new previous.
         var next = new HomeLayoutState(HomeLayoutRules.Normalize(previous.Tiles),
             HomeLayoutRules.NormalizeCards(previous.HiddenCards), state.Revision + 1, HomeLayoutAuthors.App,
-            clock.GetUtcNow(), null, new HomeLayoutSnapshot(state.Tiles, state.HiddenCards));
+            clock.GetUtcNow(), null, new HomeLayoutSnapshot(state.Tiles, state.HiddenCards, HomeSections.Normalize(state.Sections)),
+            HomeSections.Normalize(previous.Sections));
         await settings.SaveAsync(ownerId, HomeLayoutState.Section, next, cancellationToken);
         return new HomeLayoutResult(View(next));
     }
@@ -392,35 +521,48 @@ public sealed class HomeLayoutService(
     public Task<HomeLayoutResult> ResetAsync(Guid ownerId, string author, CancellationToken cancellationToken) =>
         ChangeAsync(ownerId, author == HomeLayoutAuthors.Jarvis ? HomeLayoutAuthors.Jarvis : HomeLayoutAuthors.App,
             author == HomeLayoutAuthors.Jarvis ? "Back to the standard Home" : null,
-            _ => Edit.To(HomeLayoutRules.DefaultTiles.ToList(), []), cancellationToken);
+            _ => Edit.To(HomeLayoutRules.DefaultTiles.ToList(), [], HomeSections.Default.ToList()), cancellationToken);
 
-    private sealed record Edit(List<HomeLayoutTile>? Tiles, IReadOnlyList<string>? HiddenCards, string? Error)
+    private sealed record Edit(
+        List<HomeLayoutTile>? Tiles, IReadOnlyList<string>? HiddenCards, IReadOnlyList<string>? Sections, string? Error)
     {
-        public static Edit To(IEnumerable<HomeLayoutTile> tiles, IReadOnlyList<string> hidden) => new(tiles.ToList(), hidden, null);
-        public static Edit Fail(string error) => new(null, null, error);
+        public static Edit To(IEnumerable<HomeLayoutTile> tiles, IReadOnlyList<string> hidden, IReadOnlyList<string> sections) =>
+            new(tiles.ToList(), hidden, sections, null);
+
+        public static Edit Fail(string error) => new(null, null, null, error);
     }
 
-    private sealed record Current(IReadOnlyList<HomeLayoutTile> Tiles, IReadOnlyList<string> HiddenCards);
+    private sealed record Current(
+        IReadOnlyList<HomeLayoutTile> Tiles, IReadOnlyList<string> HiddenCards, IReadOnlyList<string> Sections)
+    {
+        public Edit With(IEnumerable<HomeLayoutTile>? tiles = null, IReadOnlyList<string>? hidden = null,
+            IReadOnlyList<string>? sections = null) =>
+            Edit.To(tiles ?? Tiles, hidden ?? HiddenCards, sections ?? Sections);
+    }
 
     private async Task<HomeLayoutResult> ChangeAsync(Guid ownerId, string author, string? note,
         Func<Current, Edit> change, CancellationToken cancellationToken)
     {
         HomeLayoutState next;
-        HomeLayoutSnapshot before;
         using (await LockAsync(ownerId, cancellationToken))
         {
             var state = await settings.GetAsync<HomeLayoutState>(ownerId, HomeLayoutState.Section, cancellationToken);
             var view = View(state);
-            before = new HomeLayoutSnapshot(view.Tiles, view.HiddenCards);
-            var edit = change(new Current(view.Tiles, view.HiddenCards));
+            var sections = view.Sections ?? HomeSections.Default;
+            var before = new HomeLayoutSnapshot(view.Tiles, view.HiddenCards, sections);
+            var edit = change(new Current(view.Tiles, view.HiddenCards, sections));
             if (edit.Error is not null) return HomeLayoutResult.Fail(edit.Error);
             var tiles = edit.Tiles!;
             var hidden = edit.HiddenCards!;
-            if (state is not null && Same(tiles, hidden, before)) return new HomeLayoutResult(view, Changed: false);
+            var order = HomeSections.Normalize(edit.Sections);
+            if (state is not null && tiles.SequenceEqual(before.Tiles) && hidden.SequenceEqual(before.HiddenCards) &&
+                order.SequenceEqual(sections))
+                return new HomeLayoutResult(view, Changed: false);
             next = new HomeLayoutState(tiles, hidden, (state?.Revision ?? 0) + 1, author, clock.GetUtcNow(),
                 author == HomeLayoutAuthors.Jarvis ? HomeLayoutRules.CleanNote(note) : null,
                 // The first save from the app is the starting point, not a change worth undoing.
-                state is null && author == HomeLayoutAuthors.App ? null : before);
+                state is null && author == HomeLayoutAuthors.App ? null : before,
+                order);
             await settings.SaveAsync(ownerId, HomeLayoutState.Section, next, cancellationToken);
         }
         if (author == HomeLayoutAuthors.Jarvis)
@@ -431,33 +573,39 @@ public sealed class HomeLayoutService(
                 {
                     ["revision"] = next.Revision.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     ["tiles"] = string.Join(", ", next.Tiles.Select(t => HomeLayoutRules.NameOf(t.Id))),
+                    ["sections"] = string.Join(", ", next.Sections ?? HomeSections.Default),
                 },
                 Origin: EventOrigin.Agent), cancellationToken);
         }
         return new HomeLayoutResult(View(next));
     }
 
-    private static bool Same(IReadOnlyList<HomeLayoutTile> tiles, IReadOnlyList<string> hidden, HomeLayoutSnapshot before) =>
-        tiles.SequenceEqual(before.Tiles) && hidden.SequenceEqual(before.HiddenCards);
-
-    /// <summary>A catalog tile by id or name, or a connected-app tile already on Home by its id or app name.</summary>
-    private static string? ResolveId(string? idOrName, IReadOnlyList<HomeLayoutTile> current)
+    /// <summary>
+    /// A catalog tile by id or name, a connected-app tile already on Home by its id or app name, or one of the owner's
+    /// connected apps by its name.
+    /// </summary>
+    private static string? ResolveId(string? idOrName, IReadOnlyList<HomeLayoutTile> current,
+        IReadOnlyList<HomeAppTile> connected)
     {
         if (string.IsNullOrWhiteSpace(idOrName)) return null;
         var wanted = idOrName.Trim();
-        if (HomeTileCatalog.IsAppTile(wanted)) return current.Any(t => t.Id == wanted) ? wanted : null;
+        if (HomeTileCatalog.IsAppTile(wanted))
+            return current.Any(t => t.Id == wanted) || connected.Any(a => a.Id == wanted) ? wanted : null;
         if (HomeTileCatalog.Resolve(wanted) is { } spec) return spec.Id;
         return current.FirstOrDefault(t => HomeTileCatalog.IsAppTile(t.Id) &&
-                                           HomeTileCatalog.AppTileName(t.Id).Equals(wanted, StringComparison.OrdinalIgnoreCase))?.Id;
+                                           HomeTileCatalog.AppTileName(t.Id).Equals(wanted, StringComparison.OrdinalIgnoreCase))?.Id
+               ?? connected.FirstOrDefault(a => a.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase))?.Id;
     }
 
     private static string? SizeIn(IReadOnlyList<HomeLayoutTile> tiles, string id) =>
         tiles.FirstOrDefault(t => t.Id == id)?.Size;
 
     private static HomeLayoutView View(HomeLayoutState? state) => state is null
-        ? new HomeLayoutView(HomeLayoutRules.DefaultTiles, [], 0, HomeLayoutAuthors.App, null, null, false, false)
+        ? new HomeLayoutView(HomeLayoutRules.DefaultTiles, [], 0, HomeLayoutAuthors.App, null, null, false, false,
+            HomeSections.Default)
         : new HomeLayoutView(HomeLayoutRules.Normalize(state.Tiles), HomeLayoutRules.NormalizeCards(state.HiddenCards),
-            state.Revision, state.ChangedBy, state.UpdatedAt, state.Note, state.Previous is not null, true);
+            state.Revision, state.ChangedBy, state.UpdatedAt, state.Note, state.Previous is not null, true,
+            HomeSections.Normalize(state.Sections));
 
     private static async Task<IDisposable> LockAsync(Guid ownerId, CancellationToken cancellationToken)
     {

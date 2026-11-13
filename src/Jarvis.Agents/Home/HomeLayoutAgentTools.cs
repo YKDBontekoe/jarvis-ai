@@ -19,6 +19,7 @@ internal sealed class HomeLayoutToolContributor(IHomeLayoutService layouts, ICur
         yield return AIFunctionFactory.Create(tools.PinHomeTileAsync);
         yield return AIFunctionFactory.Create(tools.RemoveHomeTileAsync);
         yield return AIFunctionFactory.Create(tools.SetHomeCardVisibilityAsync);
+        yield return AIFunctionFactory.Create(tools.ReorderHomeSectionsAsync);
         yield return AIFunctionFactory.Create(tools.UndoHomeLayoutChangeAsync);
         yield return AIFunctionFactory.Create(tools.ResetHomeLayoutAsync);
     }
@@ -35,7 +36,7 @@ public sealed record HomeTilePlacement(
 /// </summary>
 internal sealed class HomeLayoutAgentTools(IHomeLayoutService layouts, ICurrentUser currentUser)
 {
-    [Description("Show the user's Home screen: the tiles on it in order with their sizes, the cards above the tiles and whether they are hidden, and every tile that can be added with the sizes it supports. Call it before changing Home, and when the user asks what is on Home or what could go there.")]
+    [Description("Show the user's Home screen: the order of its sections (cards and the tile grid), the tiles in order with their sizes, which cards are hidden, every tile that can be added with the sizes it supports, and the user's connected apps that can be a tile. Call it before changing Home, and when the user asks what is on Home or what could go there.")]
     public async Task<string> GetHomeLayoutAsync(CancellationToken cancellationToken = default)
     {
         var view = await layouts.GetAsync(currentUser.OwnerId, cancellationToken);
@@ -48,7 +49,14 @@ internal sealed class HomeLayoutAgentTools(IHomeLayoutService layouts, ICurrentU
             text.Append("  ").Append(position++).Append(". ").Append(tile.Id).Append(" \"")
                 .Append(HomeLayoutRules.NameOf(tile.Id)).Append("\" ").AppendLine(tile.Size);
 
-        text.AppendLine("Cards above the tiles (Needs you and the Right now card always show):");
+        text.AppendLine("Home from top to bottom: the greeting with the Right now card and the Ask bar always lead, then these sections in this order:");
+        position = 1;
+        foreach (var section in view.Sections ?? HomeSections.Default)
+            text.Append("  ").Append(position++).Append(". ").Append(section).Append(": ")
+                .Append(HomeSections.Names[section])
+                .AppendLine(view.HiddenCards.Contains(section) ? " [hidden]" : "");
+
+        text.AppendLine("Cards that can be hidden (Needs you and the Right now card always show):");
         foreach (var (card, description) in HomeCards.Descriptions)
             text.Append("  - ").Append(card).Append(": ").Append(description)
                 .AppendLine(view.HiddenCards.Contains(card) ? " [hidden]" : " [showing]");
@@ -62,6 +70,11 @@ internal sealed class HomeLayoutAgentTools(IHomeLayoutService layouts, ICurrentU
                 text.Append("    ").Append(spec.Id).Append(" \"").Append(spec.Name).Append("\" [")
                     .Append(string.Join(", ", spec.Sizes)).Append("]: ").AppendLine(spec.Description);
         }
+        var apps = await layouts.ListAppTilesAsync(currentUser.OwnerId, cancellationToken);
+        var addable = apps.Where(a => !onHome.Contains(a.Id)).ToList();
+        if (addable.Count > 0)
+            text.Append("  connected apps (pin by name) [icon, strip, square, wide]: ")
+                .AppendLine(string.Join(", ", addable.Select(a => $"\"{a.Name}\"")));
         if (view.ChangedBy == HomeLayoutAuthors.Jarvis && view.CanUndo)
             text.Append("Jarvis made the latest change").Append(view.Note is { } note ? $" ({note})" : "")
                 .AppendLine("; UndoHomeLayoutChange puts back what was there before.");
@@ -79,9 +92,9 @@ internal sealed class HomeLayoutAgentTools(IHomeLayoutService layouts, ICurrentU
         return Describe(result, "Home now shows");
     }
 
-    [Description("Add a tile to Home, or move or resize one that is already there (\"put Habits at the top\", \"make Today bigger\", \"add my reading list\"). Call GetHomeLayout first when unsure of the id or the sizes it supports.")]
+    [Description("Add a tile to Home, or move or resize one that is already there (\"put Habits at the top\", \"make Today bigger\", \"add my reading list\", \"put Notion on Home\"). Works for a connected app by its name too. Call GetHomeLayout first when unsure of the id or the sizes it supports.")]
     public async Task<string> PinHomeTileAsync(
-        [Description("Tile id or name from GetHomeLayout, such as 'habits'.")] string tile,
+        [Description("Tile id or name from GetHomeLayout, such as 'habits', or a connected app's name.")] string tile,
         [Description("icon, strip, square, wide or large. Leave empty to keep the current size (square for a new tile).")] string? size = null,
         [Description("Place on Home counting from 1 at the top. Leave empty to keep its place, or add it at the end.")] int? position = null,
         [Description("One short line for the user, shown on Home, saying what changed and why, in the user's language.")] string? reason = null,
@@ -112,6 +125,16 @@ internal sealed class HomeLayoutAgentTools(IHomeLayoutService layouts, ICurrentU
         return Describe(result, visible ? "The card shows again. Home tiles" : "The card is hidden. Home tiles");
     }
 
+    [Description("Change the order of Home's sections (\"put the tiles above everything\", \"show Needs you first\", \"move the brief down\"). Pass the sections to put first, in order; the rest follow in their current order. Sections: needs-you, ongoing, noticed, evening, brief, learning, tiles (the tile grid). The greeting and Ask bar always stay on top.")]
+    public async Task<string> ReorderHomeSectionsAsync(
+        [Description("Sections to put first, top to bottom, such as ['tiles', 'needs-you'].")] string[] order,
+        [Description("One short line for the user, shown on Home, saying what changed and why, in the user's language.")] string? reason = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await layouts.ReorderSectionsAsync(currentUser.OwnerId, order ?? [], reason, cancellationToken);
+        return Describe(result, "Reordered. Home tiles");
+    }
+
     [Description("Put Home back the way it was before the latest change, when the user does not like what changed.")]
     public async Task<string> UndoHomeLayoutChangeAsync(CancellationToken cancellationToken = default)
     {
@@ -132,6 +155,7 @@ internal sealed class HomeLayoutAgentTools(IHomeLayoutService layouts, ICurrentU
         var view = result.View!;
         var tiles = string.Join(", ", view.Tiles.Select(t => $"{HomeLayoutRules.NameOf(t.Id)} ({t.Size})"));
         var hidden = view.HiddenCards.Count == 0 ? "" : $" Hidden cards: {string.Join(", ", view.HiddenCards)}.";
+        hidden += $" Section order: {string.Join(", ", view.Sections ?? HomeSections.Default)}.";
         var unchanged = result.Changed ? "" : " (nothing changed; it was already like that)";
         return $"{lead}{unchanged}: {tiles}.{hidden} The app updates Home within a minute and offers Undo there.";
     }

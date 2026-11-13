@@ -35,6 +35,7 @@ class TileLayoutController extends ChangeNotifier {
   final Dio? http;
   List<TilePlacement> _layout;
   Set<String> _hidden = {};
+  List<String> _sections = List.of(HomeSectionIds.defaults);
   bool _ready;
 
   /// The server revision this device last had, 0 before the first sync.
@@ -61,6 +62,9 @@ class TileLayoutController extends ChangeNotifier {
 
   bool showsCard(String card) => !_hidden.contains(card);
 
+  /// Home's sections top to bottom ([HomeSectionIds]), the tiles among them.
+  List<String> get sections => List.unmodifiable(_sections);
+
   /// A change Jarvis made to Home since this device last looked, so Home can
   /// say so and offer Undo. Null once seen.
   JarvisHomeChange? get jarvisChange => _jarvisChange;
@@ -76,6 +80,7 @@ class TileLayoutController extends ChangeNotifier {
     _layout = List.of(_store.read());
     final meta = _store.readMeta();
     _hidden = {...meta.hiddenCards};
+    _sections = HomeSectionIds.normalize(meta.sections);
     _revision = meta.revision;
     _dirty = meta.dirty;
     _ready = true;
@@ -88,8 +93,12 @@ class TileLayoutController extends ChangeNotifier {
   // history; the layout is saved only when the owner taps Done, and Cancel puts
   // back what Home looked like before.
 
-  ({List<TilePlacement> tiles, Set<String> hidden})? _sessionStart;
-  final List<({List<TilePlacement> tiles, Set<String> hidden})> _undo = [];
+  ({List<TilePlacement> tiles, Set<String> hidden, List<String> sections})?
+  _sessionStart;
+  final List<
+    ({List<TilePlacement> tiles, Set<String> hidden, List<String> sections})
+  >
+  _undo = [];
 
   /// Most steps Undo can go back.
   static const maxUndo = 50;
@@ -97,8 +106,12 @@ class TileLayoutController extends ChangeNotifier {
   bool get editing => _sessionStart != null;
   bool get canUndo => _undo.isNotEmpty;
 
-  ({List<TilePlacement> tiles, Set<String> hidden}) get _snapshot =>
-      (tiles: List.of(_layout), hidden: {..._hidden});
+  ({List<TilePlacement> tiles, Set<String> hidden, List<String> sections})
+  get _snapshot => (
+    tiles: List.of(_layout),
+    hidden: {..._hidden},
+    sections: List.of(_sections),
+  );
 
   /// Starts an editing session. Changes are not saved until [commitEdit].
   void beginEdit() {
@@ -113,7 +126,9 @@ class TileLayoutController extends ChangeNotifier {
     final start = _sessionStart;
     if (start == null) return;
     final changed =
-        !_same(start.tiles, _layout) || !setEquals(start.hidden, _hidden);
+        !_same(start.tiles, _layout) ||
+        !setEquals(start.hidden, _hidden) ||
+        !listEquals(start.sections, _sections);
     _sessionStart = null;
     _undo.clear();
     if (changed) _save();
@@ -126,6 +141,7 @@ class TileLayoutController extends ChangeNotifier {
     if (start == null) return;
     _layout = List.of(start.tiles);
     _hidden = {...start.hidden};
+    _sections = List.of(start.sections);
     _sessionStart = null;
     _undo.clear();
     notifyListeners();
@@ -137,6 +153,7 @@ class TileLayoutController extends ChangeNotifier {
     final last = _undo.removeLast();
     _layout = last.tiles;
     _hidden = last.hidden;
+    _sections = last.sections;
     notifyListeners();
   }
 
@@ -223,10 +240,25 @@ class TileLayoutController extends ChangeNotifier {
     _changed();
   }
 
+  /// Moves a section of Home from [from] to [to] in [sections].
+  void moveSection(int from, int to) {
+    if (from == to ||
+        from < 0 ||
+        to < 0 ||
+        from >= _sections.length ||
+        to >= _sections.length) {
+      return;
+    }
+    _remember();
+    _sections.insert(to, _sections.removeAt(from));
+    _changed();
+  }
+
   void reset() {
     _remember();
     _layout = List.of(defaultTileLayout);
     _hidden = {};
+    _sections = List.of(HomeSectionIds.defaults);
     _changed();
   }
 
@@ -246,7 +278,12 @@ class TileLayoutController extends ChangeNotifier {
   }
 
   Future<void> _writeMeta() => _store.writeMeta(
-    TileLayoutMeta(hiddenCards: _hidden, revision: _revision, dirty: _dirty),
+    TileLayoutMeta(
+      hiddenCards: _hidden,
+      revision: _revision,
+      dirty: _dirty,
+      sections: _sections,
+    ),
   );
 
   // --- Account sync ----------------------------------------------------
@@ -264,6 +301,7 @@ class TileLayoutController extends ChangeNotifier {
         data: {
           'tiles': [for (final item in _layout) item.toJson()],
           'hiddenCards': _hidden.toList()..sort(),
+          'sections': _sections,
         },
       );
       if (account != _account) return;
@@ -324,6 +362,7 @@ class TileLayoutController extends ChangeNotifier {
   void _apply(RemoteHomeLayout remote) {
     _layout = List.of(remote.tiles.isEmpty ? defaultTileLayout : remote.tiles);
     _hidden = {...remote.hiddenCards};
+    _sections = List.of(remote.sections);
     _revision = remote.revision;
     _dirty = false;
     unawaited(_store.write(_layout));
@@ -363,6 +402,7 @@ class TileLayoutController extends ChangeNotifier {
     _undo.clear();
     _layout = List.of(defaultTileLayout);
     _hidden = {};
+    _sections = List.of(HomeSectionIds.defaults);
     _revision = 0;
     _dirty = false;
     _jarvisChange = null;

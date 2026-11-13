@@ -167,6 +167,68 @@ public sealed class HomeLayoutTests
     }
 
     [Fact]
+    public async Task Sections_reorder_with_the_rest_kept_in_order_and_undo_brings_the_old_order_back()
+    {
+        var (service, events) = Create();
+        Assert.Equal(HomeSections.Default, (await service.GetAsync(Owner, default)).Sections);
+
+        var tilesFirst = await service.ReorderSectionsAsync(Owner, ["Tiles", "needs you"], "Tiles first", default);
+        Assert.Equal(["tiles", "needs-you", "ongoing", "noticed", "evening", "brief", "learning"], tilesFirst.View!.Sections);
+        Assert.Single(events);
+
+        Assert.False((await service.ReorderSectionsAsync(Owner, ["sidebar"], null, default)).Succeeded);
+        Assert.False((await service.ReorderSectionsAsync(Owner, [], null, default)).Succeeded);
+
+        // The app sends its own order, including a repeat and an unknown id, and keeps the order when it sends none.
+        var fromApp = await service.SaveFromAppAsync(Owner, [new("today", "wide")], null, default,
+            ["learning", "learning", "bogus", "tiles"]);
+        Assert.Equal(["learning", "tiles", "ongoing", "needs-you", "noticed", "evening", "brief"], fromApp.View!.Sections);
+        var kept = await service.SaveFromAppAsync(Owner, [new("tasks", "wide")], null, default);
+        Assert.Equal(fromApp.View.Sections, kept.View!.Sections);
+
+        var undone = await service.UndoAsync(Owner, default);
+        Assert.Equal(fromApp.View.Sections, undone.View!.Sections);
+        Assert.Equal(["today"], Ids(undone.View));
+
+        var reset = await service.ResetAsync(Owner, HomeLayoutAuthors.App, default);
+        Assert.Equal(HomeSections.Default, reset.View!.Sections);
+    }
+
+    [Fact]
+    public void A_layout_saved_before_sections_existed_reads_as_the_default_order()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        const string old = """{"tiles":[{"id":"today","size":"wide"}],"hiddenCards":[],"revision":3,"changedBy":"app","updatedAt":"2026-11-01T00:00:00Z"}""";
+        var state = JsonSerializer.Deserialize<HomeLayoutState>(old, options)!;
+        Assert.Null(state.Sections);
+        Assert.Equal(HomeSections.Default, HomeSections.Normalize(state.Sections));
+    }
+
+    [Fact]
+    public async Task Jarvis_pins_a_connected_app_by_its_name_with_the_tile_id_the_app_uses()
+    {
+        var registry = Fake<Jarvis.Application.Integrations.IUserMcpServerRegistry>.Create(("ListAsync", _ =>
+            (IReadOnlyList<Jarvis.Application.Integrations.UserMcpServer>)
+            [
+                new("srv1", "Notion ~ Work", "https://x", [], DateTimeOffset.UnixEpoch, false),
+                new("srv2", "Off", "https://y", [], DateTimeOffset.UnixEpoch, false, Enabled: false),
+            ]));
+        var service = new HomeLayoutService(new InMemorySettingsStore(), apps: registry);
+
+        // Dart's Uri.encodeComponent keeps letters, digits and -_.!*'() and the app writes ~ as %7E.
+        Assert.Equal("app:srv1~Notion%20%7E%20Work", HomeLayoutRules.AppTileId("srv1", "Notion ~ Work"));
+        Assert.Equal("app:s~Caf%C3%A9!(1)", HomeLayoutRules.AppTileId("s", "Café!(1)"));
+
+        var pinned = await service.PinAsync(Owner, "notion ~ work", "wide", 1, null, default);
+        Assert.Equal(new HomeLayoutTile("app:srv1~Notion%20%7E%20Work", "wide"), pinned.View!.Tiles[0]);
+        Assert.Equal("Notion ~ Work", HomeLayoutRules.NameOf(pinned.View.Tiles[0].Id));
+        Assert.False((await service.PinAsync(Owner, "Off", null, null, null, default)).Succeeded);
+
+        var tools = new HomeLayoutAgentTools(service, new User());
+        Assert.DoesNotContain("connected apps", await tools.GetHomeLayoutAsync());
+    }
+
+    [Fact]
     public void The_stored_state_survives_the_settings_store_json()
     {
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
@@ -198,7 +260,7 @@ public sealed class HomeLayoutTests
         Assert.Contains("Jarvis made the latest change (Habits first)", await tools.GetHomeLayoutAsync());
 
         var contributor = new HomeLayoutToolContributor(service, new User());
-        Assert.Equal(7, contributor.GetTools(new Jarvis.Agents.AgentBuildContext(Owner, null)).Count());
+        Assert.Equal(8, contributor.GetTools(new Jarvis.Agents.AgentBuildContext(Owner, null)).Count());
         Assert.Equal(["GetHomeLayout"],
             contributor.GetTools(new Jarvis.Agents.AgentBuildContext(Owner, Guid.NewGuid())).Select(t => t.Name));
     }

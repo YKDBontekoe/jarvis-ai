@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jarvis_mobile/features/tiles/app_tiles.dart';
 import 'package:jarvis_mobile/features/tiles/home_layout_sync.dart';
 import 'package:jarvis_mobile/features/tiles/tile_controller.dart';
 import 'package:jarvis_mobile/features/tiles/tile_layout.dart';
@@ -72,6 +73,38 @@ void main() {
         expect(service, contains('["$key"] = "$value"'));
       }
     });
+  });
+
+  test('section ids and the default order match the server', () {
+    final service = File('../../src/Jarvis.Application/Home/HomeLayout.cs')
+        .readAsStringSync();
+    final defaults = RegExp(r'Default = \[([^\]]+)\]')
+        .firstMatch(service)![1]!
+        .split(',')
+        .map((s) => s.trim())
+        .toList();
+    const csharp = {
+      'Ongoing': HomeSectionIds.ongoing,
+      'NeedsYou': HomeSectionIds.needsYou,
+      'Noticed': HomeSectionIds.noticed,
+      'Evening': HomeSectionIds.evening,
+      'Brief': HomeSectionIds.brief,
+      'Learning': HomeSectionIds.learning,
+      'Tiles': HomeSectionIds.tiles,
+    };
+    expect([for (final d in defaults) csharp[d]], HomeSectionIds.defaults);
+    expect(service, contains('NeedsYou = "needs-you"'));
+    expect(service, contains('Tiles = "tiles"'));
+    expect(HomeSectionIds.normalize(['tiles', 'tiles', 'nope', 3]), [
+      'tiles',
+      ...HomeSectionIds.defaults.where((s) => s != 'tiles'),
+    ]);
+  });
+
+  test('app tile ids are the ones the server builds for connected apps', () {
+    // HomeLayoutTests checks the same strings on the server.
+    expect(appTileId('srv1', 'Notion ~ Work'), 'app:srv1~Notion%20%7E%20Work');
+    expect(appTileId('s', 'Café!(1)'), 'app:s~Caf%C3%A9!(1)');
   });
 
   group('account sync', () {
@@ -239,6 +272,47 @@ void main() {
       await _settle();
       final put = http.sent('PUT', _path).single.body! as Map;
       expect(put['hiddenCards'], ['evening']);
+    });
+
+    test('the section order comes from the account, moves with undo and '
+        'is sent with the tiles', () async {
+      http.on('GET', _path, {
+        ..._remote(
+          tiles: const [
+            ['tasks', 'wide'],
+          ],
+          revision: 2,
+        ),
+        'sections': ['tiles', 'needs-you'],
+      });
+      await controller.sync();
+      expect(controller.sections.take(2), ['tiles', 'needs-you']);
+      expect(controller.sections, hasLength(7));
+
+      controller.beginEdit();
+      controller.moveSection(0, 6);
+      expect(controller.sections.last, 'tiles');
+      controller.undo();
+      expect(controller.sections.first, 'tiles');
+      controller.moveSection(1, 0);
+      http.on(
+        'PUT',
+        _path,
+        _remote(
+          tiles: const [
+            ['tasks', 'wide'],
+          ],
+          revision: 3,
+        ),
+      );
+      controller.commitEdit();
+      await _settle();
+      final put = http.sent('PUT', _path).last.body! as Map;
+      expect((put['sections'] as List).take(2), ['needs-you', 'tiles']);
+
+      final again = TileLayoutController.device();
+      await again.open();
+      expect(again.sections.take(2), ['needs-you', 'tiles']);
     });
 
     test('Cancel brings hidden cards back too', () {

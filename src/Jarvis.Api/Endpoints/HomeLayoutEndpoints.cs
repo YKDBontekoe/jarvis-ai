@@ -5,7 +5,10 @@ namespace Jarvis.Api.Endpoints;
 
 public sealed record HomeLayoutTileRequest(string? Id, string? Size);
 
-public sealed record HomeLayoutRequest(IReadOnlyList<HomeLayoutTileRequest>? Tiles, IReadOnlyList<string>? HiddenCards);
+public sealed record HomeLayoutRequest(
+    IReadOnlyList<HomeLayoutTileRequest>? Tiles,
+    IReadOnlyList<string>? HiddenCards,
+    IReadOnlyList<string>? Sections = null);
 
 /// <summary>
 /// The owner's Home (tiles in order with their sizes, and the cards they put away), shared by every device and by
@@ -25,7 +28,7 @@ internal static class HomeLayoutEndpoints
         {
             if (request.Tiles is null) return Results.BadRequest(new { error = "tiles is required." });
             var tiles = request.Tiles.Select(t => new HomeLayoutTile(t?.Id ?? "", t?.Size ?? "")).ToList();
-            return Result(await layouts.SaveFromAppAsync(user.OwnerId, tiles, request.HiddenCards, ct));
+            return Result(await layouts.SaveFromAppAsync(user.OwnerId, tiles, request.HiddenCards, ct, request.Sections));
         }).WithName("SaveHomeLayout");
 
         group.MapPost("/undo", async (IHomeLayoutService layouts, ICurrentUser user, CancellationToken ct) =>

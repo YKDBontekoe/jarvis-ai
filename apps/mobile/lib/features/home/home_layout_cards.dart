@@ -111,18 +111,26 @@ class JarvisHomeChangeCard extends StatelessWidget {
   }
 }
 
-/// In Customize Home: a switch per card above the tiles, and a way to let
-/// Jarvis arrange Home from what it knows.
+/// In Customize Home: Home's sections in order, dragged to reorder, with a
+/// switch on each card that can be put away; the Ask suggestions switch; and a
+/// way to let Jarvis arrange Home from what it knows.
 class HomeCardsEditor extends StatelessWidget {
   const HomeCardsEditor({
+    required this.sections,
     required this.isShown,
     required this.onChanged,
+    required this.onMove,
     this.onAskJarvis,
     super.key,
   });
 
+  /// Home's sections top to bottom ([HomeSectionIds]).
+  final List<String> sections;
   final bool Function(String card) isShown;
   final void Function(String card, bool visible) onChanged;
+
+  /// Moves the section at `from` to `to`, both in [sections].
+  final void Function(int from, int to) onMove;
 
   /// Ends editing and asks Jarvis for a layout; null while chat is busy.
   final VoidCallback? onAskJarvis;
@@ -130,47 +138,126 @@ class HomeCardsEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = JarvisColors.of(context);
+    final title = TextStyle(
+      fontFamily: 'Geist',
+      fontSize: 15.5,
+      fontWeight: FontWeight.w600,
+      color: colors.ink,
+    );
+    final note = TextStyle(fontSize: 12.5, color: colors.inkSoft);
+
+    Widget row(int index, String id) {
+      final hideable = HomeCardIds.all.containsKey(id);
+      final name = HomeSectionIds.names[id] ?? id;
+      return Material(
+        key: ValueKey('home-section-$id'),
+        color: colors.surface,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (index > 0)
+              Divider(height: 1, indent: 18, color: colors.outline),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 56),
+              child: Row(
+                children: [
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Semantics(
+                      label: 'Drag to move $name',
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: Icon(
+                          PhosphorIconsRegular.list,
+                          size: 18,
+                          color: colors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, style: title),
+                          if (!hideable)
+                            Text(
+                              id == HomeSectionIds.tiles
+                                  ? 'Your tiles'
+                                  : 'Always shows',
+                              style: note,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (hideable)
+                    Switch(
+                      key: Key('home-card-$id'),
+                      value: isShown(id),
+                      onChanged: (visible) {
+                        HapticFeedback.selectionClick();
+                        onChanged(id, visible);
+                      },
+                    ),
+                  const SizedBox(width: 12),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       key: const Key('home-cards-editor'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const GroupLabel('Cards on Home'),
+        const GroupLabel('Order and cards'),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(tileRadius),
+          child: ReorderableListView(
+            key: const Key('home-sections'),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            onReorderStart: (_) => HapticFeedback.mediumImpact(),
+            onReorderItem: (from, to) {
+              HapticFeedback.selectionClick();
+              onMove(from, to);
+            },
+            children: [
+              for (final (index, id) in sections.indexed) row(index, id),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         Material(
           color: colors.surface,
           borderRadius: BorderRadius.circular(tileRadius),
           clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              for (final (index, entry) in HomeCardIds.all.entries.indexed) ...[
-                if (index > 0)
-                  Divider(height: 1, indent: 18, color: colors.outline),
-                SwitchListTile(
-                  key: Key('home-card-${entry.key}'),
-                  value: isShown(entry.key),
-                  onChanged: (visible) {
-                    HapticFeedback.selectionClick();
-                    onChanged(entry.key, visible);
-                  },
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 18),
-                  title: Text(
-                    entry.value,
-                    style: TextStyle(
-                      fontFamily: 'Geist',
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w600,
-                      color: colors.ink,
-                    ),
-                  ),
-                ),
-              ],
-            ],
+          child: SwitchListTile(
+            key: const Key('home-card-${HomeCardIds.suggestions}'),
+            value: isShown(HomeCardIds.suggestions),
+            onChanged: (visible) {
+              HapticFeedback.selectionClick();
+              onChanged(HomeCardIds.suggestions, visible);
+            },
+            contentPadding: const EdgeInsets.symmetric(horizontal: 18),
+            title: Text(
+              HomeCardIds.all[HomeCardIds.suggestions]!,
+              style: title,
+            ),
           ),
         ),
         Padding(
           padding: const EdgeInsets.only(top: 8, left: 4, right: 4),
           child: Text(
-            'Needs you and the next thing on your day always show.',
-            style: TextStyle(fontSize: 12.5, color: colors.inkSoft),
+            'Drag a row by its handle to change the order. The greeting and the Ask bar stay on top.',
+            style: note,
           ),
         ),
         if (onAskJarvis != null) ...[
@@ -187,8 +274,8 @@ class HomeCardsEditor extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 8, left: 4, right: 4),
             child: Text(
-              'Or just say “put my habits first” or “hide the morning brief” in any chat.',
-              style: TextStyle(fontSize: 12.5, color: colors.inkSoft),
+              'Or just say “put my tiles first” or “hide the morning brief” in any chat.',
+              style: note,
             ),
           ),
         ],

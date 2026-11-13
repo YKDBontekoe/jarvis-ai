@@ -3,8 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jarvis_mobile/features/chats/chat_list.dart';
 import 'package:jarvis_mobile/features/home/home_layout_cards.dart';
 import 'package:jarvis_mobile/features/home/jarvis_home.dart';
+import 'package:jarvis_mobile/features/home/needs_you_card.dart';
 import 'package:jarvis_mobile/features/tiles/home_layout_sync.dart';
 import 'package:jarvis_mobile/features/tiles/tile_controller.dart';
+import 'package:jarvis_mobile/features/tiles/tile_grid.dart';
 import 'package:jarvis_mobile/features/tiles/tile_layout.dart';
 import 'package:jarvis_mobile/features/tiles/tile_models.dart';
 import 'package:jarvis_mobile/features/tiles/tile_visuals.dart';
@@ -534,6 +536,22 @@ void main() {
     expect(find.byKey(const Key('home-jarvis-change')), findsNothing);
     expect(layout.layout.map((p) => p.id), ['memory', 'tasks']);
     expect(http.sent('POST', '/api/v1/home/layout/undo'), hasLength(1));
+  });
+
+  testWidgets('sections follow the saved order, so the tiles can lead', (
+    tester,
+  ) async {
+    await show(tester);
+    double top(Finder f) => tester.getTopLeft(f.first).dy;
+    final grid = find.byType(TileGrid);
+    final needsYou = find.byType(NeedsYouCard);
+    expect(top(needsYou), lessThan(top(grid)));
+
+    layout.beginEdit();
+    layout.moveSection(layout.sections.indexOf(HomeSectionIds.tiles), 0);
+    layout.commitEdit();
+    await tester.pumpAndSettle();
+    expect(top(grid), lessThan(top(needsYou)));
   });
 
   testWidgets(
