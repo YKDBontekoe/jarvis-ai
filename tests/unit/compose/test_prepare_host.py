@@ -1,5 +1,6 @@
 """prepare-host.sh writes a production .env and Garage config that start on any host."""
 import os
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -31,6 +32,32 @@ class PrepareHostTests(unittest.TestCase):
             env, _ = self.prepare(Path(tmp))
         self.assertIn("AUTH_ALLOW_REGISTRATION=first", env)
         self.assertIn("JARVIS_DOMAIN=jarvis.example.org", env)
+
+    def test_existing_install_gets_a_private_cache_and_keeps_it_on_redeploy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env_file = root / ".env.production"
+            env_file.write_text("JARVIS_DOMAIN=existing.example.org\n")
+            env, _ = self.prepare(root)
+            cache = root / "data" / "mcp-cache"
+            self.assertIn(f"MCP_RUNNER_CACHE_DIR={cache}\n", env)
+            self.assertIn("JARVIS_DOMAIN=existing.example.org\n", env)
+            self.assertEqual(0o700, stat.S_IMODE(cache.stat().st_mode))
+            self.assertEqual((os.getuid(), os.getgid()), (cache.stat().st_uid, cache.stat().st_gid))
+            package = cache / "package-marker"
+            package.write_text("cached package")
+            self.prepare(root)
+            self.assertEqual("cached package", package.read_text())
+
+    def test_custom_cache_path_is_preserved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = root / "custom-cache"
+            (root / ".env.production").write_text(f"MCP_RUNNER_CACHE_DIR={cache}\n")
+            env, _ = self.prepare(root)
+            self.assertIn(f"MCP_RUNNER_CACHE_DIR={cache}\n", env)
+            self.assertEqual(0o700, stat.S_IMODE(cache.stat().st_mode))
+            self.assertFalse((root / "data" / "mcp-cache").exists())
 
 
 if __name__ == "__main__":

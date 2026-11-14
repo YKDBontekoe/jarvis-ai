@@ -143,6 +143,7 @@ chmod 700 "${DATA_DIR}"
 ensure_directory CODEX_HOME_DIR "${DATA_DIR}/codex-home"
 ensure_directory JARVIS_DATA_PROTECTION_KEYS_DIR "${DATA_DIR}/data-protection-keys"
 ensure_directory JARVIS_BACKUP_DIR "${DATA_DIR}/backups"
+ensure_directory MCP_RUNNER_CACHE_DIR "${DATA_DIR}/mcp-cache"
 
 ensure GARAGE_CONFIG_FILE "${DATA_DIR}/garage.toml"
 garage_config="$(env_get GARAGE_CONFIG_FILE)"
